@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { sair } from '@/lib/autenticacao'
 import type { Sessao } from '@/lib/sessao-servidor'
 
 type Props = {
@@ -42,8 +44,27 @@ const ROTULOS_PERFIL: Record<Sessao['perfil'], string> = {
  */
 export function BarraLateral({ nome, perfil, podeAdministrar }: Props) {
   const caminhoAtual = usePathname()
+  const roteador = useRouter()
+  const [saindo, setSaindo] = useState(false)
 
   const itens = podeAdministrar ? [...ITENS_BASE, ITEM_CONFIGURACOES] : ITENS_BASE
+
+  /**
+   * Encerra a sessão. Existe porque estas máquinas são compartilhadas: sem
+   * uma forma de sair, a sessão de quem usou antes continua aberta para quem
+   * senta depois.
+   *
+   * `replace` em vez de `push` para que o botão "voltar" do navegador não
+   * traga de volta a tela autenticada, e `refresh()` para descartar o que o
+   * servidor já tinha renderizado com a sessão antiga.
+   */
+  async function encerrarSessao() {
+    if (saindo) return
+    setSaindo(true)
+    await sair()
+    roteador.replace('/login')
+    roteador.refresh()
+  }
 
   return (
     <aside className="flex w-[224px] shrink-0 flex-col gap-[6px] border-r border-[var(--borda)] bg-[var(--superficie)] p-4 py-[22px]">
@@ -86,20 +107,31 @@ export function BarraLateral({ nome, perfil, podeAdministrar }: Props) {
         })}
       </nav>
 
-      <div className="mt-auto flex items-center gap-[10px] border-t border-[var(--borda)] px-2 pt-[10px]">
-        <span
-          aria-hidden
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
-          style={{ background: 'var(--marca)' }}
-        >
-          {(nome.charAt(0) || '?').toUpperCase()}
-        </span>
-        <div className="min-w-0">
-          <div className="truncate text-[12px] font-bold text-[var(--texto)]">{nome}</div>
-          <div className="truncate text-[10px] font-medium text-[var(--texto-3)]">
-            {ROTULOS_PERFIL[perfil]}
+      <div className="mt-auto border-t border-[var(--borda)] px-2 pt-[10px]">
+        <div className="flex items-center gap-[10px]">
+          <span
+            aria-hidden
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
+            style={{ background: 'var(--marca)' }}
+          >
+            {(nome.charAt(0) || '?').toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[12px] font-bold text-[var(--texto)]">{nome}</div>
+            <div className="truncate text-[10px] font-medium text-[var(--texto-3)]">
+              {ROTULOS_PERFIL[perfil]}
+            </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={encerrarSessao}
+          disabled={saindo}
+          className="mt-[8px] w-full rounded-[10px] border border-[var(--borda-forte)] px-3 py-[8px] text-left text-[12px] font-semibold text-[var(--texto-3)] enabled:cursor-pointer disabled:opacity-60"
+        >
+          {saindo ? 'Saindo…' : 'Sair'}
+        </button>
       </div>
     </aside>
   )
