@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { salvarPrograma } from '@/lib/acoes/programas'
 import { enviarImagemDePrograma } from '@/lib/acoes/imagens'
 import type { EstadoDoPrograma, Programa } from '@/lib/dominio/cadastro'
+import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
 
 const ROTULOS_ESTADO: Record<EstadoDoPrograma, string> = {
   ativo: 'Ativo',
@@ -59,27 +60,14 @@ function rascunhoInicial(programa: Programa | null): Rascunho {
     acoes_minimas: programa ? String(programa.acoes_minimas) : '1',
     acoes_maximas: programa ? String(programa.acoes_maximas) : '1',
     disponivel_para_proposta: programa?.disponivel_para_proposta ?? false,
-    custo_midia: programa?.custo_midia !== null && programa?.custo_midia !== undefined ? String(programa.custo_midia) : '',
-    custo_producao:
-      programa?.custo_producao !== null && programa?.custo_producao !== undefined ? String(programa.custo_producao) : '',
-    percentual_simulcast:
-      programa?.percentual_simulcast !== null && programa?.percentual_simulcast !== undefined
-        ? String(programa.percentual_simulcast)
-        : '',
-    custo_multishow:
-      programa?.custo_multishow !== null && programa?.custo_multishow !== undefined ? String(programa.custo_multishow) : '',
+    custo_midia: formatarMoeda(programa?.custo_midia),
+    custo_producao: formatarMoeda(programa?.custo_producao),
+    percentual_simulcast: formatarMoeda(programa?.percentual_simulcast),
+    custo_multishow: formatarMoeda(programa?.custo_multishow),
     possui_fluxo_aprovacao: programa?.possui_fluxo_aprovacao ?? false,
     contem_digital: programa?.contem_digital ?? false,
     redes_sociais: programa?.redes_sociais ?? false,
   }
-}
-
-/** Texto vazio vira `null`; texto preenchido vira número. Usado nos campos de custo. */
-function numeroOuNulo(texto: string): number | null {
-  const limpo = texto.trim()
-  if (limpo === '') return null
-  const valor = Number(limpo)
-  return Number.isNaN(valor) ? null : valor
 }
 
 /**
@@ -109,10 +97,10 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
     acoes_minimas: numeroOuIndefinido(rascunho.acoes_minimas),
     acoes_maximas: numeroOuIndefinido(rascunho.acoes_maximas),
     disponivel_para_proposta: rascunho.disponivel_para_proposta,
-    custo_midia: numeroOuNulo(rascunho.custo_midia),
-    custo_producao: numeroOuNulo(rascunho.custo_producao),
-    percentual_simulcast: numeroOuNulo(rascunho.percentual_simulcast),
-    custo_multishow: numeroOuNulo(rascunho.custo_multishow),
+    custo_midia: paraNumero(rascunho.custo_midia),
+    custo_producao: paraNumero(rascunho.custo_producao),
+    percentual_simulcast: paraNumero(rascunho.percentual_simulcast),
+    custo_multishow: paraNumero(rascunho.custo_multishow),
     possui_fluxo_aprovacao: rascunho.possui_fluxo_aprovacao,
     contem_digital: rascunho.contem_digital,
     redes_sociais: rascunho.redes_sociais,
@@ -232,14 +220,19 @@ function Campo({
   rotulo,
   valor,
   aoMudar,
+  aoSairDoFoco,
   tipo = 'text',
   placeholder,
+  ajuda,
 }: {
   rotulo: string
   valor: string
   aoMudar: (valor: string) => void
+  aoSairDoFoco?: () => void
   tipo?: 'text' | 'number'
   placeholder?: string
+  /** Linha curta de ajuda, em termos do negócio, exibida abaixo do campo. */
+  ajuda?: string
 }) {
   return (
     <label className="flex flex-col gap-1">
@@ -249,9 +242,37 @@ function Campo({
         value={valor}
         placeholder={placeholder}
         onChange={(evento) => aoMudar(evento.target.value)}
+        onBlur={aoSairDoFoco}
         className="h-[40px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[13.5px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
       />
+      {ajuda && <span className="text-[11.5px] text-[var(--texto-3)]">{ajuda}</span>}
     </label>
+  )
+}
+
+/**
+ * Campo de dinheiro: exibe e aceita o formato brasileiro (`8.300,00`). A
+ * pessoa pode digitar livremente (`8300`, `8.300`, `R$ 8.300,00`…); ao sair
+ * do campo, o valor é normalizado para o padrão brasileiro com duas casas.
+ * A conversão de verdade acontece no envio do formulário, com `paraNumero`.
+ */
+function CampoDeMoeda({
+  rotulo,
+  valor,
+  aoMudar,
+}: {
+  rotulo: string
+  valor: string
+  aoMudar: (valor: string) => void
+}) {
+  return (
+    <Campo
+      rotulo={rotulo}
+      valor={valor}
+      placeholder="0,00"
+      aoMudar={aoMudar}
+      aoSairDoFoco={() => aoMudar(formatarMoeda(paraNumero(valor)))}
+    />
   )
 }
 
@@ -476,12 +497,14 @@ function BlocoExibicao({
           tipo="number"
           valor={rascunho.slots}
           aoMudar={(valor) => mudar('slots', valor)}
+          ajuda="Quantas ações de conteúdo cabem num mesmo dia de exibição do programa."
         />
         <Campo
           rotulo="Prazo mínimo (dias)"
           tipo="number"
           valor={rascunho.prazo_minimo_dias}
           aoMudar={(valor) => mudar('prazo_minimo_dias', valor)}
+          ajuda="Com quantos dias de antecedência a venda precisa ser fechada antes da exibição."
         />
       </div>
     </fieldset>
@@ -498,18 +521,21 @@ function BlocoRegrasDeProposta({ rascunho, mudar }: PropsDoBloco) {
           tipo="number"
           valor={rascunho.bloqueio_mensal}
           aoMudar={(valor) => mudar('bloqueio_mensal', valor)}
+          ajuda="Quantas ações o programa aceita vender num mês antes de fechar para novas propostas."
         />
         <Campo
           rotulo="Ações mínimas"
           tipo="number"
           valor={rascunho.acoes_minimas}
           aoMudar={(valor) => mudar('acoes_minimas', valor)}
+          ajuda="O menor número de ações que uma mesma proposta pode conter."
         />
         <Campo
           rotulo="Ações máximas"
           tipo="number"
           valor={rascunho.acoes_maximas}
           aoMudar={(valor) => mudar('acoes_maximas', valor)}
+          ajuda="O maior número de ações que uma mesma proposta pode conter."
         />
       </div>
       <Marcador
@@ -527,27 +553,23 @@ function BlocoCustos({ rascunho, mudar }: PropsDoBloco) {
     <fieldset className="flex flex-col gap-3 border-t border-[var(--borda)] pt-5">
       <TituloDoBloco texto="Custos" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo
+        <CampoDeMoeda
           rotulo="Custo de mídia"
-          tipo="number"
           valor={rascunho.custo_midia}
           aoMudar={(valor) => mudar('custo_midia', valor)}
         />
-        <Campo
+        <CampoDeMoeda
           rotulo="Custo de produção"
-          tipo="number"
           valor={rascunho.custo_producao}
           aoMudar={(valor) => mudar('custo_producao', valor)}
         />
-        <Campo
+        <CampoDeMoeda
           rotulo="% simulcast"
-          tipo="number"
           valor={rascunho.percentual_simulcast}
           aoMudar={(valor) => mudar('percentual_simulcast', valor)}
         />
-        <Campo
+        <CampoDeMoeda
           rotulo="Custo Multishow"
-          tipo="number"
           valor={rascunho.custo_multishow}
           aoMudar={(valor) => mudar('custo_multishow', valor)}
         />
