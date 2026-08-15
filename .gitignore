@@ -21,6 +21,12 @@ supabase/seed-clientes.sql
 # entra no repositório.
 Database password*.txt
 
+# Exportações da API do Globo Take salvas pelo navegador para alimentar
+# `npm run importar -- --arquivo`. São dados comerciais (anunciante, marca,
+# custos de produção, elenco) e podem ter dezenas de MB. Ficam só na máquina.
+/vendas*.json
+/*-globotake*.json
+
 # Artefatos do Office e do OneDrive
 ~$*
 *.tmp
