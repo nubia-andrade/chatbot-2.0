@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { salvarPrograma } from '@/lib/acoes/programas'
+import { enviarImagemDePrograma } from '@/lib/acoes/imagens'
 import type { EstadoDoPrograma, Programa } from '@/lib/dominio/cadastro'
 
 const ROTULOS_ESTADO: Record<EstadoDoPrograma, string> = {
@@ -254,6 +255,116 @@ function Campo({
   )
 }
 
+/**
+ * Imagem do programa: envio de arquivo para o Supabase Storage, com o campo
+ * de URL preservado ao lado.
+ *
+ * Os dois caminhos coexistem de propósito. O upload é o que a spec pede —
+ * ninguém precisa hospedar imagem em outro lugar antes de cadastrar um
+ * programa. Colar URL continua valendo porque é o que já funcionava, porque
+ * parte das imagens já vive em CDN da casa, e porque é a saída quando o
+ * bucket ainda não foi criado no projeto.
+ *
+ * O que é gravado em `imagem_url` é sempre uma URL — o upload apenas produz
+ * uma.
+ */
+/**
+ * A URL só vira miniatura se for http(s) e não contiver aspas ou parênteses
+ * — caracteres que escapariam do `url("…")` e deixariam quem edita um
+ * programa injetar CSS na página de quem edita outro.
+ */
+function urlParaPreVisualizacao(valor: string): string | null {
+  const limpo = valor.trim()
+  if (!/^https?:\/\//i.test(limpo)) return null
+  if (/["'()\\]/.test(limpo)) return null
+  return limpo
+}
+
+function CampoDeImagem({ valor, aoMudar }: { valor: string; aoMudar: (valor: string) => void }) {
+  const entradaDeArquivo = useRef<HTMLInputElement>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  async function enviar(arquivo: File) {
+    setEnviando(true)
+    setErro(null)
+
+    const formulario = new FormData()
+    formulario.append('arquivo', arquivo)
+    const resultado = await enviarImagemDePrograma(formulario)
+
+    setEnviando(false)
+    if (entradaDeArquivo.current) entradaDeArquivo.current.value = ''
+
+    if (resultado.erro) {
+      setErro(resultado.erro)
+      return
+    }
+    if (resultado.url) aoMudar(resultado.url)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[12px] font-semibold text-[var(--texto-2)]">Imagem do programa</span>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          aria-hidden
+          className="h-[56px] w-[92px] shrink-0 rounded-[10px] border border-[var(--borda-forte)]"
+          style={{
+            background: urlParaPreVisualizacao(valor)
+              ? `center / cover no-repeat url("${urlParaPreVisualizacao(valor)}")`
+              : 'var(--superficie-suave)',
+          }}
+        />
+
+        <input
+          ref={entradaDeArquivo}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(evento) => {
+            const arquivo = evento.target.files?.[0]
+            if (arquivo) void enviar(arquivo)
+          }}
+        />
+
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={() => entradaDeArquivo.current?.click()}
+          className="h-[40px] rounded-[10px] border border-[var(--borda-forte)] px-4 text-[12.5px] font-bold text-[var(--roxo)] enabled:cursor-pointer disabled:opacity-60"
+        >
+          {enviando ? 'Enviando…' : valor.trim() ? 'Trocar imagem' : 'Enviar imagem'}
+        </button>
+
+        {valor.trim() !== '' && !enviando && (
+          <button
+            type="button"
+            onClick={() => aoMudar('')}
+            className="h-[40px] cursor-pointer px-1 text-[12.5px] font-semibold text-[var(--texto-3)]"
+          >
+            Remover
+          </button>
+        )}
+      </div>
+
+      {erro && (
+        <p role="alert" className="text-[12px] font-semibold" style={{ color: 'var(--concorrencia)' }}>
+          {erro}
+        </p>
+      )}
+
+      <Campo
+        rotulo="Ou cole a URL de uma imagem já hospedada"
+        valor={valor}
+        placeholder="https://…"
+        aoMudar={aoMudar}
+      />
+    </div>
+  )
+}
+
 function Marcador({
   rotulo,
   descricao,
@@ -318,12 +429,7 @@ function BlocoIdentificacao({ rascunho, mudar }: PropsDoBloco) {
           </select>
         </label>
         <div className="sm:col-span-2">
-          <Campo
-            rotulo="URL da imagem"
-            valor={rascunho.imagem_url}
-            placeholder="https://…"
-            aoMudar={(valor) => mudar('imagem_url', valor)}
-          />
+          <CampoDeImagem valor={rascunho.imagem_url} aoMudar={(valor) => mudar('imagem_url', valor)} />
         </div>
       </div>
     </fieldset>

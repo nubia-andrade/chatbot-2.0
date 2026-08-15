@@ -132,3 +132,38 @@ create policy "leitura autenticada" on clientes
 drop policy if exists "leitura autenticada" on acoes_vendidas;
 create policy "leitura autenticada" on acoes_vendidas
   for select to authenticated using (true);
+
+-- ---------------------------------------------------------------------------
+-- Storage: imagens dos programas
+-- ---------------------------------------------------------------------------
+-- Bucket público: a imagem do programa aparece na lista do cadastro e, nas
+-- próximas entregas, na proposta — não é dado sensível e não vale o custo de
+-- gerar URL assinada a cada exibição. Escrever, porém, continua restrito a
+-- administradores.
+--
+-- Se este trecho falhar por permissão no SQL Editor, dá para criar o bucket
+-- pelo painel (Storage > New bucket > nome `programas`, marcado como Public)
+-- — o README explica o passo a passo.
+insert into storage.buckets (id, name, public)
+values ('programas', 'programas', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "imagens de programa: leitura publica" on storage.objects;
+create policy "imagens de programa: leitura publica" on storage.objects
+  for select using (bucket_id = 'programas');
+
+drop policy if exists "imagens de programa: escrita administrador" on storage.objects;
+create policy "imagens de programa: escrita administrador" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'programas' and e_administrador());
+
+drop policy if exists "imagens de programa: substituicao administrador" on storage.objects;
+create policy "imagens de programa: substituicao administrador" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'programas' and e_administrador())
+  with check (bucket_id = 'programas' and e_administrador());
+
+drop policy if exists "imagens de programa: remocao administrador" on storage.objects;
+create policy "imagens de programa: remocao administrador" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'programas' and e_administrador());
