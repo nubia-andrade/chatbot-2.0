@@ -11,7 +11,27 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import * as XLSX from 'xlsx'
 
 function lerPlanilha(caminho) {
-  const livro = XLSX.read(readFileSync(caminho))
+  let conteudo
+  try {
+    conteudo = readFileSync(caminho)
+  } catch (erro) {
+    if (erro.code === 'ENOENT') {
+      // A pasta `dados/` não é versionada (contém CNPJ e e-mails nominais),
+      // então quem clona o repositório não a recebe. Sem esta mensagem o
+      // script morria com um ENOENT cru, sem dizer qual arquivo falta.
+      console.error(
+        `Não encontrei a planilha ${caminho}.\n` +
+          `Ela precisa estar em ${caminho} — a pasta dados/ fica na raiz do projeto e NÃO é\n` +
+          'versionada (contém CNPJ e e-mails nominais), por isso não vem junto com o\n' +
+          'repositório. Peça o arquivo a quem já o tem e coloque-o nesse caminho.\n' +
+          'Nenhum arquivo de seed foi gerado.',
+      )
+      process.exit(1)
+    }
+    console.error(`Não consegui ler a planilha ${caminho}: ${erro.message}`)
+    process.exit(1)
+  }
+  const livro = XLSX.read(conteudo)
   const aba = livro.Sheets[livro.SheetNames[0]]
   return XLSX.utils.sheet_to_json(aba, { defval: '' })
 }
