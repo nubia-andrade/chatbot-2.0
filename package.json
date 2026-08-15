@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:assistir": "vitest",
     "seed:gerar": "node scripts/gerar-seed.mjs",
-    "importar": "node --experimental-strip-types scripts/importar.mjs"
+    "importar": "node --experimental-strip-types --import ./scripts/registrar-resolvedor-ts.mjs scripts/importar.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
