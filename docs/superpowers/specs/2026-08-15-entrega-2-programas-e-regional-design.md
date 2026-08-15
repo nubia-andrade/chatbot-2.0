@@ -199,6 +199,60 @@ não alimenta o cálculo de disponibilidade e depende de definir a proposta em
 si, o que acontece na Entrega 4. A aba nasce visível e desabilitada, com a nota
 de quando chega — melhor do que aparecer sem aviso.
 
+## Experiência do usuário
+
+A área pediu a melhor experiência possível. Traduzido em decisões que valem
+para toda a entrega, e que a revisão deve cobrar:
+
+**Aproveitar o que o sistema já sabe.** O banco tem 15.519 clientes com setor e
+indústria. Nenhum campo que se refira a cliente, setor ou indústria pode ser
+texto livre: são campos de busca que completam a partir da carteira. Digitar
+"Ambev" à mão cria "AMBEV", "Ambev S/A" e "ambev" — três restrições que não se
+reconhecem. O mesmo vale para as praças e para os programas.
+
+**Sugerir a partir da API, decidir com gente.** Ao cadastrar uma ação regional,
+o sistema lê a `descritivo_da_acao` da entrega correspondente, propõe as praças
+que reconheceu ("Ação regional para SP1, RJ + BH" → SP, RJ e BH pré-marcadas) e
+deixa o consultor confirmar ou corrigir. Ele digita menos e a decisão continua
+sendo humana. O campo `origem` registra se veio de sugestão ou do zero.
+
+**Nunca perder trabalho digitado.** Formulário com alteração não salva avisa
+antes de sair da página. Erro de gravação devolve o formulário preenchido, com
+o foco no primeiro campo com problema — nunca uma tela em branco e um "erro ao
+salvar".
+
+**Todo estado tem forma.** Carregando, vazio, com erro e cheio são quatro telas
+diferentes, e as quatro precisam existir. O vazio explica o que fazer ("Nenhuma
+data bloqueada. Bloqueie datas em que o programa não aceita ação, como
+feriados") em vez de mostrar uma lista vazia sem contexto.
+
+**Toda ação dá retorno imediato.** Botão que grava fica desabilitado enquanto
+grava — se der para clicar duas vezes, alguém vai. Sucesso é confirmado
+visivelmente, não deduzido pelo silêncio.
+
+**Destruir exige confirmação nomeada.** Excluir programa pede que a pessoa
+digite o nome do programa. Não é fricção gratuita: é a única ação irreversível
+desta entrega, e leva junto datas bloqueadas, restrições, preços e ações
+regionais.
+
+**Mostrar a consequência, não só o dado.** A aba Regional não lista apenas
+preços: mostra o valor total de uma ação nas praças selecionadas, somando
+direitos e conexos e produção — que é a pergunta que o consultor realmente tem.
+Datas bloqueadas mostram quantas ações seriam afetadas antes de confirmar.
+
+**Calendário se mostra como calendário.** Datas bloqueadas e disponibilidade
+regional aparecem em grade mensal, com os mesmos estados coloridos do handoff,
+não como lista de datas. A informação é temporal; a forma acompanha.
+
+**Acessibilidade não é etapa final.** Todo campo tem rótulo associado, foco
+visível, e navegação por teclado funcional. Cor nunca é o único indicador de
+estado — sempre acompanhada de texto ou ícone. Contraste mínimo de 4.5:1 para
+texto, conforme WCAG AA.
+
+**Responsivo de verdade nas telas de consulta.** O executivo consulta
+disponibilidade fora da mesa. O cadastro pode ser desktop-first; a consulta,
+não.
+
 ## Segurança
 
 O RLS ganha uma função `e_consultor_de(programa_id)`, e as políticas de escrita
@@ -240,7 +294,13 @@ dias de prazo; É de Casa com 1 slot aos sábados e 10 dias.
 6. No Encontro, numa sexta com SP, RJ e BH vendidos, `DF` e `PE1` continuam
    disponíveis, e um quarto cliente não consegue comprar SP.
 7. Numa quinta-feira, o Encontro não oferece disponibilidade regional alguma.
-8. `npm test` passa; `npm run build` completa sem erro.
+8. Campos de cliente, setor e indústria completam a partir da carteira — não
+   aceitam texto livre.
+9. Sair de um formulário alterado sem salvar dispara aviso.
+10. Excluir programa exige digitar o nome do programa.
+11. Toda lista tem estado vazio com orientação, e todo botão de gravação fica
+    desabilitado durante a gravação.
+12. `npm test` passa; `npm run build` completa sem erro.
 
 ## Pendências para confirmar com a área
 
