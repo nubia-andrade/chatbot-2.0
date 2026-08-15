@@ -53,13 +53,19 @@ SQL Editor.
 1. **Aplicar o schema.** No painel do Supabase, `SQL Editor` > cole o conteúdo
    de `supabase/schema.sql` > `Run`. Cria as seis tabelas, o RLS, o bucket de
    imagens e as policies. Pode ser rodado de novo a qualquer momento.
-2. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
+2. **Aplicar a Entrega 2.** Ainda no `SQL Editor`, cole o conteúdo de
+   `supabase/schema-entrega-2.sql` > `Run`. Roda depois do `schema.sql`: torna
+   os perfis acumuláveis, cria `usuario` e as tabelas da área regional
+   (`pracas`, `preco_regional`, `acoes_regionais`, `datas_bloqueadas`,
+   `restricoes_anunciante`, `consultor_programa`) e as colunas novas de
+   `programas`. Também pode ser rodado de novo a qualquer momento.
+4. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
    planilhas em `dados/`) e aplique no SQL Editor, nesta ordem,
    `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql`. São 73
    formatos e ~15,5 mil clientes.
-3. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
+5. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
    `Create new user`. Informe e-mail e senha e marque **Auto Confirm User**.
-4. **Tornar esse usuário administrador.** Na raiz do projeto:
+6. **Tornar esse usuário administrador.** Na raiz do projeto:
 
    ```bash
    npm run admin -- pessoa@empresa.com
@@ -68,8 +74,8 @@ SQL Editor.
    Sem este passo ninguém enxerga Configurações: `perfil_usuario` nasce vazia
    e todo mundo cai no perfil `executivo`, que não administra nada. O script
    não cria contas — se o e-mail não existir, ele diz isso e manda voltar ao
-   passo 3. Repita o comando para cada pessoa que precisar administrar.
-5. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
+   passo 5. Repita o comando para cada pessoa que precisar administrar.
+7. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
    login em vez de JSON, veja "Importar sem o comando de linha" abaixo — é o
    caminho normal, não um sinal de erro. Depois de importar,
    `Configurações > Importação` mostra a data do snapshot e o que veio.
