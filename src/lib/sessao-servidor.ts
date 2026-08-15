@@ -1,10 +1,14 @@
 import { criarClienteServidor } from './supabase/cliente-servidor'
+import { listarProgramasVinculados } from './dados/vinculos'
+import { podeAdministrarProgramas, type Perfil } from './dominio/perfis'
 
 export type Sessao = {
   usuarioId: string
   email: string
   nome: string
-  perfil: 'executivo' | 'admin_programa' | 'admin_geral'
+  cargo: string | null
+  perfis: Perfil[]
+  programasVinculados: string[]
 }
 
 /**
@@ -14,30 +18,40 @@ export type Sessao = {
  * servidor do Supabase, enquanto `getSession()` confia no cookie, que o
  * navegador pode ter adulterado.
  *
- * Devolve null para quem não está autenticado. Sem cadastro em
+ * Devolve null para quem não está autenticado. Sem cadastro em `usuario` ou
  * `perfil_usuario` a pessoa ainda é considerada logada (autenticação e
- * autorização são passos distintos), com o perfil mais restrito por padrão.
+ * autorização são passos distintos), com o perfil mais restrito por
+ * padrão — nunca o mais permissivo.
  */
 export async function obterSessao(): Promise<Sessao | null> {
   const supabase = await criarClienteServidor()
   const { data } = await supabase.auth.getUser()
-  const usuario = data.user
-  if (!usuario) return null
+  const usuarioAutenticado = data.user
+  if (!usuarioAutenticado) return null
 
-  const { data: perfil } = await supabase
-    .from('perfil_usuario')
-    .select('nome, perfil')
-    .eq('usuario_id', usuario.id)
-    .maybeSingle()
+  const [{ data: usuario }, { data: linhasDePerfil }] = await Promise.all([
+    supabase
+      .from('usuario')
+      .select('nome, cargo')
+      .eq('usuario_id', usuarioAutenticado.id)
+      .maybeSingle(),
+    supabase.from('perfil_usuario').select('perfil').eq('usuario_id', usuarioAutenticado.id),
+  ])
+
+  const perfis = (linhasDePerfil ?? []).map((linha) => linha.perfil as Perfil)
+  const programasVinculados = await listarProgramasVinculados(usuarioAutenticado.id)
 
   return {
-    usuarioId: usuario.id,
-    email: usuario.email ?? '',
-    nome: perfil?.nome ?? usuario.email ?? '',
-    perfil: (perfil?.perfil ?? 'executivo') as Sessao['perfil'],
+    usuarioId: usuarioAutenticado.id,
+    email: usuarioAutenticado.email ?? '',
+    nome: usuario?.nome ?? usuarioAutenticado.email ?? '',
+    cargo: usuario?.cargo ?? null,
+    perfis: perfis.length > 0 ? perfis : ['executivo'],
+    programasVinculados,
   }
 }
 
 export function podeAdministrar(sessao: Sessao | null): boolean {
-  return sessao?.perfil === 'admin_programa' || sessao?.perfil === 'admin_geral'
+  if (!sessao) return false
+  return podeAdministrarProgramas(sessao.perfis)
 }

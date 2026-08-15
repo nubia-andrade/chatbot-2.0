@@ -32,7 +32,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-[var(--canvas)]">
       <BarraLateral
         nome={sessao.nome}
-        perfil={sessao.perfil}
+        perfis={sessao.perfis}
         podeAdministrar={podeAdministrar(sessao)}
       />
       <main className="flex-1 overflow-auto p-10">{children}</main>

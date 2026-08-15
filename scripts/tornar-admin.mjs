@@ -1,5 +1,6 @@
-// Promove uma conta já existente no Supabase Auth a administrador geral.
-// Uso: npm run admin -- pessoa@empresa.com
+// Acrescenta um perfil a uma conta já existente no Supabase Auth.
+// Uso: npm run admin -- pessoa@empresa.com [perfil]
+// Perfil padrão: proprietario
 //
 // Por que este script existe: `perfil_usuario` nasce vazia e só tem policy
 // de select, então nada dentro do aplicativo cria a primeira linha. Sem ele,
@@ -7,20 +8,36 @@
 // `src/lib/sessao-servidor.ts`), ninguém vê Configurações, e as telas desta
 // entrega ficam inacessíveis para sempre.
 //
+// Perfis se acumulam: rodar de novo com outro perfil ACRESCENTA uma linha em
+// `perfil_usuario`, sem apagar as que já existem — uma pessoa pode ser, por
+// exemplo, `proprietario` e `executivo_regional` ao mesmo tempo.
+//
 // Roda na máquina do administrador e usa a SUPABASE_SERVICE_ROLE_KEY, que
 // ignora o RLS — por isso é um comando de linha de comando, nunca código de
 // página ou componente.
 import { createClient } from '@supabase/supabase-js'
 import { lerCredenciaisDeServico, encerrarComErro } from './ambiente.mjs'
 
-const PERFIL = 'admin_geral'
+const PERFIS_VALIDOS = ['executivo', 'executivo_regional', 'consultor_programa', 'proprietario']
+const PERFIL_PADRAO = 'proprietario'
 const USUARIOS_POR_PAGINA = 1000
 
 const email = (process.argv[2] ?? '').trim().toLowerCase()
+const perfil = (process.argv[3] ?? PERFIL_PADRAO).trim().toLowerCase()
 
 if (email === '') {
   encerrarComErro(
-    'Falta o e-mail.\n' + 'Uso: npm run admin -- pessoa@empresa.com',
+    'Falta o e-mail.\n' +
+      'Uso: npm run admin -- pessoa@empresa.com [perfil]\n' +
+      `Perfis válidos: ${PERFIS_VALIDOS.join(', ')} (padrão: ${PERFIL_PADRAO}).`,
+  )
+}
+
+if (!PERFIS_VALIDOS.includes(perfil)) {
+  encerrarComErro(
+    `Perfil inválido: "${perfil}".\n` +
+      `Perfis válidos: ${PERFIS_VALIDOS.join(', ')}.\n` +
+      'Uso: npm run admin -- pessoa@empresa.com [perfil]',
   )
 }
 
@@ -59,9 +76,9 @@ async function encontrarUsuario(emailProcurado) {
   }
 }
 
-const usuario = await encontrarUsuario(email)
+const usuarioAuth = await encontrarUsuario(email)
 
-if (!usuario) {
+if (!usuarioAuth) {
   encerrarComErro(
     `Não existe nenhuma conta com o e-mail ${email} neste projeto do Supabase.\n\n` +
       'Este comando só promove quem já tem conta — ele não cria contas.\n' +
@@ -74,40 +91,67 @@ if (!usuario) {
   )
 }
 
-// `nome` é obrigatório em `perfil_usuario`. Numa promoção de quem já tem
-// linha, o nome cadastrado é preservado; numa criação, usa o que o Auth
-// souber e, na falta, a parte do e-mail antes do @ — melhor que gravar
-// vazio, e a pessoa pode ajustar depois.
-const { data: perfilExistente } = await supabase
-  .from('perfil_usuario')
-  .select('nome, perfil')
-  .eq('usuario_id', usuario.id)
+// `nome` é obrigatório em `usuario`. Numa promoção de quem já tem linha, o
+// nome cadastrado é preservado; numa criação, usa o que o Auth souber e, na
+// falta, a parte do e-mail antes do @ — melhor que gravar vazio, e a pessoa
+// pode ajustar depois.
+const { data: usuarioExistente } = await supabase
+  .from('usuario')
+  .select('nome, cargo')
+  .eq('usuario_id', usuarioAuth.id)
   .maybeSingle()
 
-const nomeDosMetadados = usuario.user_metadata?.nome ?? usuario.user_metadata?.full_name ?? ''
-const nome = perfilExistente?.nome || nomeDosMetadados || email.split('@')[0]
+const nomeDosMetadados = usuarioAuth.user_metadata?.nome ?? usuarioAuth.user_metadata?.full_name ?? ''
+const nome = usuarioExistente?.nome || nomeDosMetadados || email.split('@')[0]
 
-const { error: erroAoGravar } = await supabase
-  .from('perfil_usuario')
-  .upsert({ usuario_id: usuario.id, nome, perfil: PERFIL }, { onConflict: 'usuario_id' })
+const { error: erroAoGravarUsuario } = await supabase
+  .from('usuario')
+  .upsert({ usuario_id: usuarioAuth.id, nome }, { onConflict: 'usuario_id' })
 
-if (erroAoGravar) {
+if (erroAoGravarUsuario) {
   encerrarComErro(
-    'Não consegui gravar o perfil: ' +
-      erroAoGravar.message +
-      '\nSe a mensagem falar em relação inexistente, aplique antes o supabase/schema.sql ' +
+    'Não consegui gravar o usuário: ' +
+      erroAoGravarUsuario.message +
+      '\nSe a mensagem falar em relação inexistente, aplique antes o supabase/schema-entrega-2.sql ' +
       'no SQL Editor do Supabase.',
   )
 }
 
-if (perfilExistente) {
+const { data: perfisExistentes } = await supabase
+  .from('perfil_usuario')
+  .select('perfil')
+  .eq('usuario_id', usuarioAuth.id)
+
+const jaTinhaEssePerfil = (perfisExistentes ?? []).some((linha) => linha.perfil === perfil)
+
+if (!jaTinhaEssePerfil) {
+  const { error: erroAoGravarPerfil } = await supabase
+    .from('perfil_usuario')
+    .insert({ usuario_id: usuarioAuth.id, perfil })
+
+  if (erroAoGravarPerfil) {
+    encerrarComErro(
+      'Não consegui gravar o perfil: ' +
+        erroAoGravarPerfil.message +
+        '\nSe a mensagem falar em relação inexistente, aplique antes o supabase/schema-entrega-2.sql ' +
+        'no SQL Editor do Supabase.',
+    )
+  }
+}
+
+const todosOsPerfis = [
+  ...new Set([...(perfisExistentes ?? []).map((linha) => linha.perfil), perfil]),
+]
+
+if (jaTinhaEssePerfil) {
   console.log(
-    `Perfil de ${email} atualizado de "${perfilExistente.perfil}" para "${PERFIL}".\n` +
-      'Se a pessoa já estiver com o app aberto, ela precisa recarregar a página.',
+    `${email} já tinha o perfil "${perfil}". Nada mudou.\n` +
+      `Perfis atuais: ${todosOsPerfis.join(', ')}.`,
   )
 } else {
   console.log(
-    `Perfil criado para ${email} como "${PERFIL}" (nome: ${nome}).\n` +
-      'Ela já pode entrar no app e ver o menu Configurações.',
+    `Perfil "${perfil}" acrescentado a ${email} (nome: ${nome}).\n` +
+      `Perfis atuais: ${todosOsPerfis.join(', ')}.\n` +
+      'Se a pessoa já estiver com o app aberto, ela precisa recarregar a página.',
   )
 }

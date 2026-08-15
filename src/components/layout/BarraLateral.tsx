@@ -4,18 +4,18 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { sair } from '@/lib/autenticacao'
-import type { Sessao } from '@/lib/sessao-servidor'
+import type { Perfil } from '@/lib/dominio/perfis'
 
 type Props = {
   nome: string
-  perfil: Sessao['perfil']
+  perfis: Perfil[]
   /**
-   * Já calculado no servidor (via `podeAdministrar` da Task 8) e recebido
+   * Já calculado no servidor (via `podeAdministrar` da Task 7) e recebido
    * pronto aqui. Esconder "Configurações" para quem não administra é só
    * conveniência de interface — quem protege de verdade o acesso aos dados
-   * de configuração é o RLS do banco (`supabase/schema.sql`). Uma pessoa
-   * sem permissão que force a URL não veria nada além do que a política do
-   * banco autorizar.
+   * de configuração é o RLS do banco (`supabase/schema-entrega-2.sql`). Uma
+   * pessoa sem permissão que force a URL não veria nada além do que a
+   * política do banco autorizar.
    */
   podeAdministrar: boolean
 }
@@ -31,10 +31,11 @@ const ITENS_BASE: ItemMenu[] = [
 
 const ITEM_CONFIGURACOES: ItemMenu = { href: '/configuracoes', rotulo: 'Configurações' }
 
-const ROTULOS_PERFIL: Record<Sessao['perfil'], string> = {
-  executivo: 'Executivo comercial',
-  admin_programa: 'Administrador de programa',
-  admin_geral: 'Administrador geral',
+const ROTULOS_PERFIL: Record<Perfil, string> = {
+  executivo: 'Executiva comercial',
+  executivo_regional: 'Regional',
+  consultor_programa: 'Consultora de programa',
+  proprietario: 'Proprietária',
 }
 
 /**
@@ -42,7 +43,7 @@ const ROTULOS_PERFIL: Record<Sessao['perfil'], string> = {
  *
  * 224px, fundo branco, itens de navegação e o rodapé com quem está logado.
  */
-export function BarraLateral({ nome, perfil, podeAdministrar }: Props) {
+export function BarraLateral({ nome, perfis, podeAdministrar }: Props) {
   const caminhoAtual = usePathname()
   const roteador = useRouter()
   const [saindo, setSaindo] = useState(false)
@@ -119,7 +120,7 @@ export function BarraLateral({ nome, perfil, podeAdministrar }: Props) {
           <div className="min-w-0">
             <div className="truncate text-[12px] font-bold text-[var(--texto)]">{nome}</div>
             <div className="truncate text-[10px] font-medium text-[var(--texto-3)]">
-              {ROTULOS_PERFIL[perfil]}
+              {perfis.map((p) => ROTULOS_PERFIL[p]).join(' · ')}
             </div>
           </div>
         </div>
