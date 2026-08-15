@@ -33,6 +33,7 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 | `npm run test:assistir` | Roda os testes em modo observador |
 | `npm run seed:gerar` | Gera `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql` a partir das planilhas em `dados/` (lê arquivo local; não fala com o Supabase) |
 | `npm run importar` | Busca as vendas na API do Globo Take e grava o snapshot em `acoes_vendidas` |
+| `npm run importar -- --arquivo caminho.json` | Mesma importação, lendo os registros de um arquivo salvo em vez de chamar a API — veja "Importar sem o comando de linha" |
 | `npm run admin -- <e-mail>` | Promove uma conta já existente a administrador geral |
 
 ## Configuração
@@ -68,9 +69,47 @@ SQL Editor.
    e todo mundo cai no perfil `executivo`, que não administra nada. O script
    não cria contas — se o e-mail não existir, ele diz isso e manda voltar ao
    passo 3. Repita o comando para cada pessoa que precisar administrar.
-5. **Importar as vendas.** `npm run importar`, numa máquina com sessão ativa
-   no SSO corporativo. Depois disso `Configurações > Importação` mostra a data
-   do snapshot e o que veio.
+5. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
+   login em vez de JSON, veja "Importar sem o comando de linha" abaixo — é o
+   caminho normal, não um sinal de erro. Depois de importar,
+   `Configurações > Importação` mostra a data do snapshot e o que veio.
+
+### Importar sem o comando de linha
+
+`npm run importar` chama a API do Globo Take direto do terminal. Isso só
+funciona se o SSO corporativo autenticar a chamada — e a sessão do SSO vive
+nos **cookies do navegador**; o Node não tem acesso a eles. Fazer login numa
+aba do navegador não resolve nada aqui: o problema não é a sessão ter
+expirado, é que o terminal nunca a vê. Quando isso acontece, o comando
+imprime essa explicação e para sem tocar no banco.
+
+O caminho que funciona: salvar a resposta da API pelo navegador (onde a
+sessão existe de verdade) e apontar o importador para o arquivo salvo.
+
+1. Com a sessão do SSO ativa, abra
+   `https://globotake.g.globo/api/v1/programsActionsPowerBi` no navegador.
+   A página mostra só o JSON da resposta.
+2. Salve com **Ctrl+S** (ou `Arquivo > Salvar como`), escolhendo o formato de
+   página que salva o texto puro (no Chrome/Edge, "Página da Web, somente
+   HTML" já grava o JSON puro; outros navegadores podem chamar de "Texto" ou
+   "Todos os arquivos"). Dê à extensão do arquivo `.json`, ex.:
+   `resposta-globotake.json`.
+3. Rode a importação apontando para o arquivo:
+
+   ```bash
+   npm run importar -- --arquivo caminho/para/resposta-globotake.json
+   ```
+
+Daí em diante o fluxo é idêntico ao da API: os mesmos filtros de data, a
+mesma projeção de colunas, a mesma trava contra números de entrega
+duplicados, a mesma leitura paginada e o mesmo upsert com remoção-por-
+diferença. Só a origem dos dados muda — nada no cálculo de disponibilidade é
+diferente entre os dois caminhos.
+
+Aceita tanto um array puro (`[...]`) quanto um envelope
+(`{"data": [...]}` ou `{"results": [...]}`), do mesmo jeito que a leitura da
+API já aceita. Se o arquivo não existir ou não for um JSON válido, o comando
+avisa exatamente qual arquivo e qual foi o problema, sem alterar o banco.
 
 ### Imagens dos programas
 

@@ -11,7 +11,7 @@
     "test:assistir": "vitest",
     "seed:gerar": "node scripts/gerar-seed.mjs",
     "admin": "node scripts/tornar-admin.mjs",
-    "importar": "node --experimental-strip-types --import ./scripts/registrar-resolvedor-ts.mjs scripts/importar.mjs"
+    "importar": "node --no-warnings --experimental-strip-types --import ./scripts/registrar-resolvedor-ts.mjs scripts/importar.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

@@ -1,6 +1,17 @@
-// Busca a API do Globo Take e substitui o snapshot em acoes_vendidas.
-// Roda na máquina do administrador, onde o SSO corporativo funciona.
-// Uso: npm run importar
+// Busca a API do Globo Take (ou lê um arquivo já salvo) e substitui o
+// snapshot em acoes_vendidas.
+//
+// Modo normal: roda na máquina do administrador, onde o SSO corporativo
+// funciona no NAVEGADOR. Uso: npm run importar
+//
+// Modo arquivo: quando o SSO não coopera com o Node (ver mensagem de erro
+// abaixo para o motivo), a pessoa salva a resposta da API pelo navegador e
+// aponta este script para o arquivo. Uso: npm run importar -- --arquivo caminho/para/resposta.json
+//
+// Da leitura em diante — filtro de data, projeção, trava de duplicatas,
+// paginação, upsert com remoção-por-diferença — o fluxo é idêntico
+// independente da origem dos dados; só `obterRegistros` muda de caminho.
+import { readFileSync, existsSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 import { deveImportar, projetar, formatosNovos } from '../src/lib/dominio/ingestao.ts'
 import { montarMapa } from '../src/lib/dominio/formatos.ts'
@@ -13,44 +24,112 @@ const TAMANHO_DO_LOTE = 500
 const { url, chaveDeServico } = lerCredenciaisDeServico()
 const supabase = createClient(url, chaveDeServico)
 
-let resposta
-try {
-  resposta = await fetch(API)
-} catch (erroDeRede) {
-  encerrarComErro(
-    'Não consegui alcançar ' +
-      API +
-      ' (' +
-      erroDeRede.message +
-      ').\n' +
-      'Confira a conexão com a rede corporativa e tente de novo. Nada foi alterado no banco.',
-  )
+/**
+ * Extrai o valor passado depois de `--arquivo` na linha de comando.
+ * `npm run importar -- --arquivo caminho.json` → argv chega com
+ * `['--arquivo', 'caminho.json']` depois dos dois primeiros (node, script).
+ */
+function lerArgumentoArquivo(argv) {
+  const indice = argv.indexOf('--arquivo')
+  if (indice === -1) return null
+  const caminho = argv[indice + 1]
+  if (!caminho) {
+    encerrarComErro('Faltou o caminho depois de --arquivo. Uso: npm run importar -- --arquivo caminho/para/resposta.json')
+  }
+  return caminho
 }
 
-const corpo = await resposta.text()
-
-// A API responde HTTP 200 com a página de login quando não há sessão de SSO.
-if (corpo.trimStart().startsWith('<')) {
-  encerrarComErro(
-    'A API devolveu HTML em vez de JSON: você não está autenticado no SSO corporativo.\n' +
-      'Abra ' +
-      API +
-      ' no navegador, faça login, e rode este comando de novo.\nNada foi alterado no banco.',
-  )
+/** Aceita tanto um array puro quanto um envelope `{data: [...]}` ou `{results: [...]}`. */
+function extrairRegistros(brutos) {
+  return Array.isArray(brutos) ? brutos : (brutos.data ?? brutos.results ?? [])
 }
 
-let brutos
-try {
-  brutos = JSON.parse(corpo)
-} catch {
-  encerrarComErro(
-    'A API respondeu, mas o corpo não é JSON válido. Nada foi alterado no banco.\n' +
-      'Início da resposta: ' +
-      corpo.slice(0, 200),
-  )
+/** Lê os registros de um arquivo JSON salvo do navegador. */
+function obterRegistrosDeArquivo(caminho) {
+  if (!existsSync(caminho)) {
+    encerrarComErro(
+      `Não encontrei o arquivo "${caminho}".\n` +
+        'Confira o caminho, ou gere o arquivo salvando a resposta da API pelo navegador ' +
+        '(veja o passo a passo no README, seção "Importar sem o comando de linha").',
+    )
+  }
+
+  let corpo
+  try {
+    corpo = readFileSync(caminho, 'utf8')
+  } catch (erroDeLeitura) {
+    encerrarComErro(`Não consegui ler "${caminho}": ${erroDeLeitura.message}`)
+  }
+
+  let brutos
+  try {
+    brutos = JSON.parse(corpo)
+  } catch (erroDeParse) {
+    encerrarComErro(
+      `O arquivo "${caminho}" não é um JSON válido: ${erroDeParse.message}\n` +
+        'Confira se foi salvo com Ctrl+S a partir da página da API (que mostra só o JSON, sem HTML ao redor).',
+    )
+  }
+
+  return extrairRegistros(brutos)
 }
 
-const registros = Array.isArray(brutos) ? brutos : (brutos.data ?? brutos.results ?? [])
+/** Busca os registros na API do Globo Take, usando a sessão de SSO da máquina. */
+async function obterRegistrosDaApi() {
+  let resposta
+  try {
+    resposta = await fetch(API)
+  } catch (erroDeRede) {
+    encerrarComErro(
+      'Não consegui alcançar ' +
+        API +
+        ' (' +
+        erroDeRede.message +
+        ').\n' +
+        'Confira a conexão com a rede corporativa e tente de novo. Nada foi alterado no banco.',
+    )
+  }
+
+  const corpo = await resposta.text()
+
+  // A API responde HTTP 200 com a página de login quando não há sessão de SSO
+  // visível para ESTE comando. A sessão do SSO vive nos cookies do
+  // NAVEGADOR; o Node não tem acesso a eles e nunca vai ter só porque você
+  // fez login numa aba — fazer login de novo no navegador não resolve nada
+  // aqui. O caminho que funciona é salvar a resposta da API pelo navegador
+  // (onde a sessão existe) e importar a partir do arquivo:
+  if (corpo.trimStart().startsWith('<')) {
+    encerrarComErro(
+      'A API devolveu HTML em vez de JSON: este comando (rodando no terminal, via Node) não\n' +
+        'enxerga a sessão do SSO corporativo — ela fica guardada nos cookies do NAVEGADOR, e\n' +
+        'o Node não tem acesso a eles. Fazer login de novo na aba do navegador não resolve,\n' +
+        'porque o problema não é a sessão estar expirada: é que o terminal nunca a vê.\n\n' +
+        'O caminho que funciona hoje:\n' +
+        `  1. Abra ${API} no navegador, já logado.\n` +
+        '  2. Salve a página com Ctrl+S, formato "Página da Web, somente HTML" ou similar,\n' +
+        '     com extensão .json (o conteúdo já é só o JSON da resposta).\n' +
+        '  3. Rode: npm run importar -- --arquivo caminho/para/o-arquivo-salvo.json\n\n' +
+        'O passo a passo completo está no README, seção "Importar sem o comando de linha".\n' +
+        'Nada foi alterado no banco.',
+    )
+  }
+
+  let brutos
+  try {
+    brutos = JSON.parse(corpo)
+  } catch {
+    encerrarComErro(
+      'A API respondeu, mas o corpo não é JSON válido. Nada foi alterado no banco.\n' +
+        'Início da resposta: ' +
+        corpo.slice(0, 200),
+    )
+  }
+
+  return extrairRegistros(brutos)
+}
+
+const caminhoDoArquivo = lerArgumentoArquivo(process.argv.slice(2))
+const registros = caminhoDoArquivo ? obterRegistrosDeArquivo(caminhoDoArquivo) : await obterRegistrosDaApi()
 const hoje = new Date().toISOString().slice(0, 10)
 
 // Um único carimbo para a leva inteira: o painel usa MAX(importado_em) para
