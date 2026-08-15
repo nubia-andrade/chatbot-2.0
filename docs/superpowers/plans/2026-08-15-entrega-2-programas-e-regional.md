@@ -673,7 +673,7 @@ teste.
 - [ ] **Step 5: Rodar e ver passar**
 
 Run: `npm test`
-Expected: PASS — 73 + 15 = 88.
+Expected: PASS — 73 + 16 = 89 (15 do Step 1 mais 1 do Step 4).
 
 - [ ] **Step 6: Commitar**
 
@@ -805,7 +805,7 @@ export function dentroDoPrazoMinimo(
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `npm test`
-Expected: PASS — 88 + 10 = 98.
+Expected: PASS — 89 + 10 = 99.
 
 - [ ] **Step 5: Commitar**
 
@@ -993,7 +993,7 @@ export function concorrenteNaData(
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `npm test`
-Expected: PASS — 98 + 9 = 107.
+Expected: PASS — 99 + 9 = 108.
 
 - [ ] **Step 5: Commitar**
 
@@ -1116,7 +1116,7 @@ export function pracasNoTexto(texto: string | null | undefined): string[] {
 - [ ] **Step 4: Rodar e ver passar**
 
 Run: `npm test`
-Expected: PASS — 107 + 11 = 118.
+Expected: PASS — 108 + 11 = 119.
 
 - [ ] **Step 5: Conferir contra a base real**
 
@@ -1486,7 +1486,7 @@ git commit -m "feat: aba regional com precos por praca e matriz de disponibilida
 
 ## Verificação final da entrega
 
-1. `npm test` — todos passam (118 esperados).
+1. `npm test` — todos passam (119 esperados).
 2. `npm run build` e `npm run lint` sem erro.
 3. Uma pessoa com dois perfis vê o que os dois permitem.
 4. Consultor sem vínculo recebe "não encontrado" ao abrir o programa por URL.
