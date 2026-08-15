@@ -8,7 +8,9 @@ build/
 next-env.d.ts
 
 # Planilhas de trabalho: contêm CNPJ e e-mails nominais. Nunca versionar.
-dados/
+# Ancorada na raiz (`/dados/`) de propósito: sem a barra, a regra também
+# casaria `src/lib/dados/`, que é código-fonte, não planilha.
+/dados/
 
 # Seed gerado da carteira de clientes: contém CNPJ e e-mails nominais de
 # executivos. Nunca versionar — só o seed-formatos.sql (dado não sensível) vai

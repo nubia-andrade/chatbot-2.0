@@ -81,9 +81,16 @@ function numeroOuNulo(texto: string): number | null {
   return Number.isNaN(valor) ? null : valor
 }
 
-function numeroOuZero(texto: string): number {
-  const valor = Number(texto.trim())
-  return Number.isNaN(valor) ? 0 : valor
+/**
+ * Texto vazio vira `undefined` — "não informado", e não zero. É a
+ * validação de domínio (`validarPrograma`) quem decide o que fazer com um
+ * campo ausente (ex.: slots ausente vira o mesmo erro de slots zerado).
+ */
+function numeroOuIndefinido(texto: string): number | undefined {
+  const limpo = texto.trim()
+  if (limpo === '') return undefined
+  const valor = Number(limpo)
+  return Number.isNaN(valor) ? undefined : valor
 }
 
 function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Programa> {
@@ -95,11 +102,11 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
     canal: rascunho.canal,
     estado: rascunho.estado,
     dias_da_semana: rascunho.dias_da_semana,
-    slots: numeroOuZero(rascunho.slots),
-    prazo_minimo_dias: numeroOuZero(rascunho.prazo_minimo_dias),
-    bloqueio_mensal: numeroOuZero(rascunho.bloqueio_mensal),
-    acoes_minimas: numeroOuZero(rascunho.acoes_minimas),
-    acoes_maximas: numeroOuZero(rascunho.acoes_maximas),
+    slots: numeroOuIndefinido(rascunho.slots),
+    prazo_minimo_dias: numeroOuIndefinido(rascunho.prazo_minimo_dias),
+    bloqueio_mensal: numeroOuIndefinido(rascunho.bloqueio_mensal),
+    acoes_minimas: numeroOuIndefinido(rascunho.acoes_minimas),
+    acoes_maximas: numeroOuIndefinido(rascunho.acoes_maximas),
     disponivel_para_proposta: rascunho.disponivel_para_proposta,
     custo_midia: numeroOuNulo(rascunho.custo_midia),
     custo_producao: numeroOuNulo(rascunho.custo_producao),
