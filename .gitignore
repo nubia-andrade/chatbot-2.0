@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.env*.local
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Planilhas de trabalho: contêm CNPJ e e-mails nominais. Nunca versionar.
+dados/
+
+# Artefatos do Office e do OneDrive
+~$*
+*.tmp

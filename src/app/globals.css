@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  --marca: linear-gradient(135deg, #FF2D55 0%, #A031F5 52%, #2D6BFF 100%);
+  --tile-a: linear-gradient(160deg, #FFD23F, #FF5E3A);
+  --tile-b: linear-gradient(160deg, #12D8FA, #2D6BFF);
+  --tile-c: linear-gradient(160deg, #F857A6, #7A2FF2);
+
+  --roxo: #7A2FF2;
+  --roxo-hover: #5E22C4;
+  --texto: #1A1626;
+  --texto-2: #6B6577;
+  --texto-3: #8A8497;
+  --placeholder: #B4AEC0;
+
+  --canvas: #E7E5EE;
+  --superficie: #FFFFFF;
+  --superficie-suave: #FAF9FC;
+  --borda: #ECEAF1;
+  --borda-forte: #E2DFEA;
+
+  --disponivel: #16A34A;
+  --disponivel-fundo: #EAF7EF;
+  --concorrencia: #E11D48;
+  --concorrencia-fundo: #FDECEF;
+  --prazo: #F59E0B;
+  --prazo-fundo: #FEF4E6;
+  --reservado: #64748B;
+  --reservado-fundo: #EEF1F5;
+  --esgotado: #1E1B2E;
+  --esgotado-fundo: #E9E7EE;
+
+  --raio-janela: 16px;
+  --raio-card: 12px;
+  --raio-campo: 11px;
+  --sombra-janela: 0 18px 50px rgba(60, 30, 110, .14);
+  --sombra-botao: 0 12px 26px rgba(122, 47, 242, .3);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--texto);
+  font-family: var(--fonte-corpo), system-ui, sans-serif;
+}
