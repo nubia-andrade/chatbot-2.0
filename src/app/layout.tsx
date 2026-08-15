@@ -22,7 +22,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${tituloFonte.variable} ${corpoFonte.variable}`}>
-      <body>{children}</body>
+      {/*
+        suppressHydrationWarning apenas no <body>: extensões de navegador
+        (ColorZilla, Grammarly e afins) injetam atributos aqui depois que a
+        página carrega, e o React acusa diferença entre servidor e cliente por
+        algo que não é nosso. A supressão vale só para os atributos deste
+        elemento — qualquer diferença de verdade, dentro da árvore, continua
+        sendo reportada.
+      */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }
