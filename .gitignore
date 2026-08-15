@@ -17,6 +17,10 @@ next-env.d.ts
 # para o repositório.
 supabase/seed-clientes.sql
 
+# Anotações com senha do banco salvas na raiz do projeto. Segredo nenhum
+# entra no repositório.
+Database password*.txt
+
 # Artefatos do Office e do OneDrive
 ~$*
 *.tmp

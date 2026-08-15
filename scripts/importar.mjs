@@ -2,47 +2,16 @@
 // Roda na máquina do administrador, onde o SSO corporativo funciona.
 // Uso: npm run importar
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'node:fs'
 import { deveImportar, projetar, formatosNovos } from '../src/lib/dominio/ingestao.ts'
 import { montarMapa } from '../src/lib/dominio/formatos.ts'
+import { lerPaginado } from '../src/lib/dados/paginacao.ts'
+import { lerCredenciaisDeServico, encerrarComErro } from './ambiente.mjs'
 
 const API = 'https://globotake.g.globo/api/v1/programsActionsPowerBi'
 const TAMANHO_DO_LOTE = 500
 
-function lerEnv() {
-  let texto
-  try {
-    texto = readFileSync('.env.local', 'utf8')
-  } catch {
-    console.error(
-      'Não encontrei o arquivo .env.local na raiz do projeto.\n' +
-        'Copie .env.local.example para .env.local e preencha com as chaves do Supabase ' +
-        '(a SUPABASE_SERVICE_ROLE_KEY fica em Project Settings > API > service_role).',
-    )
-    process.exit(1)
-  }
-  const env = {}
-  for (const linha of texto.split('\n')) {
-    const par = linha.match(/^([A-Z_]+)=(.*)$/)
-    if (par) env[par[1]] = par[2].trim()
-  }
-  return env
-}
-
-function encerrarComErro(mensagem) {
-  console.error(mensagem)
-  process.exit(1)
-}
-
-const env = lerEnv()
-if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-  encerrarComErro(
-    'Faltam NEXT_PUBLIC_SUPABASE_URL e/ou SUPABASE_SERVICE_ROLE_KEY no .env.local.\n' +
-      'Preencha as duas chaves (Project Settings > API) antes de importar.',
-  )
-}
-
-const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+const { url, chaveDeServico } = lerCredenciaisDeServico()
+const supabase = createClient(url, chaveDeServico)
 
 let resposta
 try {
@@ -124,15 +93,73 @@ if (registros.length === 0) {
   encerrarComErro('A API devolveu zero registros. Parei antes de tocar no banco.')
 }
 
-const { data: formatosCadastrados, error: erroFormatos } = await supabase
-  .from('formatos')
-  .select('formato, categoria')
-if (erroFormatos) {
+// Trava de segurança: `numero_da_entrega` é a chave primária de
+// `acoes_vendidas`, o que assume que a origem nunca manda a mesma entrega em
+// duas linhas. A premissa se sustenta na amostra real (302 registros, 302
+// números distintos), mas a base completa é maior e ninguém garante isso.
+//
+// Se a premissa cair, o upsert erraria de duas formas ruins: colapsaria as
+// linhas repetidas numa só — ocupação ABAIXO da real, o pior erro possível
+// neste produto, porque faria o app anunciar espaço que já foi vendido — ou o
+// lote quebraria com "cannot affect row a second time", mensagem que não
+// explica nada a quem roda a importação.
+//
+// Por isso a checagem é aqui, em memória, ANTES de qualquer escrita: erro
+// visível e explicado é infinitamente melhor que ocupação silenciosamente
+// errada.
+const EXEMPLOS_DE_DUPLICATA = 5
+
+const porNumeroDeEntrega = new Map()
+for (const acao of aceitos) {
+  const iguais = porNumeroDeEntrega.get(acao.numero_da_entrega)
+  if (iguais) iguais.push(acao)
+  else porNumeroDeEntrega.set(acao.numero_da_entrega, [acao])
+}
+
+const duplicadas = [...porNumeroDeEntrega.entries()].filter(([, iguais]) => iguais.length > 1)
+
+if (duplicadas.length > 0) {
+  const exemplos = duplicadas
+    .slice(0, EXEMPLOS_DE_DUPLICATA)
+    .map(([numero, iguais]) => {
+      const linhas = iguais
+        .map(
+          (acao) =>
+            `      data ${acao.data_de_exibicao || '(sem data)'} · formato ` +
+            `${acao.formato || '(sem formato)'} · programa ${acao.programa || '(sem programa)'}`,
+        )
+        .join('\n')
+      return `  entrega ${numero} — ${iguais.length} linhas:\n${linhas}`
+    })
+    .join('\n')
+
   encerrarComErro(
-    'Não consegui ler a tabela de formatos para checar formatos novos: ' + erroFormatos.message,
+    '\nIMPORTAÇÃO CANCELADA: a API trouxe números de entrega repetidos.\n' +
+      `${duplicadas.length} número(s) de entrega aparecem em mais de uma linha desta leva.\n\n` +
+      'Exemplos:\n' +
+      exemplos +
+      (duplicadas.length > EXEMPLOS_DE_DUPLICATA
+        ? `\n  … e mais ${duplicadas.length - EXEMPLOS_DE_DUPLICATA} número(s).\n`
+        : '\n') +
+      '\nHoje `numero_da_entrega` é a chave primária de `acoes_vendidas`, ou seja, o\n' +
+      'banco só admite uma linha por entrega. Gravar assim colapsaria as linhas\n' +
+      'repetidas numa só e a ocupação calculada ficaria ABAIXO da real — o app\n' +
+      'anunciaria como livre espaço que já foi vendido.\n\n' +
+      'A chave primária precisa ser revista antes de importar (provavelmente\n' +
+      'passando a combinar entrega + data de exibição + formato, em\n' +
+      '`supabase/schema.sql`). Nada foi alterado no banco.',
   )
 }
-const mapa = montarMapa(formatosCadastrados ?? [])
+
+const { linhas: formatosCadastrados, erro: erroFormatos } = await lerPaginado((de, ate) =>
+  supabase.from('formatos').select('formato, categoria').range(de, ate),
+)
+if (erroFormatos) {
+  encerrarComErro(
+    'Não consegui ler a tabela de formatos para checar formatos novos: ' + erroFormatos,
+  )
+}
+const mapa = montarMapa(formatosCadastrados)
 const novos = formatosNovos(aceitos, mapa)
 
 // A partir daqui os dados já estão validados e completos em memória (`aceitos`).
@@ -140,11 +167,17 @@ const novos = formatosNovos(aceitos, mapa)
 // veio, depois apaga só o que saiu), nunca por "apagar tudo e inserir de
 // novo": se a inserção falhar no meio do caminho, o snapshot anterior
 // continua de pé em vez de a base ficar vazia.
-const { data: existentes, error: erroExistentes } = await supabase
-  .from('acoes_vendidas')
-  .select('numero_da_entrega')
+//
+// A leitura é PAGINADA de propósito. O PostgREST corta em 1000 linhas sem
+// avisar; um `select('numero_da_entrega')` solto enxergaria só as primeiras
+// mil entregas e toda venda cancelada além desse ponto jamais seria removida
+// — ficaria ocupando slot para sempre, e o app diria "esgotado" onde há
+// espaço livre.
+const { linhas: existentes, erro: erroExistentes } = await lerPaginado((de, ate) =>
+  supabase.from('acoes_vendidas').select('numero_da_entrega').range(de, ate),
+)
 if (erroExistentes) {
-  encerrarComErro('Não consegui ler o snapshot atual antes de importar: ' + erroExistentes.message)
+  encerrarComErro('Não consegui ler o snapshot atual antes de importar: ' + erroExistentes)
 }
 
 for (let i = 0; i < aceitos.length; i += TAMANHO_DO_LOTE) {
@@ -163,7 +196,7 @@ for (let i = 0; i < aceitos.length; i += TAMANHO_DO_LOTE) {
 }
 
 const idsNovos = new Set(aceitos.map((acao) => acao.numero_da_entrega))
-const idsParaRemover = (existentes ?? [])
+const idsParaRemover = existentes
   .map((linha) => linha.numero_da_entrega)
   .filter((id) => !idsNovos.has(id))
 
