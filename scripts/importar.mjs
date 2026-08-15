@@ -84,10 +84,28 @@ try {
 const registros = Array.isArray(brutos) ? brutos : (brutos.data ?? brutos.results ?? [])
 const hoje = new Date().toISOString().slice(0, 10)
 
+// Um único carimbo para a leva inteira: o painel usa MAX(importado_em) para
+// mostrar quando foi a última importação (src/lib/dados/importacao.ts), e
+// isso só funciona se todo registro desta rodada levar o mesmo instante —
+// gerar um `new Date()` por linha tornaria essa data quase arbitrária.
+const agora = new Date().toISOString()
+
 // Filtro e projeção usam a mesma lógica de domínio do aplicativo
 // (src/lib/dominio/ingestao.ts) — nada disso é reimplementado aqui, para que
 // o script e o app nunca divirjam sobre o que conta como ação futura.
-const aceitos = registros.filter((registro) => deveImportar(registro, hoje)).map(projetar)
+//
+// `projetar()` não carimba `importado_em` de propósito: essa coluna é sobre
+// quando o script rodou, não sobre os dados da API, então é responsabilidade
+// daqui, não da projeção de domínio (que é coberta por teste como projeção
+// pura das colunas vindas da origem). É setado explicitamente porque o
+// `default now()` do schema só se aplica a INSERT — num UPSERT sobre uma
+// entrega que já existia (o caso comum: quase tudo aqui é exibição futura,
+// logo já apareceu numa importação anterior), sem isso a coluna manteria o
+// timestamp antigo e o painel mostraria um snapshot velho como se fosse
+// recente.
+const aceitos = registros
+  .filter((registro) => deveImportar(registro, hoje))
+  .map((registro) => ({ ...projetar(registro), importado_em: agora }))
 
 // Trava de segurança: uma resposta vazia ou um filtro que zera tudo (bug na
 // API, na rede, ou aqui mesmo) não pode se transformar em "apagar a base

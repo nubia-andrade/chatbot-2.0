@@ -1,5 +1,5 @@
 import { criarClienteServidor } from '../supabase/cliente-servidor'
-import { formatosNovos, type AcaoImportada } from '../dominio/ingestao'
+import { formatosNovos } from '../dominio/ingestao'
 import { montarMapa } from '../dominio/formatos'
 
 export type ResumoDaImportacao = {
@@ -63,16 +63,7 @@ export async function resumoDaImportacao(): Promise<ResumoDaImportacao> {
     .sort((a, b) => a.programa.localeCompare(b.programa, 'pt-BR'))
 
   const mapa = montarMapa(formatosCadastrados ?? [])
-  const acoesParaChecarFormato: AcaoImportada[] = linhas.map((linha) => ({
-    numero_da_entrega: '',
-    programa: linha.programa,
-    data_de_exibicao: '',
-    anunciante: '',
-    marca: '',
-    formato: linha.formato ?? '',
-    tipo_da_entrega: '',
-    status_aprovacao: '',
-  }))
+  const acoesParaChecarFormato = linhas.map((linha) => ({ formato: linha.formato ?? '' }))
 
   return {
     importadoEm,

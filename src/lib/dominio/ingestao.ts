@@ -65,7 +65,10 @@ export function projetar(bruto: RegistroBruto): AcaoImportada {
  * Sem este alerta, um formato criado na origem entraria mudo, seria tratado
  * como ação de conteúdo por R2 e distorceria a ocupação sem ninguém perceber.
  */
-export function formatosNovos(acoes: AcaoImportada[], mapa: MapaDeFormatos): string[] {
+export function formatosNovos(
+  acoes: Pick<AcaoImportada, 'formato'>[],
+  mapa: MapaDeFormatos,
+): string[] {
   const novos = new Set<string>()
   for (const acao of acoes) {
     const chave = normalizarFormato(acao.formato)
