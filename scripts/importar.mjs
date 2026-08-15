@@ -25,18 +25,26 @@ const { url, chaveDeServico } = lerCredenciaisDeServico()
 const supabase = createClient(url, chaveDeServico)
 
 /**
- * Extrai o valor passado depois de `--arquivo` na linha de comando.
- * `npm run importar -- --arquivo caminho.json` → argv chega com
- * `['--arquivo', 'caminho.json']` depois dos dois primeiros (node, script).
+ * Descobre o arquivo de origem na linha de comando. Aceita as duas formas:
+ *
+ *   npm run importar -- vendas.json              (recomendada)
+ *   npm run importar -- --arquivo vendas.json
+ *
+ * A segunda existe por compatibilidade, mas é frágil: o npm trata `--arquivo`
+ * como configuração dele mesmo e não repassa a flag ao script — só o caminho
+ * chega aqui. Por isso qualquer argumento solto terminado em `.json` também
+ * vale como caminho.
  */
 function lerArgumentoArquivo(argv) {
   const indice = argv.indexOf('--arquivo')
-  if (indice === -1) return null
-  const caminho = argv[indice + 1]
-  if (!caminho) {
-    encerrarComErro('Faltou o caminho depois de --arquivo. Uso: npm run importar -- --arquivo caminho/para/resposta.json')
+  if (indice !== -1) {
+    const caminho = argv[indice + 1]
+    if (!caminho) {
+      encerrarComErro('Faltou o caminho depois de --arquivo. Uso: npm run importar -- caminho/para/resposta.json')
+    }
+    return caminho
   }
-  return caminho
+  return argv.find((argumento) => !argumento.startsWith('-') && argumento.endsWith('.json')) ?? null
 }
 
 /** Aceita tanto um array puro quanto um envelope `{data: [...]}` ou `{results: [...]}`. */
