@@ -59,7 +59,7 @@ SQL Editor.
    (`pracas`, `preco_regional`, `acoes_regionais`, `datas_bloqueadas`,
    `restricoes_anunciante`, `consultor_programa`) e as colunas novas de
    `programas`. Também pode ser rodado de novo a qualquer momento.
-4. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
+3. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
    planilhas em `dados/`) e aplique no SQL Editor, nesta ordem,
    `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql`. São 73
    formatos e ~15,5 mil clientes.

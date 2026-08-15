@@ -21,12 +21,15 @@ alter table perfil_usuario drop column if exists nome;
 alter table perfil_usuario drop column if exists cargo;
 alter table perfil_usuario
   drop constraint if exists perfil_usuario_perfil_check;
-alter table perfil_usuario add constraint perfil_usuario_perfil_check
-  check (perfil in ('executivo', 'executivo_regional', 'consultor_programa', 'proprietario'));
 
--- Perfis antigos viram os novos equivalentes.
+-- Perfis antigos viram os novos equivalentes. Precisa rodar depois de
+-- remover o check antigo (que rejeitaria os valores novos) e antes de
+-- adicionar o check novo (que rejeitaria os valores antigos ainda presentes).
 update perfil_usuario set perfil = 'consultor_programa' where perfil = 'admin_programa';
 update perfil_usuario set perfil = 'proprietario' where perfil = 'admin_geral';
+
+alter table perfil_usuario add constraint perfil_usuario_perfil_check
+  check (perfil in ('executivo', 'executivo_regional', 'consultor_programa', 'proprietario'));
 
 alter table perfil_usuario
   add constraint perfil_usuario_pkey primary key (usuario_id, perfil);
