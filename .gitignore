@@ -10,6 +10,11 @@ next-env.d.ts
 # Planilhas de trabalho: contêm CNPJ e e-mails nominais. Nunca versionar.
 dados/
 
+# Seed gerado da carteira de clientes: contém CNPJ e e-mails nominais de
+# executivos. Nunca versionar — só o seed-formatos.sql (dado não sensível) vai
+# para o repositório.
+supabase/seed-clientes.sql
+
 # Artefatos do Office e do OneDrive
 ~$*
 *.tmp
