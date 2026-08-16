@@ -15,6 +15,31 @@ export function estaBloqueada(
   return bloqueios.find((bloqueio) => bloqueio.data === dataIso) ?? null
 }
 
+/**
+ * Índice de bloqueios por data — para uma grade mensal (Task 11) responder
+ * "esta célula está bloqueada?" sem varrer `bloqueios` inteiro a cada uma
+ * das ~35 células do mês.
+ *
+ * Constrói o índice CHAMANDO `estaBloqueada` para cada data, em vez de
+ * reimplementar a comparação (`bloqueio.data === dataIso`) por conta própria.
+ * A diferença importa: se R12 ganhar nuance — uma tolerância, uma validade,
+ * um tipo de bloqueio que não vale para regional —, quem decide isso passa a
+ * ser só `estaBloqueada`, e este índice (e qualquer grade que o use)
+ * acompanha automaticamente. Sem isso, a regra viveria em dois lugares, e um
+ * deles ficaria desatualizado sem avisar ninguém.
+ */
+export function indexarBloqueios(
+  bloqueios: DataBloqueada[],
+  datas: string[],
+): Map<string, DataBloqueada> {
+  const indice = new Map<string, DataBloqueada>()
+  for (const data of datas) {
+    const bloqueio = estaBloqueada(bloqueios, data)
+    if (bloqueio) indice.set(data, bloqueio)
+  }
+  return indice
+}
+
 const MILISSEGUNDOS_POR_DIA = 24 * 60 * 60 * 1000
 
 export function diasDeAntecedencia(hojeIso: string, dataIso: string): number {

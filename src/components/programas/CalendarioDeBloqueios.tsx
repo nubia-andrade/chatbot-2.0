@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { bloquearDatas, desbloquearData } from '@/lib/acoes/datas-bloqueadas'
+import { indexarBloqueios } from '@/lib/dominio/bloqueios'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
 import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
@@ -72,13 +73,16 @@ export function CalendarioDeBloqueios({ programaId, bloqueiosIniciais }: Props) 
   const [erros, setErros] = useState<string[]>([])
   const [sucesso, setSucesso] = useState<string | null>(null)
 
-  const bloqueiosPorData = useMemo(() => {
-    const mapa = new Map<string, Bloqueio>()
-    for (const bloqueio of bloqueios) mapa.set(bloqueio.data, bloqueio)
-    return mapa
-  }, [bloqueios])
-
   const celulas = useMemo(() => montarGrade(ano, mes), [ano, mes])
+
+  // Quem decide se uma data está bloqueada é `estaBloqueada` (Task 4, regra
+  // R12) — `indexarBloqueios` só chama essa função para cada dia do mês em
+  // exibição e guarda o resultado num `Map`, para a grade não varrer
+  // `bloqueios` inteiro a cada uma das ~35 células.
+  const bloqueiosPorData = useMemo(() => {
+    const datasDoMes = celulas.flatMap((celula) => (celula ? [celula.iso] : []))
+    return indexarBloqueios(bloqueios, datasDoMes)
+  }, [bloqueios, celulas])
 
   const temAlteracaoNaoSalva = selecionadas.length > 0 || motivo.trim() !== ''
 
