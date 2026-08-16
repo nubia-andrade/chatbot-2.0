@@ -1,3 +1,5 @@
+import { normalizarNome as normalizar } from './texto'
+
 export type Restricao = {
   anunciante: string | null
   setor: string | null
@@ -15,16 +17,6 @@ export type VendaNaData = {
   anunciante: string
   setor: string | null
   industria: string | null
-}
-
-function normalizar(texto: string | null | undefined): string {
-  if (!texto) return ''
-  return texto
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
 }
 
 /**

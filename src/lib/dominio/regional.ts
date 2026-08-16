@@ -1,3 +1,6 @@
+import { estaBloqueada, type DataBloqueada } from './bloqueios'
+import { normalizarNome } from './texto'
+
 /** As 5 Globos, na ordem em que aparecem na interface. */
 export const PRACAS = ['SP', 'RJ', 'BH', 'DF', 'PE1'] as const
 
@@ -43,13 +46,58 @@ export function pracasLivresEm(
   return PRACAS.filter((praca) => !ocupadas.has(praca))
 }
 
-/** R9 — um cliente compra até `max_pracas_por_acao` praças, consumindo o slot de cada. */
+/** As praças que um mesmo cliente JÁ tem naquela data, comparando pelo nome normalizado. */
+export function pracasDoClienteEm(
+  acoes: AcaoRegional[],
+  dataIso: string,
+  clienteNome: string,
+): string[] {
+  const alvo = normalizarNome(clienteNome)
+  if (alvo === '') return []
+  return acoes
+    .filter((a) => a.data_de_exibicao === dataIso && normalizarNome(a.cliente_nome) === alvo)
+    .map((a) => a.praca_codigo)
+}
+
+/**
+ * O que a compra precisa saber além das praças pedidas.
+ *
+ * Nasceu opcional de propósito: a matriz e a prévia da tela chamam
+ * `validarCompra` sem saber quem é o cliente ainda, e a gravação — o único
+ * ponto que decide de verdade — preenche os dois campos.
+ */
+export type ContextoDaCompra = {
+  /**
+   * Cliente que está comprando. Sem ele, R9 só consegue contar as praças
+   * DESTE envio, e um mesmo cliente contorna o teto em duas gravações
+   * (SP+RJ+BH, depois DF+PE1, dando 5 praças).
+   */
+  clienteNome?: string
+  /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
+  bloqueios?: DataBloqueada[]
+}
+
+/**
+ * R9 — um cliente compra até `max_pracas_por_acao` praças, consumindo o slot
+ * de cada; e R12 — data bloqueada vence tudo.
+ *
+ * A ordem importa: um bloqueio de data encerra a validação sozinho, sem
+ * enumerar praça livre nenhuma. "Vence tudo" quer dizer exatamente isso —
+ * mostrar "a praça SP já está vendida" ao lado de "a data está bloqueada"
+ * sugeriria que resolver a primeira liberaria a venda.
+ */
 export function validarCompra(
   config: ConfiguracaoRegional,
   acoes: AcaoRegional[],
   dataIso: string,
   pracasDesejadas: string[],
+  contexto: ContextoDaCompra = {},
 ): string[] {
+  const bloqueio = estaBloqueada(contexto.bloqueios ?? [], dataIso)
+  if (bloqueio) {
+    return [`Esta data está bloqueada: ${bloqueio.motivo}`]
+  }
+
   const erros: string[] = []
 
   if (pracasDesejadas.length === 0) {
@@ -60,6 +108,18 @@ export function validarCompra(
   }
   if (pracasDesejadas.length > config.max_pracas_por_acao) {
     erros.push(`Uma ação pode ter no máximo ${config.max_pracas_por_acao} praças.`)
+  }
+
+  // R9 conta o que o cliente JÁ tem na data, não só o envio atual.
+  const jaTem = contexto.clienteNome
+    ? pracasDoClienteEm(acoes, dataIso, contexto.clienteNome)
+    : []
+  if (jaTem.length > 0 && jaTem.length + pracasDesejadas.length > config.max_pracas_por_acao) {
+    erros.push(
+      `${contexto.clienteNome} já tem ${jaTem.length} praça${jaTem.length > 1 ? 's' : ''} ` +
+        `nesta data (${jaTem.join(', ')}); com mais ${pracasDesejadas.length} passaria do ` +
+        `máximo de ${config.max_pracas_por_acao} praças por cliente.`,
+    )
   }
 
   const ocupadas = new Set(pracasOcupadasEm(acoes, dataIso))

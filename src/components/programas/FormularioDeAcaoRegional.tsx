@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { registrarAcaoRegional, buscarSugestaoDeAcao } from '@/lib/acoes/regional'
 import { PRACAS, pracasOcupadasEm, validarCompra, type AcaoRegional } from '@/lib/dominio/regional'
-import { dentroDoPrazoMinimo } from '@/lib/dominio/bloqueios'
+import { dentroDoPrazoMinimo, estaBloqueada, type DataBloqueada } from '@/lib/dominio/bloqueios'
 import { CampoDeBuscaDeCliente } from '@/components/comum/CampoDeBuscaDeCliente'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
@@ -17,6 +17,8 @@ type Props = {
   maxPracasPorAcao: number
   hojeIso: string
   acoes: AcaoRegionalDaMatriz[]
+  /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
+  bloqueios: DataBloqueada[]
   /** Data escolhida ao clicar numa célula livre da matriz — pré-preenche o seletor abaixo. */
   dataSugeridaPelaMatriz: string | null
   aoRegistrar: (novas: AcaoRegionalDaMatriz[]) => void
@@ -71,6 +73,7 @@ export function FormularioDeAcaoRegional({
   maxPracasPorAcao,
   hojeIso,
   acoes,
+  bloqueios,
   dataSugeridaPelaMatriz,
   aoRegistrar,
 }: Props) {
@@ -138,6 +141,8 @@ export function FormularioDeAcaoRegional({
 
   const sugestaoAtual = sugestao?.paraData === data ? sugestao : null
   const foraDePrazo = data !== '' && dentroDoPrazoMinimo(hojeIso, data, prazoMinimoRegionalDias)
+  // R12 — quem decide é `estaBloqueada`; aqui só perguntamos.
+  const bloqueioDaData = data === '' ? null : estaBloqueada(bloqueios, data)
 
   const acaoPorPraca = useMemo(() => {
     const mapa = new Map<string, string>()
@@ -176,8 +181,13 @@ export function FormularioDeAcaoRegional({
     // ela quem decide de verdade, isto aqui só evita uma viagem ao servidor
     // para o erro mais comum.
     const config = { aceita_regional: true, dia_da_semana_regional: diaDaSemanaRegional, max_pracas_por_acao: maxPracasPorAcao }
-    const errosLocais = validarCompra(config, acoes as AcaoRegional[], data, pracasSelecionadas)
-    if (foraDePrazo) errosLocais.push(`Esta data está fora do prazo mínimo de ${prazoMinimoRegionalDias} dias.`)
+    const errosLocais = validarCompra(config, acoes as AcaoRegional[], data, pracasSelecionadas, {
+      clienteNome: cliente.nome,
+      bloqueios,
+    })
+    if (!bloqueioDaData && foraDePrazo) {
+      errosLocais.push(`Esta data está fora do prazo mínimo de ${prazoMinimoRegionalDias} dias.`)
+    }
     if (errosLocais.length > 0) {
       setErros(errosLocais)
       return
@@ -241,14 +251,21 @@ export function FormularioDeAcaoRegional({
             {datasDisponiveis.map((iso) => {
               const livres = PRACAS.length - pracasOcupadasEm(acoes, iso).length
               const bloqueadaPeloPrazo = dentroDoPrazoMinimo(hojeIso, iso, prazoMinimoRegionalDias)
+              const bloqueio = estaBloqueada(bloqueios, iso)
               return (
-                <option key={iso} value={iso} disabled={bloqueadaPeloPrazo || livres === 0}>
+                <option
+                  key={iso}
+                  value={iso}
+                  disabled={Boolean(bloqueio) || bloqueadaPeloPrazo || livres === 0}
+                >
                   {formatarDataBR(iso)}
-                  {bloqueadaPeloPrazo
-                    ? ' (fora do prazo mínimo)'
-                    : livres === 0
-                      ? ' (esgotada)'
-                      : ` (${livres} praça${livres > 1 ? 's' : ''} livre${livres > 1 ? 's' : ''})`}
+                  {bloqueio
+                    ? ` (bloqueada: ${bloqueio.motivo})`
+                    : bloqueadaPeloPrazo
+                      ? ' (fora do prazo mínimo)'
+                      : livres === 0
+                        ? ' (esgotada)'
+                        : ` (${livres} praça${livres > 1 ? 's' : ''} livre${livres > 1 ? 's' : ''})`}
                 </option>
               )
             })}
@@ -263,6 +280,16 @@ export function FormularioDeAcaoRegional({
           }}
         />
       </div>
+
+      {bloqueioDaData && (
+        <p
+          role="alert"
+          className="mt-3 rounded-[10px] px-3 py-2 text-[12.5px] font-semibold"
+          style={{ background: 'var(--reservado-fundo)', color: 'var(--reservado)' }}
+        >
+          Esta data está bloqueada: {bloqueioDaData.motivo}. Nenhuma praça pode ser vendida nela.
+        </p>
+      )}
 
       {buscandoSugestao && (
         <p className="mt-3 text-[12.5px] text-[var(--texto-3)]">Consultando a API de entregas…</p>
@@ -291,6 +318,7 @@ export function FormularioDeAcaoRegional({
             const marcada = pracasSelecionadas.includes(praca)
             const desabilitada =
               Boolean(ocupante) ||
+              Boolean(bloqueioDaData) ||
               foraDePrazo ||
               (!marcada && pracasSelecionadas.length >= maxPracasPorAcao)
             return (
@@ -339,7 +367,7 @@ export function FormularioDeAcaoRegional({
       <BotaoDeGravacao
         type="button"
         gravando={gravando}
-        desabilitado={!cliente || pracasSelecionadas.length === 0 || foraDePrazo}
+        desabilitado={!cliente || pracasSelecionadas.length === 0 || foraDePrazo || Boolean(bloqueioDaData)}
         onClick={registrar}
         className="mt-4 w-full sm:w-auto"
       >

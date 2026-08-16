@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { PRACAS, pracasOcupadasEm, type AcaoRegional } from '@/lib/dominio/regional'
-import { dentroDoPrazoMinimo } from '@/lib/dominio/bloqueios'
+import { dentroDoPrazoMinimo, indexarBloqueios, type DataBloqueada } from '@/lib/dominio/bloqueios'
 
 export type AcaoRegionalDaMatriz = AcaoRegional & { id: string }
 
@@ -10,6 +10,8 @@ type Props = {
   diaDaSemanaRegional: number
   prazoMinimoRegionalDias: number
   acoes: AcaoRegionalDaMatriz[]
+  /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
+  bloqueios: DataBloqueada[]
   /** Data de hoje em ISO — recebida do servidor para a "fora de prazo" não depender do relógio do navegador. */
   hojeIso: string
   /** Chamado ao clicar numa data com pelo menos uma praça livre — pré-preenche o formulário de venda. */
@@ -44,7 +46,15 @@ function datasRegionaisDoMes(ano: number, mes: number, diaDaSemana: number): str
   return datas
 }
 
-type EstadoDaCelula = 'livre' | 'vendida' | 'fora_de_prazo'
+type EstadoDaCelula = 'livre' | 'vendida' | 'fora_de_prazo' | 'bloqueada'
+
+/** Cor de cada estado, sempre por token — nunca hex literal. */
+const CORES_DA_CELULA: Record<EstadoDaCelula, { fundo: string; texto: string }> = {
+  livre: { fundo: 'var(--disponivel-fundo)', texto: 'var(--disponivel)' },
+  vendida: { fundo: 'var(--esgotado-fundo)', texto: 'var(--esgotado)' },
+  fora_de_prazo: { fundo: 'var(--prazo-fundo)', texto: 'var(--prazo)' },
+  bloqueada: { fundo: 'var(--reservado-fundo)', texto: 'var(--reservado)' },
+}
 
 /**
  * A visão principal da aba Regional — Task 12, Step 2.
@@ -63,6 +73,7 @@ export function MatrizDePracas({
   diaDaSemanaRegional,
   prazoMinimoRegionalDias,
   acoes,
+  bloqueios,
   hojeIso,
   aoEscolherData,
 }: Props) {
@@ -99,11 +110,22 @@ export function MatrizDePracas({
       ...datasRegionaisDoMes(anoDoSegundoMes, segundoMes, diaDaSemanaRegional),
     ]
 
+    // Quem decide se uma data está bloqueada é `estaBloqueada` (R12);
+    // `indexarBloqueios` só a chama para cada data desta janela e guarda o
+    // resultado, para a grade não varrer a lista inteira por célula.
+    const bloqueiosPorData = indexarBloqueios(bloqueios, datas)
+
     return datas.map((dataIso) => {
+      const bloqueio = bloqueiosPorData.get(dataIso)
       const ocupadas = new Set(pracasOcupadasEm(acoes, dataIso))
       const foraDePrazo = dentroDoPrazoMinimo(hojeIso, dataIso, prazoMinimoRegionalDias)
 
       const celulas = PRACAS.map((praca) => {
+        // R12 vence tudo: uma sexta bloqueada por feriado não tem praça livre
+        // nenhuma, por mais que o slot esteja vago.
+        if (bloqueio) {
+          return { praca, estado: 'bloqueada' as EstadoDaCelula, clienteNome: '' }
+        }
         if (ocupadas.has(praca)) {
           const acao = acoes.find((a) => a.data_de_exibicao === dataIso && a.praca_codigo === praca)
           return { praca, estado: 'vendida' as EstadoDaCelula, clienteNome: acao?.cliente_nome ?? '' }
@@ -115,9 +137,9 @@ export function MatrizDePracas({
       })
 
       const temPracaLivre = celulas.some((celula) => celula.estado === 'livre')
-      return { dataIso, celulas, temPracaLivre }
+      return { dataIso, celulas, temPracaLivre, motivoDoBloqueio: bloqueio?.motivo ?? null }
     })
-  }, [ano, mes, anoDoSegundoMes, segundoMes, diaDaSemanaRegional, acoes, hojeIso, prazoMinimoRegionalDias])
+  }, [ano, mes, anoDoSegundoMes, segundoMes, diaDaSemanaRegional, acoes, bloqueios, hojeIso, prazoMinimoRegionalDias])
 
   return (
     <div
@@ -159,6 +181,10 @@ export function MatrizDePracas({
           <span aria-hidden className="h-[10px] w-[10px] rounded-[3px]" style={{ background: 'var(--prazo)' }} />
           Fora do prazo mínimo
         </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-[10px] w-[10px] rounded-[3px]" style={{ background: 'var(--reservado)' }} />
+          Data bloqueada
+        </span>
       </div>
 
       {linhas.length === 0 ? (
@@ -181,57 +207,64 @@ export function MatrizDePracas({
             <tbody>
               {linhas.map((linha) => (
                 <tr key={linha.dataIso} className="border-t border-[var(--borda)]">
-                  <td className="py-2 pr-3 text-left">
+                  <td className="py-2 pr-3 text-left align-top">
                     <button
                       type="button"
                       disabled={!linha.temPracaLivre || !aoEscolherData}
                       onClick={() => aoEscolherData?.(linha.dataIso)}
                       className="text-[13px] font-bold text-[var(--texto)] enabled:cursor-pointer enabled:hover:text-[var(--roxo)] enabled:hover:underline disabled:cursor-default"
                       title={
-                        linha.temPracaLivre
-                          ? 'Usar esta data no formulário de venda'
-                          : 'Nenhuma praça livre nesta data'
+                        linha.motivoDoBloqueio
+                          ? `Data bloqueada: ${linha.motivoDoBloqueio}`
+                          : linha.temPracaLivre
+                            ? 'Usar esta data no formulário de venda'
+                            : 'Nenhuma praça livre nesta data'
                       }
                     >
                       {formatarDataBR(linha.dataIso)}
                     </button>
-                  </td>
-                  {linha.celulas.map((celula) => (
-                    <td key={celula.praca} className="py-2 text-center">
+                    {/* O motivo fica à vista, não só no `title`: quem olha a
+                        matriz precisa saber POR QUE a data está fechada sem
+                        passar o mouse — e sem telefonar para descobrir. */}
+                    {linha.motivoDoBloqueio && (
                       <span
-                        className="mx-auto flex h-[38px] w-full max-w-[92px] flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 text-[10.5px] font-bold"
-                        style={{
-                          background:
-                            celula.estado === 'vendida'
-                              ? 'var(--esgotado-fundo)'
-                              : celula.estado === 'fora_de_prazo'
-                                ? 'var(--prazo-fundo)'
-                                : 'var(--disponivel-fundo)',
-                          color:
-                            celula.estado === 'vendida'
-                              ? 'var(--esgotado)'
-                              : celula.estado === 'fora_de_prazo'
-                                ? 'var(--prazo)'
-                                : 'var(--disponivel)',
-                        }}
-                        title={
-                          celula.estado === 'vendida'
-                            ? `Vendida para ${celula.clienteNome}`
-                            : celula.estado === 'fora_de_prazo'
-                              ? `Fora do prazo mínimo de ${prazoMinimoRegionalDias} dias`
-                              : 'Livre'
-                        }
+                        className="mt-1 block max-w-[180px] text-[10.5px] font-semibold leading-tight"
+                        style={{ color: 'var(--reservado)' }}
                       >
-                        {celula.estado === 'vendida' ? (
-                          <span className="max-w-full truncate">{celula.clienteNome}</span>
-                        ) : celula.estado === 'fora_de_prazo' ? (
-                          <span>Fora de prazo</span>
-                        ) : (
-                          <span>Livre</span>
-                        )}
+                        Bloqueada: {linha.motivoDoBloqueio}
                       </span>
-                    </td>
-                  ))}
+                    )}
+                  </td>
+                  {linha.celulas.map((celula) => {
+                    const cor = CORES_DA_CELULA[celula.estado]
+                    return (
+                      <td key={celula.praca} className="py-2 text-center align-top">
+                        <span
+                          className="mx-auto flex h-[38px] w-full max-w-[92px] flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 text-[10.5px] font-bold"
+                          style={{ background: cor.fundo, color: cor.texto }}
+                          title={
+                            celula.estado === 'bloqueada'
+                              ? `Data bloqueada: ${linha.motivoDoBloqueio}`
+                              : celula.estado === 'vendida'
+                                ? `Vendida para ${celula.clienteNome}`
+                                : celula.estado === 'fora_de_prazo'
+                                  ? `Fora do prazo mínimo de ${prazoMinimoRegionalDias} dias`
+                                  : 'Livre'
+                          }
+                        >
+                          <span className="max-w-full truncate">
+                            {celula.estado === 'bloqueada'
+                              ? 'Bloqueada'
+                              : celula.estado === 'vendida'
+                                ? celula.clienteNome
+                                : celula.estado === 'fora_de_prazo'
+                                  ? 'Fora de prazo'
+                                  : 'Livre'}
+                          </span>
+                        </span>
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

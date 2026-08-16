@@ -5,8 +5,16 @@ import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { podeEditarPrograma } from '../dominio/perfis'
 import { PRACAS, validarCompra, type AcaoRegional, type ConfiguracaoRegional } from '../dominio/regional'
-import { dentroDoPrazoMinimo } from '../dominio/bloqueios'
-import { extrairMnemonico } from '../dominio/programas'
+import { dentroDoPrazoMinimo, type DataBloqueada } from '../dominio/bloqueios'
+import { extrairMnemonico, montarIndice, encontrarProgramaId } from '../dominio/programas'
+import { normalizarNome } from '../dominio/texto'
+import {
+  restricaoQueBloqueia,
+  concorrenteNaData,
+  type Anunciante,
+  type Restricao as RegraDeRestricao,
+  type VendaNaData,
+} from '../dominio/restricoes'
 
 /**
  * Escrita e consulta de apoio da aba Regional — Task 12.
@@ -95,6 +103,136 @@ function ehViolacaoDeUnicidade(mensagem: string, codigo: string | undefined): bo
   return codigo === '23505' || mensagem.toLowerCase().includes('duplicate')
 }
 
+type ClienteServidor = Awaited<ReturnType<typeof criarClienteServidor>>
+
+/**
+ * R13 e R14 no único ponto desta entrega que reúne cliente, data e programa.
+ *
+ * Antes desta função, `restricaoQueBloqueia` só era chamada para CONTAR
+ * quantos clientes uma restrição alcançaria (a prévia do formulário de
+ * restrições) e `concorrenteNaData` não tinha chamador nenhum: as duas regras
+ * existiam, com teste, e não impediam venda alguma. Aqui elas passam a
+ * decidir.
+ *
+ * A concorrência olha os dois inventários da mesma data, como manda a R14:
+ * as ações regionais deste programa e as ações NACIONAIS já importadas em
+ * `acoes_vendidas`. A tabela nacional guarda o anunciante como texto, sem
+ * setor nem indústria — o cruzamento com a carteira (`clientes`) é o que dá
+ * categoria a esse nome. Um anunciante nacional que não exista na carteira
+ * fica sem classificação e, por definição de `concorrenteNaData`, não gera
+ * bloqueio: acusar concorrência sem base impediria venda legítima.
+ */
+async function conferirRestricaoEConcorrencia(
+  supabase: ClienteServidor,
+  programaId: string,
+  dados: DadosDeAcaoRegional,
+): Promise<string[]> {
+  const { data: cliente } = await supabase
+    .from('clientes')
+    .select('nome, setor, industria')
+    .eq('id', dados.clienteId)
+    .maybeSingle()
+
+  if (!cliente) {
+    return ['Não foi possível confirmar este cliente na carteira. Escolha-o de novo na busca.']
+  }
+
+  const anunciante: Anunciante = {
+    nome: cliente.nome,
+    setor: cliente.setor,
+    industria: cliente.industria,
+  }
+
+  // R13 — restrição cadastrada bloqueia o cliente no programa inteiro.
+  const { data: restricoes, error: erroRestricoes } = await supabase
+    .from('restricoes_anunciante')
+    .select('anunciante, setor, industria, motivo')
+    .eq('programa_id', programaId)
+
+  if (erroRestricoes) {
+    return ['Não foi possível conferir as restrições deste programa. Tente novamente.']
+  }
+
+  const restricao = restricaoQueBloqueia((restricoes ?? []) as RegraDeRestricao[], anunciante)
+  if (restricao) {
+    return [`${cliente.nome} está restrito neste programa: ${restricao.motivo}`]
+  }
+
+  // R14 — concorrência é calculada a partir do que já está vendido na data.
+  const vendas = await levantarVendasNaData(supabase, programaId, dados.data)
+  const concorrente = concorrenteNaData(vendas, anunciante)
+  if (concorrente) {
+    return [
+      `${concorrente.anunciante} já tem ação nesta data e é concorrente de ${cliente.nome} ` +
+        `(mesmo setor e indústria: ${concorrente.setor} · ${concorrente.industria}).`,
+    ]
+  }
+
+  return []
+}
+
+/**
+ * Os anunciantes com ação nesta data — regional deste programa e nacional
+ * importada —, já classificados por setor e indústria a partir da carteira.
+ *
+ * Sem paginação de propósito: as três consultas são filtradas por data (ou
+ * pela lista de nomes daquela data), e nenhuma delas chega perto das 1000
+ * linhas que o PostgREST devolve por padrão. Quem precisa de `lerPaginado` é
+ * quem varre `clientes` ou `acoes_vendidas` inteiras.
+ */
+async function levantarVendasNaData(
+  supabase: ClienteServidor,
+  programaId: string,
+  dataIso: string,
+): Promise<VendaNaData[]> {
+  const [regionais, nacionais, programas, apelidos] = await Promise.all([
+    supabase
+      .from('acoes_regionais')
+      .select('cliente_nome')
+      .eq('programa_id', programaId)
+      .eq('data_de_exibicao', dataIso),
+    supabase
+      .from('acoes_vendidas')
+      .select('programa, anunciante')
+      .eq('data_de_exibicao', dataIso),
+    supabase.from('programas').select('id, mnemonico'),
+    supabase.from('programa_apelidos').select('programa_id, texto'),
+  ])
+
+  const indice = montarIndice(programas.data ?? [], apelidos.data ?? [])
+
+  // Só as entregas nacionais DESTE programa contam: a concorrência da R14 é
+  // "não dividir o mesmo dia no mesmo programa", não no canal inteiro.
+  const nomesNacionais = (nacionais.data ?? [])
+    .filter((linha) => encontrarProgramaId(linha.programa, indice) === programaId)
+    .map((linha) => linha.anunciante)
+
+  const nomes = [
+    ...(regionais.data ?? []).map((linha) => linha.cliente_nome),
+    ...nomesNacionais,
+  ].filter((nome): nome is string => Boolean(nome && nome.trim() !== ''))
+
+  if (nomes.length === 0) return []
+
+  const { data: clientes } = await supabase
+    .from('clientes')
+    .select('nome, setor, industria')
+    .in('nome', [...new Set(nomes)])
+
+  const categoriaPorNome = new Map(
+    (clientes ?? []).map((linha) => [
+      normalizarNome(linha.nome),
+      { setor: linha.setor as string | null, industria: linha.industria as string | null },
+    ]),
+  )
+
+  return [...new Set(nomes)].map((nome) => ({
+    anunciante: nome,
+    setor: categoriaPorNome.get(normalizarNome(nome))?.setor ?? null,
+    industria: categoriaPorNome.get(normalizarNome(nome))?.industria ?? null,
+  }))
+}
+
 /**
  * Registra uma ação regional vendida: uma linha por praça, todas com o mesmo
  * cliente e data (R8/R9 — cada praça consome seu próprio slot, até
@@ -138,10 +276,17 @@ export async function registrarAcaoRegional(
     max_pracas_por_acao: programa.max_pracas_por_acao,
   }
 
-  const erros: string[] = []
+  // R12 — data bloqueada vence tudo, e a gravação é o último ponto capaz de
+  // impedir a venda. Sem esta leitura, uma sexta fechada por feriado aceitaria
+  // ação regional mesmo com o calendário de bloqueios mostrando o contrário.
+  const { data: bloqueiosDaData, error: erroBloqueios } = await supabase
+    .from('datas_bloqueadas')
+    .select('data, motivo')
+    .eq('programa_id', programaId)
+    .eq('data', dados.data)
 
-  if (programa.prazo_minimo_regional_dias !== null && dentroDoPrazoMinimo(hojeIso(), dados.data, programa.prazo_minimo_regional_dias)) {
-    erros.push(`Esta data está fora do prazo mínimo de ${programa.prazo_minimo_regional_dias} dias.`)
+  if (erroBloqueios) {
+    return { erros: ['Não foi possível conferir se esta data está bloqueada. Tente novamente.'] }
   }
 
   const { data: acoesNaData, error: erroAcoes } = await supabase
@@ -154,7 +299,32 @@ export async function registrarAcaoRegional(
     return { erros: ['Não foi possível conferir as praças já vendidas nesta data. Tente novamente.'] }
   }
 
-  erros.push(...validarCompra(config, (acoesNaData ?? []) as AcaoRegional[], dados.data, dados.pracas))
+  // `validarCompra` recebe o cliente (R9 conta o que ele JÁ tem na data, e não
+  // só este envio) e os bloqueios (R12) — as duas coisas que a versão anterior
+  // não sabia e que deixavam passar venda indevida.
+  const erros = validarCompra(
+    config,
+    (acoesNaData ?? []) as AcaoRegional[],
+    dados.data,
+    dados.pracas,
+    {
+      clienteNome: dados.clienteNome,
+      bloqueios: (bloqueiosDaData ?? []) as DataBloqueada[],
+    },
+  )
+
+  // Data bloqueada encerra a validação sozinha — nem prazo, nem restrição, nem
+  // concorrência mudam o resultado.
+  if (erros.length > 0) return { erros }
+
+  if (
+    programa.prazo_minimo_regional_dias !== null &&
+    dentroDoPrazoMinimo(hojeIso(), dados.data, programa.prazo_minimo_regional_dias)
+  ) {
+    erros.push(`Esta data está fora do prazo mínimo de ${programa.prazo_minimo_regional_dias} dias.`)
+  }
+
+  erros.push(...(await conferirRestricaoEConcorrencia(supabase, programaId, dados)))
 
   if (erros.length > 0) return { erros }
 

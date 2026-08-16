@@ -4,6 +4,7 @@ import {
   temSlotRegionalEm,
   pracasOcupadasEm,
   pracasLivresEm,
+  pracasDoClienteEm,
   validarCompra,
   regionalConsomeSlotNacional,
 } from './regional'
@@ -97,6 +98,67 @@ describe('validarCompra', () => {
   it('recusa compra sem praça nenhuma', () => {
     expect(validarCompra(encontro, [], SEXTA, []))
       .toContain('Selecione ao menos uma praça.')
+  })
+})
+
+describe('pracasDoClienteEm', () => {
+  it('lista o que aquele cliente já tem na data', () => {
+    expect(pracasDoClienteEm(vendidas, SEXTA, 'Cliente A')).toEqual(['SP', 'RJ', 'BH'])
+  })
+
+  it('ignora grafia diferente do mesmo nome', () => {
+    expect(pracasDoClienteEm(vendidas, SEXTA, '  cliente a  ')).toEqual(['SP', 'RJ', 'BH'])
+  })
+
+  it('não conta praça de outro cliente', () => {
+    expect(pracasDoClienteEm(vendidas, SEXTA, 'Cliente B')).toEqual([])
+  })
+
+  it('não conta praça de outra data', () => {
+    expect(pracasDoClienteEm(vendidas, '2026-08-28', 'Cliente A')).toEqual([])
+  })
+})
+
+describe('validarCompra com o cliente informado', () => {
+  // R9 — o teto é por cliente na data, não por envio: sem isto, o mesmo
+  // cliente registra SP/RJ/BH e depois DF/PE1 e fica com 5 praças.
+  it('recusa o segundo envio que estouraria o teto do mesmo cliente', () => {
+    const erros = validarCompra(encontro, vendidas, SEXTA, ['DF', 'PE1'], {
+      clienteNome: 'Cliente A',
+    })
+    expect(erros).toContain(
+      'Cliente A já tem 3 praças nesta data (SP, RJ, BH); com mais 2 passaria do máximo de 3 praças por cliente.',
+    )
+  })
+
+  it('aceita o mesmo envio para um cliente diferente', () => {
+    expect(validarCompra(encontro, vendidas, SEXTA, ['DF', 'PE1'], { clienteNome: 'Cliente B' }))
+      .toEqual([])
+  })
+
+  it('aceita completar o teto sem estourar', () => {
+    const umaPraca = [{ data_de_exibicao: SEXTA, praca_codigo: 'SP', cliente_nome: 'Cliente A' }]
+    expect(validarCompra(encontro, umaPraca, SEXTA, ['RJ', 'BH'], { clienteNome: 'Cliente A' }))
+      .toEqual([])
+  })
+})
+
+describe('validarCompra com data bloqueada', () => {
+  const bloqueios = [{ data: SEXTA, motivo: 'Feriado nacional' }]
+
+  // R12 — data bloqueada vence tudo, inclusive no regional
+  it('recusa a venda mesmo com as cinco praças livres, mostrando o motivo', () => {
+    expect(validarCompra(encontro, [], SEXTA, ['SP'], { bloqueios }))
+      .toEqual(['Esta data está bloqueada: Feriado nacional'])
+  })
+
+  it('o bloqueio é o único erro — nada sugere que resolver outra coisa liberaria', () => {
+    const erros = validarCompra(encontro, vendidas, SEXTA, ['SP', 'RJ', 'BH', 'DF'], { bloqueios })
+    expect(erros).toHaveLength(1)
+  })
+
+  it('não interfere em outra data', () => {
+    expect(validarCompra(encontro, [], '2026-08-28', ['SP'], { bloqueios })).toEqual([])
   })
 })
 

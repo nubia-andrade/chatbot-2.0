@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { salvarPrecos } from '@/lib/acoes/regional'
 import { PRACAS } from '@/lib/dominio/regional'
+import type { DataBloqueada } from '@/lib/dominio/bloqueios'
 import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
@@ -21,6 +22,8 @@ type Props = {
   custoProducaoRegional: number | null
   precosIniciais: PrecoDePraca[]
   acoesIniciais: AcaoRegionalDaMatriz[]
+  /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
+  bloqueios: DataBloqueada[]
   hojeIso: string
 }
 
@@ -50,6 +53,7 @@ export function PainelRegional({
   custoProducaoRegional,
   precosIniciais,
   acoesIniciais,
+  bloqueios,
   hojeIso,
 }: Props) {
   const [acoes, setAcoes] = useState<AcaoRegionalDaMatriz[]>(acoesIniciais)
@@ -68,6 +72,7 @@ export function PainelRegional({
         diaDaSemanaRegional={diaDaSemanaRegional}
         prazoMinimoRegionalDias={prazoMinimoRegionalDias}
         acoes={acoes}
+        bloqueios={bloqueios}
         hojeIso={hojeIso}
         aoEscolherData={setDataClicadaNaMatriz}
       />
@@ -79,6 +84,7 @@ export function PainelRegional({
         maxPracasPorAcao={maxPracasPorAcao}
         hojeIso={hojeIso}
         acoes={acoes}
+        bloqueios={bloqueios}
         dataSugeridaPelaMatriz={dataClicadaNaMatriz}
         aoRegistrar={(novas) => setAcoes((atual) => [...atual, ...novas])}
       />
