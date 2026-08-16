@@ -169,6 +169,14 @@ mesmo com o código correto.
     banco (exigiria a extensão `btree_gist`, que este projeto não usa em
     lugar nenhum); é validada em `src/lib/dominio/datas-especiais.ts` antes da
     escrita. Idempotente.
+12. **Aplicar Datas especiais — dias da semana.** No `SQL Editor`, cole
+    `supabase/schema-datas-especiais-dias.sql` > `Run`. Roda depois do passo
+    11. Acrescenta `dias_da_semana smallint[]` (opcional) à tabela
+    `datas_especiais` — vazio ou nulo continua significando "todos os dias
+    do período", os cadastros já existentes não mudam. Preenchido, restringe
+    o período a dias específicos da semana (0=domingo … 6=sábado, convenção
+    de `programas.dias_da_semana`) — caso real: Mais Você, janeiro a abril,
+    valor diferenciado só às quartas-feiras. Idempotente.
 
 ### Importar sem o comando de linha
 

@@ -7,6 +7,8 @@ export type PeriodoEspecial = {
   data_fim: string
   percentual_acrescimo: number
   texto_investimento: string | null
+  /** 0=domingo … 6=sábado. Vazio ou nulo = todos os dias do período. */
+  dias_da_semana: number[] | null
 }
 
 /**
@@ -39,7 +41,7 @@ export async function listarDatasEspeciais(programaId: string): Promise<PeriodoE
 
   const { data, error } = await supabase
     .from('datas_especiais')
-    .select('id, nome, data_inicio, data_fim, percentual_acrescimo, texto_investimento')
+    .select('id, nome, data_inicio, data_fim, percentual_acrescimo, texto_investimento, dias_da_semana')
     .eq('programa_id', programaId)
     .order('data_inicio', { ascending: false })
 

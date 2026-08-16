@@ -13,6 +13,37 @@ type PrecoDePracaParaEfeito = {
   custo_midia_tv: number
 }
 
+/** Mesma convenção 0=domingo…6=sábado e os mesmos rótulos curtos do cadastro de programa (`FormularioDePrograma`), para as duas telas não se contradizerem. */
+const DIAS_DA_SEMANA: { valor: number; rotulo: string }[] = [
+  { valor: 0, rotulo: 'Dom' },
+  { valor: 1, rotulo: 'Seg' },
+  { valor: 2, rotulo: 'Ter' },
+  { valor: 3, rotulo: 'Qua' },
+  { valor: 4, rotulo: 'Qui' },
+  { valor: 5, rotulo: 'Sex' },
+  { valor: 6, rotulo: 'Sáb' },
+]
+
+/** Nome por extenso, no plural, para a lista de períodos — "quartas-feiras", não "[3]". */
+const NOMES_PLURAL_DOS_DIAS: Record<number, string> = {
+  0: 'domingos',
+  1: 'segundas-feiras',
+  2: 'terças-feiras',
+  3: 'quartas-feiras',
+  4: 'quintas-feiras',
+  5: 'sextas-feiras',
+  6: 'sábados',
+}
+
+/** "Todos os dias" quando vazio/nulo, ou os dias por extenso separados por vírgula, em ordem — "quartas-feiras" ou "segundas-feiras, quartas-feiras". */
+function descreverDiasDaSemana(dias: number[] | null | undefined): string {
+  if (!dias || dias.length === 0) return 'Todos os dias'
+  return [...dias]
+    .sort((a, b) => a - b)
+    .map((dia) => NOMES_PLURAL_DOS_DIAS[dia])
+    .join(', ')
+}
+
 type Props = {
   programaId: string
   periodosIniciais: PeriodoEspecial[]
@@ -78,6 +109,13 @@ export function PainelDeDatasEspeciais({
   const [dataFim, setDataFim] = useState('')
   const [percentualTexto, setPercentualTexto] = useState('')
   const [textoInvestimento, setTextoInvestimento] = useState('')
+  // `todosOsDias` é estado à parte de `diasDaSemana` — não dá pra derivar
+  // "vale todos os dias" só de `diasDaSemana.length === 0`, porque essa
+  // lista vazia também é o estado transitório de quem desmarcou "todos" e
+  // ainda não escolheu nenhum dia específico: sem o booleano, a caixa
+  // "todos os dias" ficaria marcada de novo sozinha.
+  const [todosOsDias, setTodosOsDias] = useState(true)
+  const [diasDaSemana, setDiasDaSemana] = useState<number[]>([])
 
   const [gravando, setGravando] = useState(false)
   const [erros, setErros] = useState<string[]>([])
@@ -93,7 +131,23 @@ export function PainelDeDatasEspeciais({
   const temPercentualValido = percentualTexto.trim() !== '' && paraNumero(percentualTexto) !== null
 
   const temAlteracaoNaoSalva =
-    nome.trim() !== '' || dataInicio !== '' || dataFim !== '' || percentualTexto.trim() !== '' || textoInvestimento.trim() !== ''
+    nome.trim() !== '' ||
+    dataInicio !== '' ||
+    dataFim !== '' ||
+    percentualTexto.trim() !== '' ||
+    textoInvestimento.trim() !== '' ||
+    !todosOsDias
+
+  function alternarDia(dia: number) {
+    setDiasDaSemana((atual) => (atual.includes(dia) ? atual.filter((d) => d !== dia) : [...atual, dia].sort((a, b) => a - b)))
+    setSucesso(null)
+  }
+
+  // Só falta escolher pelo menos um dia quando "todos os dias" está
+  // desmarcado — sem isso, dias_da_semana ficaria vazio, que É a convenção
+  // de "todos os dias" no domínio, e o período gravaria diferente do que a
+  // pessoa pediu.
+  const faltaEscolherDia = !todosOsDias && diasDaSemana.length === 0
 
   // Validação no cliente, para o botão nascer desabilitado sem esperar o
   // servidor — a checagem que vale de verdade é a mesma função rodando de
@@ -101,12 +155,19 @@ export function PainelDeDatasEspeciais({
   const errosDePreVisualizacao = useMemo(() => {
     if (nome.trim() === '' || dataInicio === '' || dataFim === '') return []
     return validarPeriodoEspecial(
-      { nome: nome.trim(), data_inicio: dataInicio, data_fim: dataFim, percentual_acrescimo: percentual },
+      {
+        nome: nome.trim(),
+        data_inicio: dataInicio,
+        data_fim: dataFim,
+        percentual_acrescimo: percentual,
+        dias_da_semana: todosOsDias ? [] : diasDaSemana,
+      },
       periodos,
     )
-  }, [nome, dataInicio, dataFim, percentual, periodos])
+  }, [nome, dataInicio, dataFim, percentual, todosOsDias, diasDaSemana, periodos])
 
-  const formularioCompleto = nome.trim() !== '' && dataInicio !== '' && dataFim !== '' && temPercentualValido
+  const formularioCompleto =
+    nome.trim() !== '' && dataInicio !== '' && dataFim !== '' && temPercentualValido && !faltaEscolherDia
 
   function limparFormulario() {
     setNome('')
@@ -114,6 +175,8 @@ export function PainelDeDatasEspeciais({
     setDataFim('')
     setPercentualTexto('')
     setTextoInvestimento('')
+    setTodosOsDias(true)
+    setDiasDaSemana([])
   }
 
   async function salvar() {
@@ -126,12 +189,15 @@ export function PainelDeDatasEspeciais({
     setErros([])
     setSucesso(null)
 
+    const diasParaGravar = todosOsDias || diasDaSemana.length === 0 ? null : diasDaSemana
+
     const resultado = await criarPeriodoEspecial(programaId, {
       nome: nome.trim(),
       data_inicio: dataInicio,
       data_fim: dataFim,
       percentual_acrescimo: percentual,
       texto_investimento: textoInvestimento.trim() === '' ? null : textoInvestimento.trim(),
+      dias_da_semana: diasParaGravar,
     })
 
     setGravando(false)
@@ -151,6 +217,7 @@ export function PainelDeDatasEspeciais({
           data_fim: dataFim,
           percentual_acrescimo: percentual,
           texto_investimento: textoInvestimento.trim() === '' ? null : textoInvestimento.trim(),
+          dias_da_semana: diasParaGravar,
         },
         ...atual,
       ].sort((a, b) => b.data_inicio.localeCompare(a.data_inicio)),
@@ -221,6 +288,11 @@ export function PainelDeDatasEspeciais({
                     +{formatarPercentual(periodo.percentual_acrescimo)}% sobre a mídia
                   </span>
                 </div>
+
+                <p className="text-[12.5px] text-[var(--texto-3)]">
+                  <span className="font-semibold">Dias da semana: </span>
+                  {descreverDiasDaSemana(periodo.dias_da_semana)}
+                </p>
 
                 <p className="text-[12.5px] text-[var(--texto-3)]">
                   <span className="font-semibold">Texto do slide de investimento: </span>
@@ -326,6 +398,54 @@ export function PainelDeDatasEspeciais({
               className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none focus:border-[#A031F5]"
             />
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-1.5">
+          <span className="text-[12px] font-semibold text-[var(--texto-2)]">Dias da semana</span>
+          <label className="flex w-fit cursor-pointer items-center gap-1.5 text-[12.5px] text-[var(--texto-2)]">
+            <input
+              type="checkbox"
+              checked={todosOsDias}
+              onChange={(evento) => {
+                setTodosOsDias(evento.target.checked)
+                if (evento.target.checked) setDiasDaSemana([])
+                setSucesso(null)
+              }}
+              className="h-4 w-4 cursor-pointer accent-[#A031F5]"
+            />
+            Vale todos os dias do período
+          </label>
+
+          {!todosOsDias && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {DIAS_DA_SEMANA.map((dia) => {
+                  const marcado = diasDaSemana.includes(dia.valor)
+                  return (
+                    <button
+                      key={dia.valor}
+                      type="button"
+                      aria-pressed={marcado}
+                      onClick={() => alternarDia(dia.valor)}
+                      className="h-[36px] w-[52px] cursor-pointer rounded-[10px] border text-[12.5px] font-bold"
+                      style={
+                        marcado
+                          ? { borderColor: 'var(--roxo)', background: 'rgba(122,47,242,.1)', color: 'var(--roxo)' }
+                          : { borderColor: 'var(--borda-forte)', color: 'var(--texto-3)' }
+                      }
+                    >
+                      {dia.rotulo}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[11.5px] text-[var(--texto-3)]">
+                {diasDaSemana.length > 0
+                  ? `O acréscimo vale só ${descreverDiasDaSemana(diasDaSemana)}, dentro do período — ex.: Mais Você, janeiro a abril, só quartas-feiras.`
+                  : 'Escolha ao menos um dia, ou marque "Vale todos os dias do período" acima.'}
+              </p>
+            </>
+          )}
         </div>
 
         <label htmlFor="data-especial-percentual" className="mb-[7px] mt-3 block text-[12px] font-semibold text-[var(--texto-2)]">

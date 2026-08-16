@@ -30,6 +30,38 @@ describe('periodoEspecialEm', () => {
   it('devolve nulo quando não há período nenhum', () => {
     expect(periodoEspecialEm([], '2026-11-25')).toBeNull()
   })
+
+  // Caso real: Mais Você, 01/01 a 30/04, valor diferenciado só às quartas-feiras.
+  describe('dias da semana', () => {
+    const maisVoceQuartas: PeriodoEspecial = {
+      id: 'mv',
+      nome: 'Mais Você — quartas',
+      data_inicio: '2026-01-01',
+      data_fim: '2026-04-30',
+      percentual_acrescimo: 15,
+      dias_da_semana: [3],
+    }
+
+    it('devolve o período quando a data cai no dia da semana escolhido', () => {
+      // 2026-01-07 é uma quarta-feira.
+      expect(periodoEspecialEm([maisVoceQuartas], '2026-01-07')).toEqual(maisVoceQuartas)
+    })
+
+    it('devolve nulo quando a data está no intervalo mas erra o dia da semana', () => {
+      // 2026-01-08 é uma quinta-feira — está no período, mas não é quarta.
+      expect(periodoEspecialEm([maisVoceQuartas], '2026-01-08')).toBeNull()
+    })
+
+    it('vazio em dias_da_semana continua valendo para qualquer dia (compatibilidade)', () => {
+      const semDias: PeriodoEspecial = { ...blackFriday, dias_da_semana: [] }
+      expect(periodoEspecialEm([semDias], '2026-11-25')).toEqual(semDias)
+    })
+
+    it('nulo em dias_da_semana continua valendo para qualquer dia (compatibilidade)', () => {
+      const comNulo: PeriodoEspecial = { ...blackFriday, dias_da_semana: null }
+      expect(periodoEspecialEm([comNulo], '2026-11-25')).toEqual(comNulo)
+    })
+  })
 })
 
 describe('aplicarAcrescimo', () => {
@@ -167,6 +199,121 @@ describe('validarPeriodoEspecial', () => {
         [blackFriday],
       )
       expect(erros).toEqual([])
+    })
+
+    // Os quatro casos do pedido: conflito depende de data E dia da semana em
+    // comum, não só de um dos dois.
+    describe('sobreposição considerando dias da semana', () => {
+      it('não conflita quando as DATAS não se cruzam, mesmo com dia em comum ("todo dia" 20-30/11 x "quartas" jan-abr)', () => {
+        const todoDiaNovembro: PeriodoEspecial = {
+          id: 'nov',
+          nome: 'Todo dia novembro',
+          data_inicio: '2026-11-20',
+          data_fim: '2026-11-30',
+          percentual_acrescimo: 10,
+        }
+        const erros = validarPeriodoEspecial(
+          {
+            nome: 'Mais Você — quartas',
+            data_inicio: '2026-01-01',
+            data_fim: '2026-04-30',
+            percentual_acrescimo: 15,
+            dias_da_semana: [3],
+          },
+          [todoDiaNovembro],
+        )
+        expect(erros).toEqual([])
+      })
+
+      it('conflita quando "todo dia" 20-30/11 cruza com "quartas" 01/11-31/12 (há quartas no trecho comum)', () => {
+        const todoDiaNovembro: PeriodoEspecial = {
+          id: 'nov',
+          nome: 'Todo dia novembro',
+          data_inicio: '2026-11-20',
+          data_fim: '2026-11-30',
+          percentual_acrescimo: 10,
+        }
+        const erros = validarPeriodoEspecial(
+          {
+            nome: 'Quartas do fim de ano',
+            data_inicio: '2026-11-01',
+            data_fim: '2026-12-31',
+            percentual_acrescimo: 15,
+            dias_da_semana: [3],
+          },
+          [todoDiaNovembro],
+        )
+        expect(erros).toEqual([
+          'O período se sobrepõe a "Todo dia novembro" (2026-11-20 a 2026-11-30).',
+        ])
+      })
+
+      it('não conflita quando os DIAS não têm nada em comum ("segundas" jan-abr x "quartas" jan-abr)', () => {
+        const segundas: PeriodoEspecial = {
+          id: 'seg',
+          nome: 'Segundas',
+          data_inicio: '2026-01-01',
+          data_fim: '2026-04-30',
+          percentual_acrescimo: 10,
+          dias_da_semana: [1],
+        }
+        const erros = validarPeriodoEspecial(
+          {
+            nome: 'Quartas',
+            data_inicio: '2026-01-01',
+            data_fim: '2026-04-30',
+            percentual_acrescimo: 15,
+            dias_da_semana: [3],
+          },
+          [segundas],
+        )
+        expect(erros).toEqual([])
+      })
+
+      it('conflita quando "todo dia" jan-abr cruza com "quartas" de fevereiro (sem dias_da_semana conta como os sete)', () => {
+        const todoDia: PeriodoEspecial = {
+          id: 'td',
+          nome: 'Mais Você — todo dia',
+          data_inicio: '2026-01-01',
+          data_fim: '2026-04-30',
+          percentual_acrescimo: 10,
+        }
+        const erros = validarPeriodoEspecial(
+          {
+            nome: 'Quartas de fevereiro',
+            data_inicio: '2026-02-01',
+            data_fim: '2026-02-28',
+            percentual_acrescimo: 15,
+            dias_da_semana: [3],
+          },
+          [todoDia],
+        )
+        expect(erros).toEqual([
+          'O período se sobrepõe a "Mais Você — todo dia" (2026-01-01 a 2026-04-30).',
+        ])
+      })
+
+      it('não conflita quando o mesmo dia em comum não ocorre nenhuma vez no trecho de datas em comum (20-22/11/2026 é sexta a domingo)', () => {
+        const quartasNoAno: PeriodoEspecial = {
+          id: 'qa',
+          nome: 'Quartas do ano inteiro',
+          data_inicio: '2026-01-01',
+          data_fim: '2026-12-31',
+          percentual_acrescimo: 10,
+          dias_da_semana: [3],
+        }
+        const erros = validarPeriodoEspecial(
+          {
+            nome: 'Fim de semana de novembro',
+            data_inicio: '2026-11-20',
+            data_fim: '2026-11-22',
+            percentual_acrescimo: 15,
+            dias_da_semana: [3],
+          },
+          [quartasNoAno],
+        )
+        expect(erros).toEqual([])
+      })
     })
 
     it('acumula todos os erros de uma vez, incluindo mais de uma sobreposição', () => {

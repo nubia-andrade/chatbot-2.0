@@ -30,6 +30,8 @@ export type NovoPeriodoEspecial = {
   data_fim: string
   percentual_acrescimo: number
   texto_investimento: string | null
+  /** 0=domingo … 6=sábado. Vazio ou nulo = todos os dias do período. */
+  dias_da_semana: number[] | null
 }
 
 export async function criarPeriodoEspecial(
@@ -45,12 +47,15 @@ export async function criarPeriodoEspecial(
   const existentes = await listarDatasEspeciais(programaId)
 
   const nomeLimpo = novo.nome.trim()
+  const diasLimpos = novo.dias_da_semana && novo.dias_da_semana.length > 0 ? novo.dias_da_semana : null
+
   const erros = validarPeriodoEspecial(
     {
       nome: nomeLimpo,
       data_inicio: novo.data_inicio,
       data_fim: novo.data_fim,
       percentual_acrescimo: novo.percentual_acrescimo,
+      dias_da_semana: diasLimpos,
     },
     existentes,
   )
@@ -66,6 +71,7 @@ export async function criarPeriodoEspecial(
     data_fim: novo.data_fim,
     percentual_acrescimo: novo.percentual_acrescimo,
     texto_investimento: novo.texto_investimento?.trim() || null,
+    dias_da_semana: diasLimpos,
     criado_por: sessao.usuarioId,
   })
 
