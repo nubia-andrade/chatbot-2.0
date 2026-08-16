@@ -1,20 +1,23 @@
 import { notFound } from 'next/navigation'
 import { obterPrograma } from '@/lib/dados/programas'
-import { listarAcoesRegionais } from '@/lib/dados/acoes-regionais'
+import { listarPrecos, listarAcoesRegionais } from '@/lib/dados/regional'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
+import { PainelRegional } from '@/components/programas/PainelRegional'
 
-function formatarData(iso: string): string {
-  const data = new Date(`${iso}T00:00:00Z`)
-  if (Number.isNaN(data.getTime())) return '—'
-  const dia = String(data.getUTCDate()).padStart(2, '0')
-  const mes = String(data.getUTCMonth() + 1).padStart(2, '0')
-  return `${dia}/${mes}/${data.getUTCFullYear()}`
+/** A janela de datas que a matriz e o seletor de venda enxergam sem recarregar a página. */
+const MESES_PARA_TRAS = 1
+const MESES_PARA_FRENTE = 12
+
+function deslocarMeses(dataIso: string, meses: number): string {
+  const data = new Date(`${dataIso}T00:00:00Z`)
+  data.setUTCMonth(data.getUTCMonth() + meses)
+  return data.toISOString().slice(0, 10)
 }
 
 /**
- * Aba Regional — Task 10 monta a rota e a listagem das ações já vendidas; a
- * grade mensal de disponibilidade por praça, o preço por praça e a sugestão
- * de praças a partir do `descritivo_da_acao` da API são da Task 12.
+ * Aba Regional — Task 10 montou a rota; Task 12 traz o conteúdo de verdade:
+ * preços por praça, matriz de disponibilidade e registro de ações vendidas
+ * (`PainelRegional`).
  *
  * `AbasDoPrograma` só mostra este link quando `aceita_regional` é
  * verdadeiro, mas isso é conveniência de interface — quem digitar a URL de
@@ -31,31 +34,39 @@ export default async function PaginaDeRegional({
 
   if (!programa || !programa.aceita_regional) notFound()
 
-  const acoes = await listarAcoesRegionais(id)
-
-  if (acoes.length === 0) {
+  // R10/R11 exigem os dois para existir slot regional (validado em
+  // `validarPrograma`, Task 3) — mas um programa marcado `aceita_regional`
+  // antes de preencher os dois é um estado transitório possível, então a
+  // aba explica em vez de quebrar.
+  if (programa.dia_da_semana_regional === null || programa.prazo_minimo_regional_dias === null) {
     return (
       <EstadoVazio
-        titulo="Nenhuma ação regional vendida ainda"
-        explicacao="Ações regionais aparecem aqui por praça, com a data de exibição e o cliente."
+        titulo="Configuração regional incompleta"
+        explicacao="Preencha o dia da semana e o prazo mínimo regional na aba Cadastro antes de vender ações regionais."
       />
     )
   }
 
+  const hojeIso = new Date().toISOString().slice(0, 10)
+  const deIso = deslocarMeses(hojeIso, -MESES_PARA_TRAS)
+  const ateIso = deslocarMeses(hojeIso, MESES_PARA_FRENTE)
+
+  const [precos, acoes] = await Promise.all([
+    listarPrecos(id),
+    listarAcoesRegionais(id, deIso, ateIso),
+  ])
+
   return (
-    <ul className="flex flex-col gap-2">
-      {acoes.map((acao) => (
-        <li
-          key={acao.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--raio-card)] border border-[var(--borda)] p-4"
-          style={{ background: 'var(--superficie)' }}
-        >
-          <span className="text-[13.5px] font-bold text-[var(--texto)]">
-            {formatarData(acao.data_de_exibicao)} · {acao.praca_codigo}
-          </span>
-          <span className="text-[13px] text-[var(--texto-3)]">{acao.cliente_nome}</span>
-        </li>
-      ))}
-    </ul>
+    <PainelRegional
+      programaId={id}
+      diaDaSemanaRegional={programa.dia_da_semana_regional}
+      prazoMinimoRegionalDias={programa.prazo_minimo_regional_dias}
+      maxPracasPorAcao={programa.max_pracas_por_acao}
+      direitosEConexos={programa.direitos_e_conexos}
+      custoProducaoRegional={programa.custo_producao_regional}
+      precosIniciais={precos}
+      acoesIniciais={acoes}
+      hojeIso={hojeIso}
+    />
   )
 }
