@@ -7,6 +7,14 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 
+# Área de trabalho do processo de desenvolvimento (ledger, scripts descartáveis
+# e backups do banco). Contém `backup-*/clientes.json`, com CNPJ e e-mails
+# nominais dos 15.519 clientes da carteira — 4 MB de dado pessoal que um
+# `git add -A` levaria para o histórico sem ninguém perceber. Nada aqui é
+# código do produto: o que precisa ser versionado (schema, seed, documentação)
+# mora em `supabase/` e `docs/`.
+.superpowers/
+
 # Planilhas de trabalho: contêm CNPJ e e-mails nominais. Nunca versionar.
 # Ancorada na raiz (`/dados/`) de propósito: sem a barra, a regra também
 # casaria `src/lib/dados/`, que é código-fonte, não planilha.
