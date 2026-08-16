@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao, podeAdministrar } from '../sessao-servidor'
 import { validarPrograma, type Programa } from '../dominio/cadastro'
-import { podeExcluirPrograma } from '../dominio/perfis'
+import { podeExcluirPrograma, podeEditarPrograma } from '../dominio/perfis'
 
 /**
  * Cadastrar e editar programas.
@@ -22,6 +22,8 @@ import { podeExcluirPrograma } from '../dominio/perfis'
 
 const ERRO_SEM_PERMISSAO = 'Você não tem permissão para alterar programas.'
 const ERRO_SEM_PERMISSAO_EXCLUIR = 'Só o proprietário pode excluir um programa.'
+const ERRO_SEM_PERMISSAO_APELIDOS =
+  'Você não tem permissão para alterar os apelidos deste programa.'
 const ERRO_SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.'
 
 function traduzirErroDoPrograma(mensagem: string): string {
@@ -114,6 +116,13 @@ export async function salvarPrograma(
  * Recebe sempre a lista completa e desejada (não um apelido por vez): apaga
  * quem saiu, mantém quem ficou, insere quem é novo. Duplicatas e textos em
  * branco são descartados antes de gravar.
+ *
+ * A permissão é `podeEditarPrograma` — vínculo com ESTE programa —, e não o
+ * `podeAdministrar` amplo que valia antes. Apelido não é detalhe cosmético:
+ * é ele que decide qual entrega da API ocupa qual programa (`encontrarProgramaId`),
+ * então reescrever os apelidos de um programa alheio é reescrever a ocupação
+ * dele. A policy de `programa_apelidos` fecha o mesmo buraco no banco
+ * (`supabase/schema-entrega-2-correcoes.sql`).
  */
 export async function salvarApelidos(
   programaId: string,
@@ -121,7 +130,9 @@ export async function salvarApelidos(
 ): Promise<{ erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA }
-  if (!podeAdministrar(sessao)) return { erro: ERRO_SEM_PERMISSAO }
+  if (!podeEditarPrograma(sessao.perfis, sessao.programasVinculados, programaId)) {
+    return { erro: ERRO_SEM_PERMISSAO_APELIDOS }
+  }
 
   const supabase = await criarClienteServidor()
 
