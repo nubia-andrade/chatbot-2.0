@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { DataBloqueada } from '@/lib/dominio/bloqueios'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
 import { MatrizDePracas, type AcaoRegionalDaMatriz } from './MatrizDePracas'
@@ -19,6 +20,8 @@ type Props = {
   /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
   bloqueios: DataBloqueada[]
   hojeIso: string
+  /** Quantos clientes da carteira inteira estão marcados como elegíveis — a lista é global, não deste programa. */
+  clientesElegiveis: number
 }
 
 /**
@@ -41,12 +44,15 @@ export function PainelRegional({
   acoesIniciais,
   bloqueios,
   hojeIso,
+  clientesElegiveis,
 }: Props) {
   const [acoes, setAcoes] = useState<AcaoRegionalDaMatriz[]>(acoesIniciais)
   const [dataClicadaNaMatriz, setDataClicadaNaMatriz] = useState<string | null>(null)
 
   return (
     <div className="flex flex-col gap-6">
+      <ResumoDeClientesElegiveis quantidade={clientesElegiveis} />
+
       <TabelaDeCustosRegionais
         programaId={programaId}
         precosIniciais={precosIniciais}
@@ -76,6 +82,37 @@ export function PainelRegional({
 
       <SecaoDeAcoesVendidas acoes={acoes} />
     </div>
+  )
+}
+
+/**
+ * Atalho para a gestão de elegibilidade — Configurações → Clientes
+ * regionais. Deixa explícito que a lista é GLOBAL (vale para todos os
+ * programas que aceitam regional), não uma configuração deste programa,
+ * porque sem esse aviso o consultor acha que está mexendo só aqui.
+ */
+function ResumoDeClientesElegiveis({ quantidade }: { quantidade: number }) {
+  return (
+    <section
+      className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--raio-card)] border border-[var(--borda)] p-4"
+      style={{ background: 'var(--superficie-suave)' }}
+    >
+      <p className="text-[13px] text-[var(--texto-2)]">
+        <span className="font-bold text-[var(--texto)]">
+          {quantidade.toLocaleString('pt-BR')} cliente{quantidade === 1 ? '' : 's'} elegíve
+          {quantidade === 1 ? 'l' : 'is'} para ações regionais.
+        </span>{' '}
+        Essa lista é global: vale para este e para todos os outros programas que aceitam regional, não só para
+        este programa.
+      </p>
+      <Link
+        href="/configuracoes/clientes-regionais"
+        className="shrink-0 text-[12.5px] font-bold hover:underline"
+        style={{ color: 'var(--roxo)' }}
+      >
+        Gerenciar clientes elegíveis →
+      </Link>
+    </section>
   )
 }
 

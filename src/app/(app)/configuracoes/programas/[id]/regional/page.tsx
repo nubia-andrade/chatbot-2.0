@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { obterPrograma } from '@/lib/dados/programas'
 import { listarPrecos, listarAcoesRegionais } from '@/lib/dados/regional'
 import { listarDatasBloqueadas } from '@/lib/dados/datas-bloqueadas'
+import { contarClientesElegiveis } from '@/lib/dados/clientes-regionais'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
 import { PainelRegional } from '@/components/programas/PainelRegional'
 
@@ -55,10 +56,11 @@ export default async function PaginaDeRegional({
   // As datas bloqueadas entram aqui porque R12 vale para o regional igual ao
   // nacional: sem elas, uma sexta fechada por feriado apareceria com 5 praças
   // livres e aceitaria venda.
-  const [precos, acoes, bloqueios] = await Promise.all([
+  const [precos, acoes, bloqueios, clientesElegiveis] = await Promise.all([
     listarPrecos(id),
     listarAcoesRegionais(id, deIso, ateIso),
     listarDatasBloqueadas(id),
+    contarClientesElegiveis(),
   ])
 
   return (
@@ -72,6 +74,7 @@ export default async function PaginaDeRegional({
       acoesIniciais={acoes}
       bloqueios={bloqueios}
       hojeIso={hojeIso}
+      clientesElegiveis={clientesElegiveis}
     />
   )
 }

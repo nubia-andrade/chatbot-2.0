@@ -1,0 +1,198 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { criarClienteServidor } from '../supabase/cliente-servidor'
+import { obterSessao } from '../sessao-servidor'
+import { podeAdministrarProgramas } from '../dominio/perfis'
+import { normalizarCnpj, separarCnpjsColados } from '../dominio/elegibilidade-regional'
+import { lerPaginado } from '../dados/paginacao'
+import { listarClientesElegiveis, type ClienteElegivel } from '../dados/clientes-regionais'
+
+/**
+ * Escrita da elegibilidade regional (`clientes.apto_regional`) —
+ * Configurações → Clientes regionais.
+ *
+ * A elegibilidade é do CLIENTE, GLOBAL: gravar/remover aqui vale para
+ * qualquer programa que aceite regional. A permissão é conferida aqui (para
+ * o erro sair em português) e de novo no banco pela policy "escrita
+ * administrador" de `clientes` (`supabase/schema-clientes-regional.sql`).
+ */
+
+const ERRO_SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.'
+const ERRO_SEM_PERMISSAO = 'Você não tem permissão para alterar quais clientes são elegíveis para ações regionais.'
+const CAMINHO_DA_TELA = '/configuracoes/clientes-regionais'
+
+/** Marca um único cliente da carteira como elegível — o resultado do `CampoDeBuscaDeCliente`. */
+export async function adicionarClienteElegivel(clienteId: string): Promise<{ erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: ERRO_SEM_PERMISSAO }
+
+  if (!clienteId) return { erro: 'Escolha um cliente da carteira.' }
+
+  const supabase = await criarClienteServidor()
+
+  const { error, count } = await supabase
+    .from('clientes')
+    .update({ apto_regional: true }, { count: 'exact' })
+    .eq('id', clienteId)
+
+  if (error) return { erro: 'Não foi possível gravar a elegibilidade. Tente novamente.' }
+  if (!count) return { erro: 'O banco não deixou gravar. Confira sua permissão.' }
+
+  revalidatePath(CAMINHO_DA_TELA)
+  return { erro: null }
+}
+
+/** Remove a elegibilidade de um cliente. */
+export async function removerClienteElegivel(clienteId: string): Promise<{ erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: ERRO_SEM_PERMISSAO }
+
+  if (!clienteId) return { erro: 'Cliente inválido.' }
+
+  const supabase = await criarClienteServidor()
+
+  const { error, count } = await supabase
+    .from('clientes')
+    .update({ apto_regional: false }, { count: 'exact' })
+    .eq('id', clienteId)
+
+  if (error) return { erro: 'Não foi possível remover a elegibilidade. Tente novamente.' }
+  if (!count) return { erro: 'O banco não deixou gravar. Confira sua permissão.' }
+
+  revalidatePath(CAMINHO_DA_TELA)
+  return { erro: null }
+}
+
+/**
+ * Uma página da lista de elegíveis, para a tela buscar e paginar sem
+ * recarregar. Repete a checagem de permissão da tela inteira: um `fetch`
+ * direto a esta Server Action por quem não administra não deveria devolver
+ * nada além do que o RLS já autoriza.
+ */
+export async function buscarPaginaDeElegiveis(
+  pagina: number,
+  busca: string,
+): Promise<{ clientes: ClienteElegivel[]; total: number; erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { clientes: [], total: 0, erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeAdministrarProgramas(sessao.perfis)) return { clientes: [], total: 0, erro: ERRO_SEM_PERMISSAO }
+
+  return listarClientesElegiveis(pagina, busca)
+}
+
+export type CandidatoEncontrado = {
+  id: string
+  nome: string
+  cnpj: string | null
+  jaElegivel: boolean
+}
+
+export type ResultadoDaBusca = {
+  encontrados: CandidatoEncontrado[]
+  /** Os textos colados, exatamente como digitados, que não casaram com nenhum cliente da carteira. */
+  naoEncontrados: string[]
+  erro: string | null
+}
+
+/**
+ * Procura, na carteira inteira, os clientes cujo CNPJ bate com a lista
+ * colada — SÓ PROCURA, não grava nada. A tela mostra o que encontrou e o que
+ * não encontrou antes de a pessoa confirmar, para nunca gravar em silêncio
+ * uma lista em que metade dos CNPJs não casou.
+ *
+ * Varre `clientes` inteiro (`lerPaginado` — são 15.519 linhas, muito além
+ * das 1000 que o PostgREST devolve sem paginar) porque o CNPJ na carteira
+ * vem formatado de jeitos diferentes conforme a origem: comparar
+ * `normalizarCnpj` (só dígitos) dos dois lados é o único jeito de casar
+ * "12.345.678/0001-95" colado com "12345678000195" gravado, ou vice-versa.
+ */
+export async function pesquisarClientesPorCnpj(textoColado: string): Promise<ResultadoDaBusca> {
+  const sessao = await obterSessao()
+  if (!sessao) return { encontrados: [], naoEncontrados: [], erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeAdministrarProgramas(sessao.perfis)) {
+    return { encontrados: [], naoEncontrados: [], erro: ERRO_SEM_PERMISSAO }
+  }
+
+  const cnpjsColados = separarCnpjsColados(textoColado)
+  if (cnpjsColados.length === 0) {
+    return { encontrados: [], naoEncontrados: [], erro: 'Cole ao menos um CNPJ, um por linha.' }
+  }
+
+  const supabase = await criarClienteServidor()
+  const { linhas, erro } = await lerPaginado<{
+    id: string
+    nome: string
+    cnpj: string | null
+    apto_regional: boolean
+  }>((de, ate) => supabase.from('clientes').select('id, nome, cnpj, apto_regional').range(de, ate))
+
+  if (erro) {
+    return {
+      encontrados: [],
+      naoEncontrados: [],
+      erro: 'Não foi possível consultar a carteira. Tente novamente.',
+    }
+  }
+
+  const porCnpjNormalizado = new Map(
+    linhas
+      .filter((cliente) => normalizarCnpj(cliente.cnpj) !== '')
+      .map((cliente) => [normalizarCnpj(cliente.cnpj), cliente]),
+  )
+
+  const encontrados: CandidatoEncontrado[] = []
+  const naoEncontrados: string[] = []
+  const jaVistos = new Set<string>()
+
+  for (const textoOriginal of cnpjsColados) {
+    const chave = normalizarCnpj(textoOriginal)
+    const cliente = chave !== '' ? porCnpjNormalizado.get(chave) : undefined
+
+    if (!cliente) {
+      naoEncontrados.push(textoOriginal)
+      continue
+    }
+
+    // A mesma linha colada duas vezes (ou dois CNPJs que normalizam igual)
+    // não deve aparecer duplicada na lista de "encontrados".
+    if (jaVistos.has(cliente.id)) continue
+    jaVistos.add(cliente.id)
+
+    encontrados.push({
+      id: cliente.id,
+      nome: cliente.nome,
+      cnpj: cliente.cnpj,
+      jaElegivel: cliente.apto_regional,
+    })
+  }
+
+  return { encontrados, naoEncontrados, erro: null }
+}
+
+/** Marca em lote os clientes já encontrados por `pesquisarClientesPorCnpj` — a confirmação da importação em massa. */
+export async function adicionarClientesElegiveisEmMassa(
+  clienteIds: string[],
+): Promise<{ erro: string | null; quantidade: number }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA, quantidade: 0 }
+  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: ERRO_SEM_PERMISSAO, quantidade: 0 }
+
+  const idsUnicos = [...new Set(clienteIds.filter((id) => id))]
+  if (idsUnicos.length === 0) return { erro: 'Nenhum cliente para adicionar.', quantidade: 0 }
+
+  const supabase = await criarClienteServidor()
+
+  const { error, count } = await supabase
+    .from('clientes')
+    .update({ apto_regional: true }, { count: 'exact' })
+    .in('id', idsUnicos)
+
+  if (error) return { erro: 'Não foi possível gravar a elegibilidade em massa. Tente novamente.', quantidade: 0 }
+  if (!count) return { erro: 'O banco não deixou gravar. Confira sua permissão.', quantidade: 0 }
+
+  revalidatePath(CAMINHO_DA_TELA)
+  return { erro: null, quantidade: count }
+}

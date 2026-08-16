@@ -177,6 +177,25 @@ mesmo com o código correto.
     o período a dias específicos da semana (0=domingo … 6=sábado, convenção
     de `programas.dias_da_semana`) — caso real: Mais Você, janeiro a abril,
     valor diferenciado só às quartas-feiras. Idempotente.
+13. **Aplicar Elegibilidade regional.** No `SQL Editor`, cole
+    `supabase/schema-clientes-regional.sql` > `Run`. Roda depois de todos os
+    arquivos anteriores (usa `e_administrador()`, criada no passo 2).
+    Acrescenta a `clientes`: `segmentacao_se`, `cod_siscom`, `setor_ibope` (só
+    guardadas) e `apto_regional boolean not null default false` — quem pode
+    comprar ação regional, **do cliente, global**, válida em qualquer
+    programa que aceite regional, não configuração de um programa específico.
+    Cria o índice `clientes_apto_regional_idx` e a policy de escrita
+    (consultor de programa ou proprietário) que faltava em `clientes` (antes,
+    só leitura). Idempotente.
+
+    Depois de aplicado, recarregue a carteira com os valores novos: rode
+    `npm run seed:gerar` (gera `supabase/seed-clientes.sql` de novo, agora
+    com as 4 colunas) e, em seguida, `node .superpowers/carregar-seed.mjs`
+    para gravar direto pela API — ele **atualiza no lugar** (casa cada linha
+    da planilha com o cliente já gravado por CNPJ e, na falta dele, por nome,
+    e faz upsert pelo `id`), nunca apaga e reinsere: `acoes_regionais`
+    referencia `clientes.id`, e um `delete`+`insert` trocaria os ids e
+    quebraria toda ação regional já vendida.
 
 ### Importar sem o comando de linha
 

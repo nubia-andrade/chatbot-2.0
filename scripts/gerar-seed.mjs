@@ -41,18 +41,40 @@ function aspas(valor) {
   return `'${String(valor).trim().replace(/'/g, "''")}'`
 }
 
+/**
+ * "Apto Proposta Regional" na planilha vem `'Elegível'` para quem pode
+ * comprar ação regional e `'-'` para o resto. Compara tolerante a acento e
+ * caixa (a mesma normalização de `normalizarNome`,
+ * `src/lib/dominio/texto.ts`) para não depender da grafia exata da célula.
+ */
+function ehElegivelRegional(valor) {
+  const normalizado = String(valor ?? '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+  return normalizado === 'ELEGIVEL'
+}
+
 const formatos = lerPlanilha('dados/Formatos.xlsx')
   .filter((linha) => String(linha.FORMATO ?? '').trim() !== '')
   .map((linha) => `  (${aspas(linha.FORMATO)}, ${aspas(linha.CATEGORIA)})`)
 
-const clientes = lerPlanilha('dados/Carteira.xlsx')
-  .filter((linha) => String(linha['Nome da conta'] ?? '').trim() !== '')
-  .map(
-    (linha) =>
-      `  (${aspas(linha['Nome da conta'])}, ${aspas(linha.CNPJ)}, ${aspas(linha.Setor)}, ` +
-      `${aspas(linha['Indústria'])}, ${aspas(linha['Executivo de Vendas: Nome completo'])}, ` +
-      `${aspas(linha['E-mail'])})`,
-  )
+const linhasDaCarteira = lerPlanilha('dados/Carteira.xlsx').filter(
+  (linha) => String(linha['Nome da conta'] ?? '').trim() !== '',
+)
+
+const totalElegiveis = linhasDaCarteira.filter((linha) =>
+  ehElegivelRegional(linha['Apto Proposta Regional']),
+).length
+
+const clientes = linhasDaCarteira.map(
+  (linha) =>
+    `  (${aspas(linha['Nome da conta'])}, ${aspas(linha.CNPJ)}, ${aspas(linha.Setor)}, ` +
+    `${aspas(linha['Indústria'])}, ${aspas(linha['Executivo de Vendas: Nome completo'])}, ` +
+    `${aspas(linha['E-mail'])}, ${aspas(linha['Segmentação SE'])}, ${aspas(linha['Cód SISCOM'])}, ` +
+    `${ehElegivelRegional(linha['Apto Proposta Regional'])}, ${aspas(linha['Setor IBOPE'])})`,
+)
 
 const sqlFormatos = `-- ARQUIVO GERADO por scripts/gerar-seed.mjs. Não edite à mão.
 -- Pode rodar quantas vezes quiser: não duplica nada.
@@ -69,9 +91,12 @@ const sqlClientes = `-- ARQUIVO GERADO por scripts/gerar-seed.mjs. Não edite à
 -- Dado sensível (CNPJ e e-mails nominais da carteira) — este arquivo NÃO é
 -- versionado. Veja o .gitignore.
 
--- Carteira de clientes (${clientes.length} linhas)
+-- Carteira de clientes (${clientes.length} linhas, ${totalElegiveis} elegíveis para regional)
 truncate table clientes;
-insert into clientes (nome, cnpj, setor, industria, executivo, email) values
+insert into clientes (
+  nome, cnpj, setor, industria, executivo, email,
+  segmentacao_se, cod_siscom, apto_regional, setor_ibope
+) values
 ${clientes.join(',\n')};
 `
 
@@ -79,5 +104,5 @@ writeFileSync('supabase/seed-formatos.sql', sqlFormatos, 'utf8')
 writeFileSync('supabase/seed-clientes.sql', sqlClientes, 'utf8')
 console.log(
   `seed-formatos.sql gerado: ${formatos.length} formatos\n` +
-    `seed-clientes.sql gerado: ${clientes.length} clientes`,
+    `seed-clientes.sql gerado: ${clientes.length} clientes (${totalElegiveis} elegíveis para regional)`,
 )

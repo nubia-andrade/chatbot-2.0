@@ -29,6 +29,12 @@ const SECOES: Secao[] = [
     descricao:
       'Quando foi a última carga das vendas do Globo Take, quantas ações vieram e quais formatos ainda não têm categoria.',
   },
+  {
+    href: '/configuracoes/clientes-regionais',
+    titulo: 'Clientes regionais',
+    descricao:
+      'Quem pode comprar ação regional — elegibilidade do cliente, válida para todos os programas que aceitam regional.',
+  },
 ]
 
 export default async function PaginaConfiguracoes() {
