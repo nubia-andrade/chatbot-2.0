@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao, podeAdministrar } from '../sessao-servidor'
 import { validarPrograma, type Programa } from '../dominio/cadastro'
+import { podeExcluirPrograma } from '../dominio/perfis'
 
 /**
  * Cadastrar e editar programas.
@@ -20,6 +21,7 @@ import { validarPrograma, type Programa } from '../dominio/cadastro'
  */
 
 const ERRO_SEM_PERMISSAO = 'Você não tem permissão para alterar programas.'
+const ERRO_SEM_PERMISSAO_EXCLUIR = 'Só o proprietário pode excluir um programa.'
 const ERRO_SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.'
 
 function traduzirErroDoPrograma(mensagem: string): string {
@@ -76,7 +78,11 @@ export async function salvarPrograma(
   }
 
   const consulta = dados.id
-    ? supabase.from('programas').update(valores).eq('id', dados.id).select('id')
+    ? supabase
+        .from('programas')
+        .update({ ...valores, atualizado_em: new Date().toISOString() })
+        .eq('id', dados.id)
+        .select('id')
     : supabase.from('programas').insert(valores).select('id')
 
   const { data, error } = await consulta
@@ -139,5 +145,44 @@ export async function salvarApelidos(
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}`)
+  return { erro: null }
+}
+
+/**
+ * Exclui um programa — a única ação irreversível da Entrega 2. Por cascata
+ * do banco (`supabase/schema-entrega-2.sql`), leva junto as datas
+ * bloqueadas, as restrições de anunciante, os preços regionais e as ações
+ * regionais daquele programa.
+ *
+ * A checagem de `podeExcluirPrograma` (só proprietário) acontece aqui para
+ * o erro sair em português, e de novo no banco pela policy "remocao
+ * proprietario" de `programas` — a interface esconder o botão "Excluir"
+ * para quem não é proprietário (`CartaoDePrograma.tsx`) é conveniência, não
+ * proteção: quem forçar a chamada sem ser proprietário esbarra nesta
+ * checagem e, se contornar esta, esbarra no RLS.
+ */
+export async function excluirPrograma(id: string): Promise<{ erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeExcluirPrograma(sessao.perfis)) return { erro: ERRO_SEM_PERMISSAO_EXCLUIR }
+
+  const supabase = await criarClienteServidor()
+
+  const { error, count } = await supabase
+    .from('programas')
+    .delete({ count: 'exact' })
+    .eq('id', id)
+
+  if (error) {
+    return { erro: 'Não foi possível excluir o programa. Tente novamente.' }
+  }
+
+  // Um DELETE barrado pelo RLS volta sem erro e sem linhas afetadas — sem
+  // conferir, a tela diria "excluído" com o programa ainda no banco.
+  if (!count || count === 0) {
+    return { erro: 'O banco não deixou excluir. Confira se você é proprietário.' }
+  }
+
+  revalidatePath('/configuracoes/programas')
   return { erro: null }
 }

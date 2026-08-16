@@ -21,6 +21,8 @@ export type Programa = {
   percentual_simulcast: number | null
   custo_multishow: number | null
   disponivel_para_proposta: boolean
+  /** Alimenta o "Modificado em" do cartão da lista — Entrega 2. */
+  atualizado_em: string
 }
 
 function vazio(valor: string | undefined | null): boolean {

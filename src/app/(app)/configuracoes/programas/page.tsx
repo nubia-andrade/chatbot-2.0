@@ -1,16 +1,16 @@
 import Link from 'next/link'
 import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
 import { listarProgramas } from '@/lib/dados/programas'
-import { ListaDeProgramas } from '@/components/programas/ListaDeProgramas'
+import { GradeDeProgramas } from '@/components/programas/GradeDeProgramas'
 
 /**
- * Lista de programas — Task 11.
+ * Lista de programas, em grade de cartões — Task 9.
  *
  * De propósito, repete a checagem de `podeAdministrar` que já decide se
  * "Configurações" aparece na barra lateral (`BarraLateral.tsx`): esconder o
  * link é conveniência de interface, quem protege de verdade os dados é o
- * RLS do banco (`supabase/schema.sql`). Quem forçar esta URL sem permissão
- * vê o aviso abaixo, não a lista.
+ * RLS do banco (`supabase/schema.sql` e `supabase/schema-entrega-2.sql`).
+ * Quem forçar esta URL sem permissão vê o aviso abaixo, não a lista.
  */
 export default async function PaginaDeProgramas() {
   const sessao = await obterSessao()
@@ -61,7 +61,11 @@ export default async function PaginaDeProgramas() {
         </Link>
       </header>
 
-      <ListaDeProgramas programas={programas} />
+      <GradeDeProgramas
+        programas={programas}
+        perfis={sessao?.perfis ?? []}
+        programasVinculados={sessao?.programasVinculados ?? []}
+      />
     </div>
   )
 }
