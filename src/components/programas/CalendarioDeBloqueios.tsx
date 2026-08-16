@@ -1,7 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { bloquearDatas, desbloquearData } from '@/lib/acoes/datas-bloqueadas'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  bloquearDatas,
+  desbloquearData,
+  contarAcoesNasDatas,
+  type ImpactoDoBloqueio,
+} from '@/lib/acoes/datas-bloqueadas'
 import { indexarBloqueios } from '@/lib/dominio/bloqueios'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
@@ -25,6 +30,8 @@ const NOMES_DOS_MESES = [
 
 const NOMES_DOS_DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
+const ATRASO_DO_CALCULO_MS = 400
+
 function paraIso(ano: number, mes: number, dia: number): string {
   return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
@@ -35,6 +42,71 @@ function formatarDataBR(iso: string): string {
   const dia = String(data.getUTCDate()).padStart(2, '0')
   const mes = String(data.getUTCMonth() + 1).padStart(2, '0')
   return `${dia}/${mes}/${data.getUTCFullYear()}`
+}
+
+/**
+ * "Quantas ações seriam afetadas" — o número que a spec exige antes de
+ * confirmar o bloqueio.
+ *
+ * Três estados, e os três dizem alguma coisa: calculando, nenhuma ação
+ * afetada (a confirmação vira rotina tranquila) e N ações afetadas, com as
+ * datas nomeadas. O último usa o tom de alerta de propósito: bloquear uma
+ * data que já vendeu não é proibido, mas é o tipo de clique que ninguém quer
+ * dar sem ter lido.
+ */
+function AvisoDeImpacto({ impacto }: { impacto: ImpactoDoBloqueio | null }) {
+  if (!impacto) {
+    return (
+      <p className="mt-3 text-[12px] font-semibold text-[var(--texto-3)]">
+        Conferindo quantas ações já vendidas caem nestas datas…
+      </p>
+    )
+  }
+
+  if (impacto.erro) {
+    return (
+      <p role="alert" className="mt-3 text-[12px] font-semibold" style={{ color: 'var(--concorrencia)' }}>
+        {impacto.erro}
+      </p>
+    )
+  }
+
+  const total = impacto.nacionais + impacto.regionais
+
+  if (total === 0) {
+    return (
+      <p role="status" className="mt-3 text-[12px] font-semibold" style={{ color: 'var(--disponivel)' }}>
+        Nenhuma ação vendida cai nestas datas.
+      </p>
+    )
+  }
+
+  const partes: string[] = []
+  if (impacto.nacionais > 0) {
+    partes.push(`${impacto.nacionais} nacional${impacto.nacionais > 1 ? 'is' : ''}`)
+  }
+  if (impacto.regionais > 0) {
+    partes.push(`${impacto.regionais} regional${impacto.regionais > 1 ? 'is' : ''}`)
+  }
+
+  return (
+    <div
+      role="alert"
+      className="mt-3 rounded-[10px] px-3 py-2"
+      style={{ background: 'var(--prazo-fundo)', color: 'var(--prazo)' }}
+    >
+      <p className="text-[12.5px] font-bold">
+        {total === 1
+          ? '1 ação já vendida cai nestas datas'
+          : `${total} ações já vendidas caem nestas datas`}{' '}
+        ({partes.join(' e ')}).
+      </p>
+      <p className="mt-1 text-[11.5px] font-semibold">
+        Em {impacto.datasAfetadas.map(formatarDataBR).join(', ')}. Bloquear não cancela o que já
+        está vendido — só impede novas vendas.
+      </p>
+    </div>
+  )
 }
 
 /** Célula vazia à esquerda do dia 1, para o dia da semana bater na grade. */
@@ -73,7 +145,32 @@ export function CalendarioDeBloqueios({ programaId, bloqueiosIniciais }: Props) 
   const [erros, setErros] = useState<string[]>([])
   const [sucesso, setSucesso] = useState<string | null>(null)
 
+  // O impacto fica amarrado à seleção que o produziu (`paraSelecao`), em vez
+  // de ser limpo por um `setState` dentro do efeito — padrão que o linter de
+  // hooks rejeita, e com razão: ao trocar a seleção, o número antigo
+  // simplesmente deixa de casar e some, sem render extra.
+  const [impacto, setImpacto] = useState<{ paraSelecao: string; dados: ImpactoDoBloqueio } | null>(null)
+  const idDaConsultaDeImpacto = useRef(0)
+
   const celulas = useMemo(() => montarGrade(ano, mes), [ano, mes])
+
+  // A spec exige o número de ações afetadas ANTES de confirmar. A consulta
+  // acompanha a seleção com o mesmo debounce do resto do app, para clicar em
+  // seis datas seguidas não disparar seis varreduras.
+  const chaveDaSelecao = [...selecionadas].sort().join(',')
+  useEffect(() => {
+    if (chaveDaSelecao === '') return
+    const numero = ++idDaConsultaDeImpacto.current
+    const temporizador = setTimeout(async () => {
+      const resultado = await contarAcoesNasDatas(programaId, chaveDaSelecao.split(','))
+      if (numero !== idDaConsultaDeImpacto.current) return
+      setImpacto({ paraSelecao: chaveDaSelecao, dados: resultado })
+    }, ATRASO_DO_CALCULO_MS)
+    return () => clearTimeout(temporizador)
+  }, [chaveDaSelecao, programaId])
+
+  // Enquanto não casa com a seleção atual, a consulta ainda está em curso.
+  const impactoAtual = impacto?.paraSelecao === chaveDaSelecao ? impacto.dados : null
 
   // Quem decide se uma data está bloqueada é `estaBloqueada` (Task 4, regra
   // R12) — `indexarBloqueios` só chama essa função para cada dia do mês em
@@ -282,6 +379,8 @@ export function CalendarioDeBloqueios({ programaId, bloqueiosIniciais }: Props) 
               ))}
             </ul>
           )}
+
+          {selecionadas.length > 0 && <AvisoDeImpacto impacto={impactoAtual} />}
 
           <label htmlFor="motivo-do-bloqueio" className="mb-[7px] mt-4 block text-[12px] font-semibold text-[var(--texto-2)]">
             Motivo (obrigatório)

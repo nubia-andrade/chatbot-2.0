@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { podeEditarPrograma } from '../dominio/perfis'
+import { montarMapa, ocupaSlot } from '../dominio/formatos'
+import { montarIndice, encontrarProgramaId } from '../dominio/programas'
+import { lerPaginado } from '../dados/paginacao'
 
 /**
  * Cadastro de datas bloqueadas — Task 11.
@@ -84,6 +87,97 @@ export async function bloquearDatas(
 
   revalidatePath(`/configuracoes/programas/${programaId}/datas`)
   return { erros }
+}
+
+export type ImpactoDoBloqueio = {
+  nacionais: number
+  regionais: number
+  /** Datas escolhidas que já têm ação vendida, em ISO — a tela as nomeia. */
+  datasAfetadas: string[]
+  erro: string | null
+}
+
+/**
+ * Quantas ações JÁ VENDIDAS caem nas datas prestes a ser bloqueadas — o número
+ * que a spec exige à vista antes de confirmar ("Datas bloqueadas mostram
+ * quantas ações seriam afetadas antes de confirmar").
+ *
+ * Sem ele, a tela informava apenas quantas datas estavam selecionadas, que é
+ * a única coisa que a pessoa já sabe: ela acabou de clicar nelas. O que ela
+ * não sabe, e não tem como descobrir sem sair da página, é que a sexta que
+ * está fechando por feriado já tem três ações vendidas. Bloquear data com
+ * venda é decisão legítima — acontece quando o feriado é confirmado depois da
+ * venda —, mas é decisão que muda de natureza com o número na frente.
+ *
+ * Conta os dois inventários:
+ *
+ * - **Nacionais**, de `acoes_vendidas`, restritas a este programa (pelo
+ *   mnemônico ou apelido, mesma regra da ocupação) e só o que ocupa slot —
+ *   `ocupaSlot`: comercial, vinheta e chamada estão na base mas não são ação
+ *   de conteúdo, e contá-las inflaria o aviso.
+ * - **Regionais**, de `acoes_regionais`, uma linha por praça vendida.
+ *
+ * `formatos` é lida com `lerPaginado` porque cresce com a origem (73 hoje) e
+ * um formato que ficasse fora das primeiras 1000 linhas seria classificado
+ * pelo padrão conservador, mudando a contagem em silêncio.
+ */
+export async function contarAcoesNasDatas(
+  programaId: string,
+  datas: string[],
+): Promise<ImpactoDoBloqueio> {
+  const vazio: ImpactoDoBloqueio = { nacionais: 0, regionais: 0, datasAfetadas: [], erro: null }
+
+  const sessao = await obterSessao()
+  if (!sessao) return { ...vazio, erro: ERRO_SESSAO_EXPIRADA }
+
+  const datasUnicas = [...new Set(datas)]
+  if (datasUnicas.length === 0) return vazio
+
+  const supabase = await criarClienteServidor()
+
+  const [nacionais, regionais, programas, apelidos, leituraDeFormatos] = await Promise.all([
+    supabase
+      .from('acoes_vendidas')
+      .select('programa, data_de_exibicao, formato')
+      .in('data_de_exibicao', datasUnicas),
+    supabase
+      .from('acoes_regionais')
+      .select('data_de_exibicao')
+      .eq('programa_id', programaId)
+      .in('data_de_exibicao', datasUnicas),
+    supabase.from('programas').select('id, mnemonico'),
+    supabase.from('programa_apelidos').select('programa_id, texto'),
+    lerPaginado<{ formato: string; categoria: string }>((de, ate) =>
+      supabase.from('formatos').select('formato, categoria').range(de, ate),
+    ),
+  ])
+
+  if (nacionais.error || regionais.error) {
+    return { ...vazio, erro: 'Não foi possível conferir as ações já vendidas nestas datas.' }
+  }
+
+  const indice = montarIndice(programas.data ?? [], apelidos.data ?? [])
+  const mapaDeFormatos = montarMapa(leituraDeFormatos.linhas)
+
+  const nacionaisDoPrograma = (nacionais.data ?? []).filter(
+    (linha) =>
+      encontrarProgramaId(linha.programa, indice) === programaId &&
+      ocupaSlot(linha.formato, mapaDeFormatos),
+  )
+
+  const datasAfetadas = [
+    ...new Set([
+      ...nacionaisDoPrograma.map((linha) => linha.data_de_exibicao),
+      ...(regionais.data ?? []).map((linha) => linha.data_de_exibicao),
+    ]),
+  ].sort()
+
+  return {
+    nacionais: nacionaisDoPrograma.length,
+    regionais: (regionais.data ?? []).length,
+    datasAfetadas,
+    erro: null,
+  }
 }
 
 /** Remove um único bloqueio de data — a linha "Desbloquear" da listagem. */
