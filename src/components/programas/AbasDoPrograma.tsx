@@ -44,15 +44,20 @@ export function AbasDoPrograma({
   const pathname = usePathname()
   const base = `/configuracoes/programas/${programaId}`
 
-  const abas: Aba[] = [
-    { rotulo: 'Cadastro', href: base },
-    { rotulo: 'Datas bloqueadas', href: `${base}/datas`, contagem: contagemDatas },
-    { rotulo: 'Restrições', href: `${base}/restricoes`, contagem: contagemRestricoes },
-  ]
+  // Ordem pedida pela área: Regional vem logo depois do Cadastro, porque é a
+  // continuação natural da configuração do programa — quem acabou de definir
+  // dias e slots segue para praças e preços. Datas bloqueadas e Restrições
+  // são ajustes posteriores, feitos ao longo do tempo.
+  const abas: Aba[] = [{ rotulo: 'Cadastro', href: base }]
 
   if (aceitaRegional) {
     abas.push({ rotulo: 'Regional', href: `${base}/regional`, contagem: contagemRegional })
   }
+
+  abas.push(
+    { rotulo: 'Datas bloqueadas', href: `${base}/datas`, contagem: contagemDatas },
+    { rotulo: 'Restrições', href: `${base}/restricoes`, contagem: contagemRestricoes },
+  )
 
   return (
     <nav
