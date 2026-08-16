@@ -14,6 +14,20 @@ export type Cliente = {
 const LIMITE_PADRAO = 20
 
 /**
+ * Escapa os coringas do `LIKE`/`ILIKE` do Postgres antes de interpolar um
+ * termo digitado livremente num padrão `%…%`.
+ *
+ * `%` casa qualquer sequência, `_` casa qualquer caractere único e `\` é o
+ * caractere de escape — sem isso, uma razão social com `_` (comum em nomes
+ * compostos) ou alguém que digite `%` por acaso produz correspondência
+ * errada, não um erro. A ordem importa: a barra invertida escapa primeiro,
+ * senão as barras inseridas para escapar `%` e `_` seriam escapadas de novo.
+ */
+function escaparCoringasLike(valor: string): string {
+  return valor.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+/**
  * Busca clientes da carteira por nome, para o `CampoDeBuscaDeCliente`.
  *
  * São 15.519 registros (`supabase/seed-clientes.sql`): nunca traz a tabela
@@ -36,7 +50,7 @@ export async function buscarClientes(
   const { data, error } = await supabase
     .from('clientes')
     .select('id, nome, cnpj, setor, industria')
-    .ilike('nome', `%${termoLimpo}%`)
+    .ilike('nome', `%${escaparCoringasLike(termoLimpo)}%`)
     .order('nome', { ascending: true })
     .limit(limite)
 
