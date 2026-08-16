@@ -59,7 +59,19 @@ SQL Editor.
    (`pracas`, `preco_regional`, `acoes_regionais`, `datas_bloqueadas`,
    `restricoes_anunciante`, `consultor_programa`) e as colunas novas de
    `programas`. Também pode ser rodado de novo a qualquer momento.
-3. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
+3. **Aplicar as correções da Entrega 2.** Ainda no `SQL Editor`, cole
+   `supabase/schema-entrega-2-correcoes.sql` > `Run`. Este arquivo é o
+   **último da sequência e tem a palavra final sobre autorização**: resolve a
+   divergência entre as duas definições de `e_administrador()`, restringe a
+   escrita de `programa_apelidos` a quem é consultor daquele programa (era
+   qualquer administrador) e amarra as imagens do Storage a quem as enviou.
+   Também é idempotente.
+
+   ⚠️ Se algum dia você reaplicar o `schema.sql` ou o `schema-entrega-2.sql`
+   sozinho, **rode este arquivo de novo em seguida** — os anteriores recriam
+   as policies amplas e a definição antiga de `e_administrador()`, revertendo
+   a autorização sem erro nenhum no console.
+4. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
    planilhas em `dados/`) e aplique no SQL Editor, nesta ordem,
    `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql`. São 73
    formatos e ~15,5 mil clientes.
@@ -79,6 +91,24 @@ SQL Editor.
    login em vez de JSON, veja "Importar sem o comando de linha" abaixo — é o
    caminho normal, não um sinal de erro. Depois de importar,
    `Configurações > Importação` mostra a data do snapshot e o que veio.
+8. **Configurar as ações regionais.** Depois de cadastrar os programas
+   (`Configurações > Programas`), aplique `supabase/seed-regional.sql` no SQL
+   Editor. Ele configura o **Encontro** e o **É de Casa** com os valores de
+   `docs/regras-acoes-regionais.md`: dia da semana do slot regional, prazo
+   mínimo próprio, teto de praças, direitos e conexos, custo de produção e o
+   preço de cada uma das 5 praças. Idempotente, e casa os programas pelo
+   mnemônico (`FATI` e `CASA`) — se os seus tiverem outro, ajuste o arquivo.
+
+   O mesmo arquivo corrige o mnemônico do É de Casa de `EDC` para `CASA`. Não
+   é detalhe: a API manda `"CASA - E DE CASA"`, e com `EDC` nenhuma entrega
+   desse programa era reconhecida — a ocupação nacional ficava zerada e a
+   sugestão de ação regional nunca achava nada, em silêncio.
+
+   ⚠️ **Os valores monetários são provisórios.** O documento da área marca
+   preço por praça, direitos e conexos e custo de produção como "checar com
+   Pricing". A aba Regional exibe esse aviso na tela. Quando Pricing
+   confirmar, atualize `supabase/seed-regional.sql` **e**
+   `docs/regras-acoes-regionais.md` juntos, para os dois não divergirem.
 
 ### Importar sem o comando de linha
 
@@ -123,12 +153,15 @@ O upload do cadastro de programas grava no bucket `programas` do Supabase
 Storage, criado pelo `schema.sql` do passo 1. Se o app reclamar de que o
 espaço de armazenamento não existe, crie o bucket à mão — `Storage` >
 `New bucket` > nome `programas`, com **Public bucket** ligado — e rode o
-`schema.sql` de novo para instalar as policies (leitura pública, escrita só
-para administradores). Enquanto isso, o formulário aceita colar a URL de uma
-imagem já hospedada.
+`schema.sql` seguido do `schema-entrega-2-correcoes.sql` para instalar as
+policies: leitura pública, envio por consultor ou proprietário, e alteração
+ou remoção só por quem enviou o arquivo (ou pelo proprietário). Enquanto
+isso, o formulário aceita colar a URL de uma imagem já hospedada.
 
 ## Dados
 
 A pasta `dados/` guarda planilhas de trabalho com CNPJ e e-mails nominais e
-**nunca é versionada** (veja `.gitignore`). O handoff de design vive em
+**nunca é versionada** (veja `.gitignore`). O mesmo vale para
+`.superpowers/`, a área de trabalho do desenvolvimento, que guarda backups do
+banco — inclusive a carteira inteira em JSON. O handoff de design vive em
 `design_handoff/`.
