@@ -48,36 +48,97 @@ function validar(dados: Partial<DadosDeRestricao>): string[] {
   return erros
 }
 
-/** Grava uma restrição nova — o formulário não edita, só cria. */
+/**
+ * Grava uma restrição nova — o formulário não edita, só cria.
+ *
+ * Devolve o `id` gerado pelo banco para a lista da tela poder oferecer
+ * "Excluir" na restrição recém-criada sem recarregar a página. Sem ele, a
+ * linha nova ficaria com um id inventado no navegador e o botão de exclusão
+ * não acharia nada para apagar — justamente no momento em que a exclusão é
+ * mais provável: logo depois de cadastrar errado.
+ */
 export async function salvarRestricao(
   programaId: string,
   dados: Partial<DadosDeRestricao>,
-): Promise<{ erros: string[] }> {
+): Promise<{ erros: string[]; id: string | null }> {
   const sessao = await obterSessao()
-  if (!sessao) return { erros: [ERRO_SESSAO_EXPIRADA] }
+  if (!sessao) return { erros: [ERRO_SESSAO_EXPIRADA], id: null }
   if (!podeEditarPrograma(sessao.perfis, sessao.programasVinculados, programaId)) {
-    return { erros: [ERRO_SEM_PERMISSAO] }
+    return { erros: [ERRO_SEM_PERMISSAO], id: null }
   }
 
   const erros = validar(dados)
-  if (erros.length > 0) return { erros }
+  if (erros.length > 0) return { erros, id: null }
 
   const supabase = await criarClienteServidor()
 
-  const { error } = await supabase.from('restricoes_anunciante').insert({
-    programa_id: programaId,
-    anunciante: dados.anunciante?.trim() || null,
-    setor: dados.setor?.trim() || null,
-    industria: dados.industria?.trim() || null,
-    motivo: dados.motivo!.trim(),
-  })
+  const { data, error } = await supabase
+    .from('restricoes_anunciante')
+    .insert({
+      programa_id: programaId,
+      anunciante: dados.anunciante?.trim() || null,
+      setor: dados.setor?.trim() || null,
+      industria: dados.industria?.trim() || null,
+      motivo: dados.motivo!.trim(),
+    })
+    .select('id')
 
   if (error) {
-    return { erros: ['Não foi possível gravar a restrição. Tente novamente.'] }
+    return { erros: ['Não foi possível gravar a restrição. Tente novamente.'], id: null }
+  }
+
+  // INSERT barrado pelo RLS volta sem erro e sem linhas — sem conferir, a tela
+  // diria "salva" e a restrição não estaria bloqueando nada.
+  if (!data || data.length === 0) {
+    return {
+      erros: ['O banco não deixou gravar. Confira sua permissão neste programa.'],
+      id: null,
+    }
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/restricoes`)
-  return { erros: [] }
+  return { erros: [], id: data[0].id }
+}
+
+/**
+ * Remove uma restrição cadastrada.
+ *
+ * Existe porque a alternativa era pior: uma restrição criada por engano
+ * bloqueia venda de verdade — o cliente some das datas oferecidas — e, sem
+ * esta função, só sairia por acesso direto ao banco. Quem cadastrou não
+ * consegue desfazer o próprio erro.
+ *
+ * Não usa `ConfirmacaoNomeada` (digitar o nome), reservada para a exclusão de
+ * programa: apagar uma restrição não destrói dado nenhum além dela mesma e é
+ * refazível em dez segundos pelo formulário ao lado. A confirmação em duas
+ * etapas da tela é proporcional ao estrago.
+ */
+export async function excluirRestricao(
+  programaId: string,
+  restricaoId: string,
+): Promise<{ erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: ERRO_SESSAO_EXPIRADA }
+  if (!podeEditarPrograma(sessao.perfis, sessao.programasVinculados, programaId)) {
+    return { erro: ERRO_SEM_PERMISSAO }
+  }
+
+  const supabase = await criarClienteServidor()
+
+  const { error, count } = await supabase
+    .from('restricoes_anunciante')
+    .delete({ count: 'exact' })
+    .eq('id', restricaoId)
+    .eq('programa_id', programaId)
+
+  if (error) return { erro: 'Não foi possível excluir a restrição. Tente novamente.' }
+
+  // DELETE barrado pelo RLS volta sem erro e sem linhas afetadas — sem
+  // conferir, a tela diria "excluída" com a restrição ainda bloqueando venda.
+  if (!count) return { erro: 'O banco não deixou excluir. Confira sua permissão neste programa.' }
+
+  revalidatePath(`/configuracoes/programas/${programaId}/restricoes`)
+  return { erro: null }
 }
 
 /**

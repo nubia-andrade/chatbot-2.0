@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { salvarRestricao, calcularAlcanceDaRestricao } from '@/lib/acoes/restricoes'
+import { salvarRestricao, calcularAlcanceDaRestricao, excluirRestricao } from '@/lib/acoes/restricoes'
 import { CampoDeBuscaDeCliente } from '@/components/comum/CampoDeBuscaDeCliente'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { EstadoVazio } from '@/components/comum/EstadoVazio'
@@ -78,6 +78,16 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
   const [gravando, setGravando] = useState(false)
   const [erros, setErros] = useState<string[]>([])
   const [sucesso, setSucesso] = useState<string | null>(null)
+
+  // Confirmação em duas etapas: a primeira troca o botão "Excluir" pelo par
+  // "Confirmar/Cancelar" naquela linha. Guarda o id da restrição em confirmação
+  // — só uma por vez, para não haver dois botões vermelhos armados na tela.
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null)
+  const [excluindo, setExcluindo] = useState<string | null>(null)
+  // Retorno da exclusão fica ao lado da LISTA, não junto do formulário de
+  // cadastro na coluna da direita: mensagem longe do que a produziu é
+  // mensagem que ninguém lê.
+  const [avisoDaLista, setAvisoDaLista] = useState<{ tipo: 'erro' | 'sucesso'; texto: string } | null>(null)
 
   const idDaConsultaAtual = useRef(0)
   const campoDeMotivo = useRef<HTMLTextAreaElement>(null)
@@ -163,12 +173,30 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
     }
 
     setRestricoes((atual) => [
-      { id: `temporario-${Date.now()}`, ...dadosDoAlvo, motivo: motivoLimpo },
+      { id: resultado.id!, ...dadosDoAlvo, motivo: motivoLimpo },
       ...atual,
     ])
     setSucesso('Restrição salva.')
     trocarModo(modo)
     setMotivo('')
+  }
+
+  async function excluir(id: string) {
+    setExcluindo(id)
+    setAvisoDaLista(null)
+
+    const resultado = await excluirRestricao(programaId, id)
+
+    setExcluindo(null)
+    setConfirmandoExclusao(null)
+
+    if (resultado.erro) {
+      setAvisoDaLista({ tipo: 'erro', texto: resultado.erro })
+      return
+    }
+
+    setRestricoes((atual) => atual.filter((restricao) => restricao.id !== id))
+    setAvisoDaLista({ tipo: 'sucesso', texto: 'Restrição excluída.' })
   }
 
   return (
@@ -177,6 +205,16 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
 
       <section className="flex-1">
         <h3 className="mb-3 text-[14px] font-bold text-[var(--texto)]">Restrições cadastradas</h3>
+
+        {avisoDaLista && (
+          <p
+            role={avisoDaLista.tipo === 'erro' ? 'alert' : 'status'}
+            className="mb-3 text-[12.5px] font-semibold"
+            style={{ color: avisoDaLista.tipo === 'erro' ? 'var(--concorrencia)' : 'var(--disponivel)' }}
+          >
+            {avisoDaLista.texto}
+          </p>
+        )}
 
         {restricoes.length === 0 ? (
           <EstadoVazio
@@ -201,6 +239,45 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                   <span className="text-[13.5px] font-bold text-[var(--texto)]">{descreverAlvo(restricao)}</span>
                 </div>
                 <span className="text-[13px] text-[var(--texto-3)]">{restricao.motivo}</span>
+
+                {confirmandoExclusao === restricao.id ? (
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-[var(--borda)] pt-2">
+                    <span className="mr-auto text-[12px] font-semibold" style={{ color: 'var(--concorrencia)' }}>
+                      Excluir esta restrição? {descreverAlvo(restricao)} volta a ser oferecido neste programa.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoExclusao(null)}
+                      disabled={excluindo === restricao.id}
+                      className="cursor-pointer rounded-[10px] border border-[var(--borda-forte)] px-3 py-1.5 text-[12px] font-semibold text-[var(--texto-2)] hover:bg-[var(--superficie-suave)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => excluir(restricao.id)}
+                      disabled={excluindo === restricao.id}
+                      className="cursor-pointer rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-[var(--superficie)] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ background: 'var(--concorrencia)' }}
+                    >
+                      {excluindo === restricao.id ? 'Excluindo…' : 'Confirmar exclusão'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoExclusao(restricao.id)
+                      setSucesso(null)
+                      setErros([])
+                    }}
+                    aria-label={`Excluir restrição de ${descreverAlvo(restricao)}`}
+                    className="cursor-pointer text-[12px] font-semibold hover:underline"
+                    style={{ color: 'var(--concorrencia)' }}
+                  >
+                    Excluir
+                  </button>
+                )}
               </li>
             ))}
           </ul>
