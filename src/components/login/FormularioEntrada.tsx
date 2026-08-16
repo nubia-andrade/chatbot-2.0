@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 type Props = {
   email: string
   senha: string
@@ -90,13 +92,12 @@ export function FormularioEntrada({
         </div>
 
         <div className="flex justify-end">
-          {/*
-            Recuperação de senha ainda não tem fluxo — a tela mostra a
-            intenção sem prometer um link que não leva a lugar nenhum.
-          */}
-          <span className="cursor-default text-[12px] font-semibold text-[var(--roxo)]">
+          <Link
+            href="/esqueci-senha"
+            className="text-[12px] font-semibold text-[var(--roxo)] hover:text-[var(--roxo-hover)]"
+          >
             Esqueci minha senha
-          </span>
+          </Link>
         </div>
 
         {erro && (

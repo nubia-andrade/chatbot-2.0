@@ -61,3 +61,24 @@ export async function sair(): Promise<void> {
   const supabase = criarClienteNavegador()
   await supabase.auth.signOut()
 }
+
+/**
+ * Dispara o e-mail de redefinição de senha.
+ *
+ * O `redirectTo` aponta para `/redefinir-senha` na própria origem — é para lá
+ * que o Supabase manda a pessoa depois de clicar no link do e-mail, com o
+ * código de recuperação anexado à URL (ver `TelaRedefinirSenha`).
+ *
+ * Não existe retorno de erro: a resposta é sempre a mesma, tenha o e-mail
+ * conta ou não. O próprio Supabase já não distingue os dois casos nesta
+ * chamada (por isso nunca "e-mail não encontrado") — e mesmo que algum erro
+ * de rede aconteça, dizer isso à pessoa não ajudaria e abriria uma diferença
+ * observável entre "deu erro" e "e-mail não existe" que um atacante poderia
+ * usar para descobrir quais e-mails têm conta no sistema.
+ */
+export async function enviarLinkDeRedefinicao(email: string): Promise<void> {
+  const supabase = criarClienteNavegador()
+  await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: `${window.location.origin}/redefinir-senha`,
+  })
+}

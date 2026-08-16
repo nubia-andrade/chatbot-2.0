@@ -48,6 +48,20 @@ cadastrada na Vercel. O `npm run seed:gerar` não usa chave nenhuma: ele só lê
 as planilhas de `dados/` e escreve arquivos `.sql`, que você aplica à mão no
 SQL Editor.
 
+### URL de redirecionamento (obrigatório para "Esqueci minha senha")
+
+O fluxo de `/esqueci-senha` → e-mail → `/redefinir-senha` só funciona se o
+Supabase tiver permissão de mandar a pessoa de volta para o app. No painel do
+projeto, em `Authentication > URL Configuration`:
+
+- **Site URL**: `http://localhost:3000` (em desenvolvimento).
+- **Redirect URLs**: adicione `http://localhost:3000/**`.
+
+Quando existir domínio de produção, repita os dois campos com esse domínio
+(ex.: `https://seu-dominio.com` e `https://seu-dominio.com/**`) — sem isso o
+link do e-mail de redefinição é recusado pelo Supabase (redirect not allowed)
+mesmo com o código correto.
+
 ## Instalação do zero, na ordem
 
 1. **Aplicar o schema.** No painel do Supabase, `SQL Editor` > cole o conteúdo
