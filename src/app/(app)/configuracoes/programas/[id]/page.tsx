@@ -1,16 +1,19 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
 import { listarApelidos, obterPrograma } from '@/lib/dados/programas'
 import { FormularioDePrograma } from '@/components/programas/FormularioDePrograma'
 import { EditorDeApelidos } from '@/components/programas/EditorDeApelidos'
 
 /**
- * Edição (ou criação) de um programa — Task 11.
+ * Aba Cadastro da área do programa — Task 10 (antes vivia sozinha nesta
+ * rota, Task 9/11 original).
  *
- * `/configuracoes/programas/novo` também cai aqui: `novo` não é um `id` de
- * verdade, é o sinal de que o formulário começa em branco. Isso evita uma
- * segunda página quase idêntica só para o caso de criação.
+ * `/configuracoes/programas/novo` cai aqui: `novo` não é um `id` de
+ * verdade, é o sinal de que o formulário começa em branco. A guarda de
+ * acesso e o cabeçalho com nome/mnemônico/canal já ficam por conta de
+ * `[id]/layout.tsx` — esta página só cuida do formulário dos 19 (+6
+ * regionais) campos. Para "novo" o layout não busca programa nem mostra
+ * cabeçalho ou abas (não há o que mostrar antes de o programa existir), daí
+ * o título próprio abaixo.
  *
  * O editor de apelidos só aparece depois que o programa existe de fato —
  * `programa_apelidos.programa_id` referencia um `programas.id` real, então
@@ -22,50 +25,31 @@ export default async function PaginaDePrograma({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const sessao = await obterSessao()
-
-  if (!podeAdministrar(sessao)) {
-    return (
-      <section
-        style={{
-          background: 'var(--superficie)',
-          borderRadius: 'var(--raio-janela)',
-          padding: '40px',
-          border: '1px solid var(--borda)',
-        }}
-      >
-        <p style={{ color: 'var(--concorrencia)' }}>
-          Você não tem permissão para ver esta página.
-        </p>
-      </section>
-    )
-  }
-
   const ehNovo = id === 'novo'
+
+  // O layout já negou acesso (`notFound()`) para qualquer id que não exista
+  // ou que a pessoa não edite — `programa` só é `null` aqui quando `ehNovo`.
   const programa = ehNovo ? null : await obterPrograma(id)
-
-  if (!ehNovo && !programa) {
-    notFound()
-  }
-
   const apelidos = programa ? await listarApelidos(programa.id) : []
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link
-          href="/configuracoes/programas"
-          className="text-[12.5px] font-semibold text-[var(--roxo)] hover:text-[var(--roxo-hover)]"
-        >
-          ← Voltar para Programas
-        </Link>
-        <h1
-          className="mt-2 text-[26px] font-bold text-[var(--texto)]"
-          style={{ fontFamily: 'var(--fonte-titulo)' }}
-        >
-          {programa ? programa.nome : 'Novo programa'}
-        </h1>
-      </div>
+      {ehNovo && (
+        <div>
+          <Link
+            href="/configuracoes/programas"
+            className="text-[12.5px] font-semibold text-[var(--roxo)] hover:text-[var(--roxo-hover)]"
+          >
+            ← Voltar para Programas
+          </Link>
+          <h1
+            className="mt-2 text-[26px] font-bold text-[var(--texto)]"
+            style={{ fontFamily: 'var(--fonte-titulo)' }}
+          >
+            Novo programa
+          </h1>
+        </div>
+      )}
 
       <FormularioDePrograma programa={programa} />
 

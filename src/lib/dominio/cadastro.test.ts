@@ -73,6 +73,68 @@ describe('validarPrograma', () => {
     )
     expect(erros).toEqual([])
   })
+
+  // R10/R11 — bloco regional, condicional a `aceita_regional`
+  it('exige dia da semana e prazo mínimo regional quando aceita regional', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: true,
+        dia_da_semana_regional: null,
+        prazo_minimo_regional_dias: null,
+      }),
+    )
+    expect(erros).toContain('Informe o dia da semana da ação regional.')
+    expect(erros).toContain('Informe o prazo mínimo regional.')
+  })
+
+  it('recusa dia da semana regional fora de 0 a 6', () => {
+    const erros = validarPrograma(
+      programa({ aceita_regional: true, dia_da_semana_regional: 9, prazo_minimo_regional_dias: 7 }),
+    )
+    expect(erros).toContain('Dia da semana regional inválido: use 0 (domingo) a 6 (sábado).')
+  })
+
+  it('recusa prazo mínimo regional negativo', () => {
+    const erros = validarPrograma(
+      programa({ aceita_regional: true, dia_da_semana_regional: 5, prazo_minimo_regional_dias: -1 }),
+    )
+    expect(erros).toContain('O prazo mínimo regional não pode ser negativo.')
+  })
+
+  it('recusa máximo de praças por ação abaixo de 1', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: true,
+        dia_da_semana_regional: 5,
+        prazo_minimo_regional_dias: 7,
+        max_pracas_por_acao: 0,
+      }),
+    )
+    expect(erros).toContain('O máximo de praças por ação regional precisa ser pelo menos 1.')
+  })
+
+  it('aceita cadastro regional completo', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: true,
+        dia_da_semana_regional: 5,
+        prazo_minimo_regional_dias: 7,
+        max_pracas_por_acao: 3,
+      }),
+    )
+    expect(erros).toEqual([])
+  })
+
+  it('dispensa o bloco regional quando o programa não aceita regional', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: false,
+        dia_da_semana_regional: null,
+        prazo_minimo_regional_dias: null,
+      }),
+    )
+    expect(erros).toEqual([])
+  })
 })
 
 describe('vaiAoArEm', () => {

@@ -23,6 +23,18 @@ export type Programa = {
   disponivel_para_proposta: boolean
   /** Alimenta o "Modificado em" do cartão da lista — Entrega 2. */
   atualizado_em: string
+
+  // Regional — Entrega 2. O bloco só se aplica quando `aceita_regional` é
+  // verdadeiro; os demais campos ficam `null`/vazios em quem não vende
+  // regional (Encontro e É de Casa hoje, por `docs/regras-acoes-regionais.md`).
+  aceita_regional: boolean
+  /** 0 (domingo) a 6 (sábado) — o único dia da semana com slot regional. */
+  dia_da_semana_regional: number | null
+  prazo_minimo_regional_dias: number | null
+  /** Quantas praças uma mesma ação pode reunir. Padrão de banco: 3. */
+  max_pracas_por_acao: number
+  direitos_e_conexos: number | null
+  custo_producao_regional: number | null
 }
 
 function vazio(valor: string | undefined | null): boolean {
@@ -59,6 +71,30 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     }
     if (programa.custo_producao === null || programa.custo_producao === undefined) {
       erros.push('Informe o custo de produção para programas disponíveis para proposta.')
+    }
+  }
+
+  // R10/R11 — um programa que aceita regional precisa do dia da semana (o
+  // único em que o slot regional existe) e do prazo mínimo regional; sem os
+  // dois, `temSlotRegionalEm`/`validarCompra` (regional.ts) não têm o que
+  // avaliar.
+  if (programa.aceita_regional === true) {
+    const dia = programa.dia_da_semana_regional
+    if (dia === null || dia === undefined) {
+      erros.push('Informe o dia da semana da ação regional.')
+    } else if (!Number.isInteger(dia) || dia < 0 || dia > 6) {
+      erros.push('Dia da semana regional inválido: use 0 (domingo) a 6 (sábado).')
+    }
+
+    const prazo = programa.prazo_minimo_regional_dias
+    if (prazo === null || prazo === undefined) {
+      erros.push('Informe o prazo mínimo regional.')
+    } else if (prazo < 0) {
+      erros.push('O prazo mínimo regional não pode ser negativo.')
+    }
+
+    if ((programa.max_pracas_por_acao ?? 0) < 1) {
+      erros.push('O máximo de praças por ação regional precisa ser pelo menos 1.')
     }
   }
 

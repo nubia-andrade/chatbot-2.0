@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { excluirPrograma } from '@/lib/acoes/programas'
 import { ConfirmacaoNomeada } from '@/components/comum/ConfirmacaoNomeada'
 import type { Programa } from '@/lib/dominio/cadastro'
+import { urlDeImagemSegura } from '@/lib/seguranca/url-imagem'
 
 const ROTULOS_ESTADO: Record<Programa['estado'], string> = {
   ativo: 'Ativo',
@@ -94,12 +95,14 @@ export function CartaoDePrograma({ programa, podeEditar, podeExcluir }: Props) {
     router.refresh()
   }
 
-  const capa = programa.imagem_url ? (
+  const imagem = urlDeImagemSegura(programa.imagem_url)
+
+  const capa = imagem ? (
     <div
       role="img"
       aria-label={`Imagem de ${programa.nome}`}
       className="h-[120px] w-full rounded-t-[var(--raio-card)] bg-cover bg-center"
-      style={{ backgroundImage: `url("${programa.imagem_url}")` }}
+      style={{ backgroundImage: `url("${imagem}")` }}
     />
   ) : (
     <div

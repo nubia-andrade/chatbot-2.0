@@ -6,6 +6,9 @@ import { salvarPrograma } from '@/lib/acoes/programas'
 import { enviarImagemDePrograma } from '@/lib/acoes/imagens'
 import type { EstadoDoPrograma, Programa } from '@/lib/dominio/cadastro'
 import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
+import { urlDeImagemSegura } from '@/lib/seguranca/url-imagem'
+import { AvisoDeSaida, useNavegacaoSegura } from '@/components/comum/AvisoDeSaida'
+import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
 
 const ROTULOS_ESTADO: Record<EstadoDoPrograma, string> = {
   ativo: 'Ativo',
@@ -44,6 +47,12 @@ type Rascunho = {
   possui_fluxo_aprovacao: boolean
   contem_digital: boolean
   redes_sociais: boolean
+  aceita_regional: boolean
+  dia_da_semana_regional: string
+  prazo_minimo_regional_dias: string
+  max_pracas_por_acao: string
+  direitos_e_conexos: string
+  custo_producao_regional: string
 }
 
 function rascunhoInicial(programa: Programa | null): Rascunho {
@@ -67,6 +76,18 @@ function rascunhoInicial(programa: Programa | null): Rascunho {
     possui_fluxo_aprovacao: programa?.possui_fluxo_aprovacao ?? false,
     contem_digital: programa?.contem_digital ?? false,
     redes_sociais: programa?.redes_sociais ?? false,
+    aceita_regional: programa?.aceita_regional ?? false,
+    dia_da_semana_regional:
+      programa?.dia_da_semana_regional !== null && programa?.dia_da_semana_regional !== undefined
+        ? String(programa.dia_da_semana_regional)
+        : '',
+    prazo_minimo_regional_dias:
+      programa?.prazo_minimo_regional_dias !== null && programa?.prazo_minimo_regional_dias !== undefined
+        ? String(programa.prazo_minimo_regional_dias)
+        : '',
+    max_pracas_por_acao: programa ? String(programa.max_pracas_por_acao) : '3',
+    direitos_e_conexos: formatarMoeda(programa?.direitos_e_conexos),
+    custo_producao_regional: formatarMoeda(programa?.custo_producao_regional),
   }
 }
 
@@ -104,28 +125,54 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
     possui_fluxo_aprovacao: rascunho.possui_fluxo_aprovacao,
     contem_digital: rascunho.contem_digital,
     redes_sociais: rascunho.redes_sociais,
+    aceita_regional: rascunho.aceita_regional,
+    // O bloco regional some da tela quando `aceita_regional` é desmarcado —
+    // os campos somem junto com ele, então o que não se digitou vira `null`
+    // (dia/prazo, R10/R11) ou fica valendo o padrão de banco (praças).
+    dia_da_semana_regional: rascunho.aceita_regional
+      ? (numeroOuIndefinido(rascunho.dia_da_semana_regional) ?? null)
+      : null,
+    prazo_minimo_regional_dias: rascunho.aceita_regional
+      ? (numeroOuIndefinido(rascunho.prazo_minimo_regional_dias) ?? null)
+      : null,
+    max_pracas_por_acao: numeroOuIndefinido(rascunho.max_pracas_por_acao) ?? 3,
+    direitos_e_conexos: rascunho.aceita_regional ? paraNumero(rascunho.direitos_e_conexos) : null,
+    custo_producao_regional: rascunho.aceita_regional
+      ? paraNumero(rascunho.custo_producao_regional)
+      : null,
   }
 }
 
 /**
- * Formulário com os 19 campos do cadastro de programa — Task 11, Step 4.
+ * Formulário com os 19 campos do cadastro de programa mais o bloco
+ * regional (6 campos, visível só com `aceita_regional` marcado) — Task 10,
+ * Step 4.
  *
- * Agrupado em cinco blocos (Identificação, Exibição, Regras de proposta,
- * Custos, Marcadores) para não virar um paredão de campos.
+ * Agrupado em blocos (Identificação, Exibição, Regras de proposta, Custos,
+ * Marcadores, Regional) para não virar um paredão de campos.
  *
  * A validação real é a de `salvarPrograma` (que chama `validarPrograma` no
  * servidor antes de gravar); os erros que ela devolve aparecem no topo,
- * em `var(--concorrencia)`. Não há validação client-side que bloqueie o
- * envio — é só o servidor que decide.
+ * em `var(--concorrencia)`, com o formulário preenchido como estava — nunca
+ * uma tela em branco. Não há validação client-side que bloqueie o envio —
+ * é só o servidor que decide.
+ *
+ * `AvisoDeSaida`/`useNavegacaoSegura` (`components/comum/AvisoDeSaida.tsx`)
+ * protegem contra perder alteração não salva: `sujo` liga assim que a
+ * pessoa toca em qualquer campo e desliga só depois de um salvamento sem
+ * erro.
  */
 export function FormularioDePrograma({ programa }: { programa: Programa | null }) {
   const router = useRouter()
   const [rascunho, setRascunho] = useState<Rascunho>(() => rascunhoInicial(programa))
   const [erros, setErros] = useState<string[]>([])
   const [salvando, setSalvando] = useState(false)
+  const [sujo, setSujo] = useState(false)
+  const navegar = useNavegacaoSegura(sujo)
 
   function mudar<C extends keyof Rascunho>(campo: C, valor: Rascunho[C]) {
     setRascunho((atual) => ({ ...atual, [campo]: valor }))
+    setSujo(true)
   }
 
   function alternarDia(dia: number) {
@@ -135,6 +182,7 @@ export function FormularioDePrograma({ programa }: { programa: Programa | null }
         ? atual.dias_da_semana.filter((d) => d !== dia)
         : [...atual.dias_da_semana, dia].sort((a, b) => a - b),
     }))
+    setSujo(true)
   }
 
   async function salvar(evento: React.FormEvent) {
@@ -153,9 +201,12 @@ export function FormularioDePrograma({ programa }: { programa: Programa | null }
       return
     }
 
+    setSujo(false)
+
     if (!programa && resultado.id) {
       // Programa novo: segue para a página de edição, onde o editor de
-      // apelidos passa a existir (ele depende de um `programa_id` real).
+      // apelidos e as demais abas passam a existir (dependem de um
+      // `programa_id` real).
       router.push(`/configuracoes/programas/${resultado.id}`)
     }
     router.refresh()
@@ -167,6 +218,8 @@ export function FormularioDePrograma({ programa }: { programa: Programa | null }
       className="flex flex-col gap-6 rounded-[var(--raio-card)] border border-[var(--borda)] p-6"
       style={{ background: 'var(--superficie)' }}
     >
+      <AvisoDeSaida ativo={sujo} />
+
       {erros.length > 0 && (
         <ul
           role="alert"
@@ -188,15 +241,20 @@ export function FormularioDePrograma({ programa }: { programa: Programa | null }
       <BlocoRegrasDeProposta rascunho={rascunho} mudar={mudar} />
       <BlocoCustos rascunho={rascunho} mudar={mudar} />
       <BlocoMarcadores rascunho={rascunho} mudar={mudar} />
+      <BlocoRegional rascunho={rascunho} mudar={mudar} />
 
       <div className="flex flex-wrap gap-3 border-t border-[var(--borda)] pt-5">
+        <BotaoDeGravacao gravando={salvando}>
+          {programa ? 'Salvar alterações' : 'Cadastrar programa'}
+        </BotaoDeGravacao>
+
         <button
-          type="submit"
+          type="button"
           disabled={salvando}
-          className="h-[44px] rounded-[12px] px-6 text-[13.5px] font-bold text-white enabled:cursor-pointer disabled:opacity-70"
-          style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}
+          onClick={() => navegar('/configuracoes/programas')}
+          className="h-[44px] rounded-[12px] border border-[var(--borda-forte)] px-5 text-[13.5px] font-semibold text-[var(--texto-2)] enabled:cursor-pointer disabled:opacity-60"
         >
-          {salvando ? 'Salvando…' : programa ? 'Salvar alterações' : 'Cadastrar programa'}
+          Cancelar
         </button>
       </div>
     </form>
@@ -289,18 +347,6 @@ function CampoDeMoeda({
  * O que é gravado em `imagem_url` é sempre uma URL — o upload apenas produz
  * uma.
  */
-/**
- * A URL só vira miniatura se for http(s) e não contiver aspas ou parênteses
- * — caracteres que escapariam do `url("…")` e deixariam quem edita um
- * programa injetar CSS na página de quem edita outro.
- */
-function urlParaPreVisualizacao(valor: string): string | null {
-  const limpo = valor.trim()
-  if (!/^https?:\/\//i.test(limpo)) return null
-  if (/["'()\\]/.test(limpo)) return null
-  return limpo
-}
-
 function CampoDeImagem({ valor, aoMudar }: { valor: string; aoMudar: (valor: string) => void }) {
   const entradaDeArquivo = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
@@ -333,8 +379,8 @@ function CampoDeImagem({ valor, aoMudar }: { valor: string; aoMudar: (valor: str
           aria-hidden
           className="h-[56px] w-[92px] shrink-0 rounded-[10px] border border-[var(--borda-forte)]"
           style={{
-            background: urlParaPreVisualizacao(valor)
-              ? `center / cover no-repeat url("${urlParaPreVisualizacao(valor)}")`
+            background: urlDeImagemSegura(valor)
+              ? `center / cover no-repeat url("${urlDeImagemSegura(valor)}")`
               : 'var(--superficie-suave)',
           }}
         />
@@ -600,6 +646,71 @@ function BlocoMarcadores({ rascunho, mudar }: PropsDoBloco) {
           descricao="O programa tem presença própria nas redes sociais."
           marcado={rascunho.redes_sociais}
           aoMudar={(valor) => mudar('redes_sociais', valor)}
+        />
+        <Marcador
+          rotulo="Aceita regional"
+          descricao="O programa vende ações locais por praça, além da grade nacional. Libera a aba Regional e o bloco abaixo."
+          marcado={rascunho.aceita_regional}
+          aoMudar={(valor) => mudar('aceita_regional', valor)}
+        />
+      </div>
+    </fieldset>
+  )
+}
+
+/**
+ * Bloco regional — Task 10. Some da tela quando `aceita_regional` está
+ * desmarcado, tanto porque os campos não fazem sentido para um programa que
+ * não vende regional quanto porque `paraPrograma` já grava `null` neles
+ * assim que o marcador é desligado.
+ */
+function BlocoRegional({ rascunho, mudar }: PropsDoBloco) {
+  if (!rascunho.aceita_regional) return null
+
+  return (
+    <fieldset className="flex flex-col gap-3 border-t border-[var(--borda)] pt-5">
+      <TituloDoBloco texto="Regional" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[12px] font-semibold text-[var(--texto-2)]">
+            Dia da semana da ação regional
+          </span>
+          <select
+            value={rascunho.dia_da_semana_regional}
+            onChange={(evento) => mudar('dia_da_semana_regional', evento.target.value)}
+            className="h-[40px] cursor-pointer rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[13.5px] text-[var(--texto)]"
+          >
+            <option value="">Selecione…</option>
+            {DIAS_DA_SEMANA.map((dia) => (
+              <option key={dia.valor} value={dia.valor}>
+                {dia.rotulo}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Campo
+          rotulo="Prazo mínimo regional (dias)"
+          tipo="number"
+          valor={rascunho.prazo_minimo_regional_dias}
+          aoMudar={(valor) => mudar('prazo_minimo_regional_dias', valor)}
+          ajuda="Com quantos dias de antecedência uma ação regional precisa ser fechada."
+        />
+        <Campo
+          rotulo="Máximo de praças por ação"
+          tipo="number"
+          valor={rascunho.max_pracas_por_acao}
+          aoMudar={(valor) => mudar('max_pracas_por_acao', valor)}
+          ajuda="Quantas praças um mesmo cliente pode reunir numa única ação regional."
+        />
+        <CampoDeMoeda
+          rotulo="Direitos e conexos"
+          valor={rascunho.direitos_e_conexos}
+          aoMudar={(valor) => mudar('direitos_e_conexos', valor)}
+        />
+        <CampoDeMoeda
+          rotulo="Custo de produção regional"
+          valor={rascunho.custo_producao_regional}
+          aoMudar={(valor) => mudar('custo_producao_regional', valor)}
         />
       </div>
     </fieldset>

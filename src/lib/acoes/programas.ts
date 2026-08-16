@@ -75,6 +75,12 @@ export async function salvarPrograma(
     percentual_simulcast: dados.percentual_simulcast ?? null,
     custo_multishow: dados.custo_multishow ?? null,
     disponivel_para_proposta: dados.disponivel_para_proposta ?? false,
+    aceita_regional: dados.aceita_regional ?? false,
+    dia_da_semana_regional: dados.dia_da_semana_regional ?? null,
+    prazo_minimo_regional_dias: dados.prazo_minimo_regional_dias ?? null,
+    max_pracas_por_acao: dados.max_pracas_por_acao ?? 3,
+    direitos_e_conexos: dados.direitos_e_conexos ?? null,
+    custo_producao_regional: dados.custo_producao_regional ?? null,
   }
 
   const consulta = dados.id

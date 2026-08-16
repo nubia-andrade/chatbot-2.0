@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import type { Programa } from '../dominio/cadastro'
 
@@ -26,8 +27,16 @@ export async function listarProgramas(): Promise<Programa[]> {
   return (data ?? []) as Programa[]
 }
 
-/** Um programa específico, para preencher o formulário de edição. */
-export async function obterPrograma(id: string): Promise<Programa | null> {
+/**
+ * Um programa específico, para preencher o formulário de edição.
+ *
+ * Envolvido em `cache()` porque tanto o layout da área do programa
+ * (`[id]/layout.tsx`, para a guarda por vínculo e o cabeçalho) quanto a
+ * página de cadastro (`[id]/page.tsx`) precisam do mesmo programa na mesma
+ * requisição — layouts não repassam dados para os filhos, então cada um
+ * chama de novo; `cache()` faz as duas chamadas virarem uma só consulta.
+ */
+export const obterPrograma = cache(async (id: string): Promise<Programa | null> => {
   const supabase = await criarClienteServidor()
 
   const { data, error } = await supabase
@@ -39,7 +48,7 @@ export async function obterPrograma(id: string): Promise<Programa | null> {
   if (error || !data) return null
 
   return data as Programa
-}
+})
 
 /**
  * Os apelidos de um programa, para o editor da tela de edição.
