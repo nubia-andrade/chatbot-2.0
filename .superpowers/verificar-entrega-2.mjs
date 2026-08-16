@@ -103,10 +103,40 @@ console.log('\n4) Colunas novas de `programas` existem?')
   const { data, error } = await supabase
     .from('programas')
     .select(
-      'aceita_regional, dia_da_semana_regional, prazo_minimo_regional_dias, max_pracas_por_acao, direitos_e_conexos, custo_producao_regional, atualizado_em'
+      'aceita_regional, dia_da_semana_regional, prazo_minimo_regional_dias, max_pracas_por_acao, atualizado_em'
     )
     .limit(1)
   marcar(!error, error ? error.message : 'colunas novas presentes')
+}
+
+console.log('\n5) Custos (Entrega 3): colunas novas presentes e as antigas removidas?')
+{
+  const { error: erroNovasProgramas } = await supabase
+    .from('programas')
+    .select('custo_midia_tv, custo_producao_tv, custo_midia_digital, custo_producao_digital')
+    .limit(1)
+  marcar(!erroNovasProgramas, erroNovasProgramas ? erroNovasProgramas.message : 'programas: colunas de custo novas presentes')
+
+  const { error: erroAntigasProgramas } = await supabase
+    .from('programas')
+    .select('custo_midia, custo_producao, custo_multishow, direitos_e_conexos, custo_producao_regional')
+    .limit(1)
+  marcar(
+    !!erroAntigasProgramas,
+    erroAntigasProgramas ? `colunas antigas já removidas (${erroAntigasProgramas.message})` : 'colunas antigas ainda existem em programas'
+  )
+
+  const { error: erroNovasPreco } = await supabase
+    .from('preco_regional')
+    .select('custo_midia_tv, custo_producao_tv, percentual_simulcast, custo_midia_digital, custo_producao_digital')
+    .limit(1)
+  marcar(!erroNovasPreco, erroNovasPreco ? erroNovasPreco.message : 'preco_regional: colunas de custo novas presentes')
+
+  const { error: erroAntigaPreco } = await supabase.from('preco_regional').select('valor').limit(1)
+  marcar(
+    !!erroAntigaPreco,
+    erroAntigaPreco ? `coluna antiga já removida (${erroAntigaPreco.message})` : 'preco_regional.valor ainda existe'
+  )
 }
 
 console.log(`\n${falhas === 0 ? 'Tudo certo: migração aplicada.' : `${falhas} verificação(ões) falhou(aram) — aplique supabase/schema-entrega-2.sql no SQL Editor do Supabase e rode de novo.`}`)

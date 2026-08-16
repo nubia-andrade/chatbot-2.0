@@ -1,5 +1,7 @@
 -- CHATBOT 2.0 — configuração regional do Encontro e do É de Casa.
--- Rode no SQL Editor do Supabase depois de schema.sql e schema-entrega-2.sql.
+-- Rode no SQL Editor do Supabase depois de schema.sql, schema-entrega-2.sql
+-- e schema-entrega-2-custos.sql (este arquivo grava em
+-- preco_regional.custo_midia_tv, que só existe depois daquela migração).
 -- Pode rodar quantas vezes quiser: só `update` e `insert … on conflict do update`.
 --
 -- POR QUE ESTE ARQUIVO EXISTE
@@ -15,14 +17,30 @@
 -- 15/08/2026.
 --
 -- ⚠️ VALORES PROVISÓRIOS — "CHECAR COM PRICING"
--- Todos os valores monetários abaixo (preço por praça, direitos e conexos e
--- custo de produção) estão marcados no documento da área como "checar com
--- Pricing". Trate-os como provisórios até a confirmação: eles alimentam o
--- total da ação que o consultor vê na aba Regional e, a partir da Entrega 4,
--- a proposta. A interface já exibe o aviso "Valores pendentes de confirmação
--- com Pricing" — se os números forem confirmados ou corrigidos, atualize
--- ESTE arquivo junto com docs/regras-acoes-regionais.md, para os dois não
--- divergirem.
+-- Todos os valores monetários abaixo (preço de mídia TV por praça) estão
+-- marcados no documento da área como "checar com Pricing". Trate-os como
+-- provisórios até a confirmação: eles alimentam o total da ação que o
+-- consultor vê na aba Regional e, a partir da Entrega 4, a proposta. A
+-- interface já exibe o aviso "Valores pendentes de confirmação com Pricing"
+-- — se os números forem confirmados ou corrigidos, atualize ESTE arquivo
+-- junto com docs/regras-acoes-regionais.md, para os dois não divergirem.
+--
+-- ⚠️ O QUE ESTE ARQUIVO DEIXOU DE GRAVAR (Entrega 3 — Custos)
+-- As versões anteriores deste seed gravavam `direitos_e_conexos` e
+-- `custo_producao_regional` como um valor ÚNICO por programa (ex.: R$
+-- 20.000,00 de direitos para o Encontro inteiro). As duas colunas foram
+-- removidas por `schema-entrega-2-custos.sql`: direitos e conexos virou
+-- cálculo (15% da mídia de TV, ver `src/lib/dominio/direitos-e-conexos.ts`)
+-- e a produção passou a ser por PRAÇA, em
+-- `preco_regional.custo_producao_tv` — uma coluna nova, nula.
+--
+-- O valor único que o documento da área trazia (R$ 7.797,00 de produção no
+-- Encontro, R$ 7.910,00 no É de Casa) NÃO é redistribuído automaticamente
+-- entre as 5 praças aqui: um número por-programa não diz quanto cabe a SP
+-- versus quanto cabe a PE1, e inventar uma divisão seria decisão de
+-- Pricing, não deste arquivo. Até a área informar o valor por praça, os
+-- campos de produção de TV regional ficam em branco na aba Regional — o
+-- mesmo destino, já visível ali, de qualquer custo "não informado".
 
 -- ---------------------------------------------------------------------------
 -- 1. Correção de mnemônico: EDC → CASA
@@ -44,20 +62,18 @@ update programas set mnemonico = 'CASA' where mnemonico = 'EDC';
 -- Slots: 1 por semana, às sextas-feiras  → dia_da_semana_regional = 5
 -- Prazo mínimo: 7 dias
 -- Até 3 praças por ação
--- Direitos e conexos: 15% — R$ 20.000,00
--- Custo de produção: R$ 7.797,00
+-- Direitos e conexos: agora calculado (15% da mídia de TV) — não gravado aqui.
+-- Custo de produção regional: pendente de valor por praça (ver aviso acima).
 update programas set
   aceita_regional = true,
   dia_da_semana_regional = 5,
   prazo_minimo_regional_dias = 7,
   max_pracas_por_acao = 3,
-  direitos_e_conexos = 20000.00,
-  custo_producao_regional = 7797.00,
   atualizado_em = now()
 where mnemonico = 'FATI';
 
-insert into preco_regional (programa_id, praca_codigo, valor, atualizado_em)
-select p.id, v.praca, v.valor, now()
+insert into preco_regional (programa_id, praca_codigo, custo_midia_tv, atualizado_em)
+select p.id, v.praca, v.custo_midia_tv, now()
 from programas p
 cross join (values
   ('SP',  49000.00),
@@ -65,10 +81,10 @@ cross join (values
   ('BH',   9000.00),
   ('DF',   6000.00),
   ('PE1',  7000.00)
-) as v(praca, valor)
+) as v(praca, custo_midia_tv)
 where p.mnemonico = 'FATI'
 on conflict (programa_id, praca_codigo)
-do update set valor = excluded.valor, atualizado_em = excluded.atualizado_em;
+do update set custo_midia_tv = excluded.custo_midia_tv, atualizado_em = excluded.atualizado_em;
 
 -- ---------------------------------------------------------------------------
 -- 3. É de Casa (mnemônico CASA)
@@ -76,20 +92,18 @@ do update set valor = excluded.valor, atualizado_em = excluded.atualizado_em;
 -- Slots: 1 por semana, aos sábados  → dia_da_semana_regional = 6
 -- Prazo mínimo: 10 dias
 -- Até 3 praças por ação
--- Direitos e conexos: R$ 23.000,00
--- Custo de produção: R$ 7.910,00
+-- Direitos e conexos: agora calculado (15% da mídia de TV) — não gravado aqui.
+-- Custo de produção regional: pendente de valor por praça (ver aviso acima).
 update programas set
   aceita_regional = true,
   dia_da_semana_regional = 6,
   prazo_minimo_regional_dias = 10,
   max_pracas_por_acao = 3,
-  direitos_e_conexos = 23000.00,
-  custo_producao_regional = 7910.00,
   atualizado_em = now()
 where mnemonico = 'CASA';
 
-insert into preco_regional (programa_id, praca_codigo, valor, atualizado_em)
-select p.id, v.praca, v.valor, now()
+insert into preco_regional (programa_id, praca_codigo, custo_midia_tv, atualizado_em)
+select p.id, v.praca, v.custo_midia_tv, now()
 from programas p
 cross join (values
   ('SP',  53000.00),
@@ -97,10 +111,10 @@ cross join (values
   ('BH',  13000.00),
   ('DF',  10000.00),
   ('PE1', 11000.00)
-) as v(praca, valor)
+) as v(praca, custo_midia_tv)
 where p.mnemonico = 'CASA'
 on conflict (programa_id, praca_codigo)
-do update set valor = excluded.valor, atualizado_em = excluded.atualizado_em;
+do update set custo_midia_tv = excluded.custo_midia_tv, atualizado_em = excluded.atualizado_em;
 
 -- ---------------------------------------------------------------------------
 -- O que este arquivo DELIBERADAMENTE não mexe
@@ -126,9 +140,8 @@ do update set valor = excluded.valor, atualizado_em = excluded.atualizado_em;
 -- uma com 5 praças precificadas:
 --
 --   select p.nome, p.mnemonico, p.dia_da_semana_regional,
---          p.prazo_minimo_regional_dias, p.direitos_e_conexos,
---          p.custo_producao_regional, count(pr.praca_codigo) as pracas,
---          sum(pr.valor) as soma_das_pracas
+--          p.prazo_minimo_regional_dias, count(pr.praca_codigo) as pracas,
+--          sum(pr.custo_midia_tv) as soma_das_pracas
 --   from programas p
 --   left join preco_regional pr on pr.programa_id = p.id
 --   where p.aceita_regional

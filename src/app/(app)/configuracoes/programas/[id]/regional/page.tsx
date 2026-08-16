@@ -67,8 +67,6 @@ export default async function PaginaDeRegional({
       diaDaSemanaRegional={programa.dia_da_semana_regional}
       prazoMinimoRegionalDias={programa.prazo_minimo_regional_dias}
       maxPracasPorAcao={programa.max_pracas_por_acao}
-      direitosEConexos={programa.direitos_e_conexos}
-      custoProducaoRegional={programa.custo_producao_regional}
       precosIniciais={precos}
       acoesIniciais={acoes}
       bloqueios={bloqueios}

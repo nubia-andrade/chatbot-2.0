@@ -85,13 +85,28 @@ mesmo com o código correto.
    sozinho, **rode este arquivo de novo em seguida** — os anteriores recriam
    as policies amplas e a definição antiga de `e_administrador()`, revertendo
    a autorização sem erro nenhum no console.
-4. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
+4. **Aplicar a reestruturação de Custos.** Ainda no `SQL Editor`, cole
+   `supabase/schema-entrega-2-custos.sql` > `Run`. Roda depois do arquivo
+   anterior: separa custo nacional de TV e de Digital (renomeia
+   `custo_midia`/`custo_producao` para `custo_midia_tv`/`custo_producao_tv` e
+   cria `custo_midia_digital`/`custo_producao_digital`), faz o mesmo em
+   `preco_regional` (renomeia `valor` para `custo_midia_tv` e cria as colunas
+   de produção, simulcast e digital por praça) e remove `custo_multishow`,
+   `direitos_e_conexos` e `custo_producao_regional` — os dois últimos porque
+   "direitos e conexos" virou um valor calculado (15% da mídia de TV, com
+   simulcast; 15% da mídia digital, sem simulcast —
+   `src/lib/dominio/direitos-e-conexos.ts`) em vez de um campo digitado, e a
+   produção regional passou a ser por praça. Todo `rename` preserva o dado
+   que já estava gravado; os `drop column` removem o que não existe mais no
+   modelo novo — o cabeçalho do arquivo lista, coluna por coluna, o que
+   acontece com cada valor existente. Idempotente.
+5. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
    planilhas em `dados/`) e aplique no SQL Editor, nesta ordem,
    `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql`. São 73
    formatos e ~15,5 mil clientes.
-5. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
+6. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
    `Create new user`. Informe e-mail e senha e marque **Auto Confirm User**.
-6. **Tornar esse usuário administrador.** Na raiz do projeto:
+7. **Tornar esse usuário administrador.** Na raiz do projeto:
 
    ```bash
    npm run admin -- pessoa@empresa.com
@@ -100,18 +115,21 @@ mesmo com o código correto.
    Sem este passo ninguém enxerga Configurações: `perfil_usuario` nasce vazia
    e todo mundo cai no perfil `executivo`, que não administra nada. O script
    não cria contas — se o e-mail não existir, ele diz isso e manda voltar ao
-   passo 5. Repita o comando para cada pessoa que precisar administrar.
-7. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
+   passo 6. Repita o comando para cada pessoa que precisar administrar.
+8. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
    login em vez de JSON, veja "Importar sem o comando de linha" abaixo — é o
    caminho normal, não um sinal de erro. Depois de importar,
    `Configurações > Importação` mostra a data do snapshot e o que veio.
-8. **Configurar as ações regionais.** Depois de cadastrar os programas
+9. **Configurar as ações regionais.** Depois de cadastrar os programas
    (`Configurações > Programas`), aplique `supabase/seed-regional.sql` no SQL
    Editor. Ele configura o **Encontro** e o **É de Casa** com os valores de
    `docs/regras-acoes-regionais.md`: dia da semana do slot regional, prazo
-   mínimo próprio, teto de praças, direitos e conexos, custo de produção e o
-   preço de cada uma das 5 praças. Idempotente, e casa os programas pelo
-   mnemônico (`FATI` e `CASA`) — se os seus tiverem outro, ajuste o arquivo.
+   mínimo próprio, teto de praças e o preço de mídia de TV de cada uma das 5
+   praças (direitos e conexos e custo de produção regional ficam de fora do
+   seed — o primeiro é calculado, o segundo é por praça e a área ainda não
+   informou o valor de cada uma; ver o aviso no cabeçalho do arquivo).
+   Idempotente, e casa os programas pelo mnemônico (`FATI` e `CASA`) — se os
+   seus tiverem outro, ajuste o arquivo.
 
    O mesmo arquivo corrige o mnemônico do É de Casa de `EDC` para `CASA`. Não
    é detalhe: a API manda `"CASA - E DE CASA"`, e com `EDC` nenhuma entrega

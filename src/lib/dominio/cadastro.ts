@@ -15,11 +15,15 @@ export type Programa = {
   bloqueio_mensal: number
   acoes_minimas: number
   acoes_maximas: number
-  custo_midia: number | null
-  custo_producao: number | null
-  prazo_minimo_dias: number
+  /** Custos nacionais de TV — Entrega 3. `direitos e conexos` de TV é calculado a partir destes dois, nunca digitado (`direitos-e-conexos.ts`). */
+  custo_midia_tv: number | null
+  custo_producao_tv: number | null
+  /** Só entra no cálculo de direitos de TV — não existe simulcast de digital. */
   percentual_simulcast: number | null
-  custo_multishow: number | null
+  /** Custos nacionais de Digital — Entrega 3. Opcionais: a área ainda não confirmou quais praças vendem digital. */
+  custo_midia_digital: number | null
+  custo_producao_digital: number | null
+  prazo_minimo_dias: number
   disponivel_para_proposta: boolean
   /** Alimenta o "Modificado em" do cartão da lista — Entrega 2. */
   atualizado_em: string
@@ -33,8 +37,6 @@ export type Programa = {
   prazo_minimo_regional_dias: number | null
   /** Quantas praças uma mesma ação pode reunir. Padrão de banco: 3. */
   max_pracas_por_acao: number
-  direitos_e_conexos: number | null
-  custo_producao_regional: number | null
 }
 
 function vazio(valor: string | undefined | null): boolean {
@@ -65,12 +67,14 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     erros.push('O prazo mínimo não pode ser negativo.')
   }
 
+  // Só a TV é exigida: os campos digitais são opcionais até a área confirmar
+  // quais praças vendem digital (não é exigido aqui de propósito).
   if (programa.disponivel_para_proposta === true) {
-    if (programa.custo_midia === null || programa.custo_midia === undefined) {
-      erros.push('Informe o custo de mídia para programas disponíveis para proposta.')
+    if (programa.custo_midia_tv === null || programa.custo_midia_tv === undefined) {
+      erros.push('Informe o custo de mídia de TV para programas disponíveis para proposta.')
     }
-    if (programa.custo_producao === null || programa.custo_producao === undefined) {
-      erros.push('Informe o custo de produção para programas disponíveis para proposta.')
+    if (programa.custo_producao_tv === null || programa.custo_producao_tv === undefined) {
+      erros.push('Informe o custo de produção de TV para programas disponíveis para proposta.')
     }
   }
 

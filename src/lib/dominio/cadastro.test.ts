@@ -14,8 +14,8 @@ function programa(sobrescritas: Partial<Programa> = {}): Partial<Programa> {
     acoes_maximas: 3,
     prazo_minimo_dias: 15,
     disponivel_para_proposta: true,
-    custo_midia: 100000,
-    custo_producao: 50000,
+    custo_midia_tv: 100000,
+    custo_producao_tv: 50000,
     ...sobrescritas,
   }
 }
@@ -59,17 +59,28 @@ describe('validarPrograma', () => {
   })
 
   // Custos são condicionais à elegibilidade para proposta
-  it('exige custos quando o programa está disponível para proposta', () => {
+  it('exige custos de TV quando o programa está disponível para proposta', () => {
     const erros = validarPrograma(
-      programa({ disponivel_para_proposta: true, custo_midia: null, custo_producao: null }),
+      programa({ disponivel_para_proposta: true, custo_midia_tv: null, custo_producao_tv: null }),
     )
-    expect(erros).toContain('Informe o custo de mídia para programas disponíveis para proposta.')
-    expect(erros).toContain('Informe o custo de produção para programas disponíveis para proposta.')
+    expect(erros).toContain('Informe o custo de mídia de TV para programas disponíveis para proposta.')
+    expect(erros).toContain('Informe o custo de produção de TV para programas disponíveis para proposta.')
   })
 
   it('dispensa custos quando o programa não gera proposta', () => {
     const erros = validarPrograma(
-      programa({ disponivel_para_proposta: false, custo_midia: null, custo_producao: null }),
+      programa({ disponivel_para_proposta: false, custo_midia_tv: null, custo_producao_tv: null }),
+    )
+    expect(erros).toEqual([])
+  })
+
+  it('não exige custos digitais mesmo quando disponível para proposta', () => {
+    const erros = validarPrograma(
+      programa({
+        disponivel_para_proposta: true,
+        custo_midia_digital: null,
+        custo_producao_digital: null,
+      }),
     )
     expect(erros).toEqual([])
   })

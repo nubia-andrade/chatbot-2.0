@@ -71,18 +71,17 @@ export async function salvarPrograma(
     bloqueio_mensal: dados.bloqueio_mensal ?? 0,
     acoes_minimas: dados.acoes_minimas ?? 1,
     acoes_maximas: dados.acoes_maximas ?? 1,
-    custo_midia: dados.custo_midia ?? null,
-    custo_producao: dados.custo_producao ?? null,
-    prazo_minimo_dias: dados.prazo_minimo_dias ?? 0,
+    custo_midia_tv: dados.custo_midia_tv ?? null,
+    custo_producao_tv: dados.custo_producao_tv ?? null,
     percentual_simulcast: dados.percentual_simulcast ?? null,
-    custo_multishow: dados.custo_multishow ?? null,
+    custo_midia_digital: dados.custo_midia_digital ?? null,
+    custo_producao_digital: dados.custo_producao_digital ?? null,
+    prazo_minimo_dias: dados.prazo_minimo_dias ?? 0,
     disponivel_para_proposta: dados.disponivel_para_proposta ?? false,
     aceita_regional: dados.aceita_regional ?? false,
     dia_da_semana_regional: dados.dia_da_semana_regional ?? null,
     prazo_minimo_regional_dias: dados.prazo_minimo_regional_dias ?? null,
     max_pracas_por_acao: dados.max_pracas_por_acao ?? 3,
-    direitos_e_conexos: dados.direitos_e_conexos ?? null,
-    custo_producao_regional: dados.custo_producao_regional ?? null,
   }
 
   const consulta = dados.id

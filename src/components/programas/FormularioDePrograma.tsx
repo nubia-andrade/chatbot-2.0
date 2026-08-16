@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { salvarPrograma } from '@/lib/acoes/programas'
 import { enviarImagemDePrograma } from '@/lib/acoes/imagens'
 import type { EstadoDoPrograma, Programa } from '@/lib/dominio/cadastro'
-import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
+import { paraNumero } from '@/lib/dominio/moeda'
 import { urlDeImagemSegura } from '@/lib/seguranca/url-imagem'
 import { AvisoDeSaida, useNavegacaoSegura } from '@/components/comum/AvisoDeSaida'
 import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
+import { BlocoDeCustos, rascunhoDeCustosInicial, type RascunhoDeCustos } from './BlocoDeCustos'
 
 const ROTULOS_ESTADO: Record<EstadoDoPrograma, string> = {
   ativo: 'Ativo',
@@ -40,10 +41,6 @@ type Rascunho = {
   acoes_minimas: string
   acoes_maximas: string
   disponivel_para_proposta: boolean
-  custo_midia: string
-  custo_producao: string
-  percentual_simulcast: string
-  custo_multishow: string
   possui_fluxo_aprovacao: boolean
   contem_digital: boolean
   redes_sociais: boolean
@@ -51,9 +48,7 @@ type Rascunho = {
   dia_da_semana_regional: string
   prazo_minimo_regional_dias: string
   max_pracas_por_acao: string
-  direitos_e_conexos: string
-  custo_producao_regional: string
-}
+} & RascunhoDeCustos
 
 function rascunhoInicial(programa: Programa | null): Rascunho {
   return {
@@ -69,10 +64,7 @@ function rascunhoInicial(programa: Programa | null): Rascunho {
     acoes_minimas: programa ? String(programa.acoes_minimas) : '1',
     acoes_maximas: programa ? String(programa.acoes_maximas) : '1',
     disponivel_para_proposta: programa?.disponivel_para_proposta ?? false,
-    custo_midia: formatarMoeda(programa?.custo_midia),
-    custo_producao: formatarMoeda(programa?.custo_producao),
-    percentual_simulcast: formatarMoeda(programa?.percentual_simulcast),
-    custo_multishow: formatarMoeda(programa?.custo_multishow),
+    ...rascunhoDeCustosInicial(programa),
     possui_fluxo_aprovacao: programa?.possui_fluxo_aprovacao ?? false,
     contem_digital: programa?.contem_digital ?? false,
     redes_sociais: programa?.redes_sociais ?? false,
@@ -86,8 +78,6 @@ function rascunhoInicial(programa: Programa | null): Rascunho {
         ? String(programa.prazo_minimo_regional_dias)
         : '',
     max_pracas_por_acao: programa ? String(programa.max_pracas_por_acao) : '3',
-    direitos_e_conexos: formatarMoeda(programa?.direitos_e_conexos),
-    custo_producao_regional: formatarMoeda(programa?.custo_producao_regional),
   }
 }
 
@@ -118,10 +108,11 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
     acoes_minimas: numeroOuIndefinido(rascunho.acoes_minimas),
     acoes_maximas: numeroOuIndefinido(rascunho.acoes_maximas),
     disponivel_para_proposta: rascunho.disponivel_para_proposta,
-    custo_midia: paraNumero(rascunho.custo_midia),
-    custo_producao: paraNumero(rascunho.custo_producao),
+    custo_midia_tv: paraNumero(rascunho.custo_midia_tv),
+    custo_producao_tv: paraNumero(rascunho.custo_producao_tv),
     percentual_simulcast: paraNumero(rascunho.percentual_simulcast),
-    custo_multishow: paraNumero(rascunho.custo_multishow),
+    custo_midia_digital: paraNumero(rascunho.custo_midia_digital),
+    custo_producao_digital: paraNumero(rascunho.custo_producao_digital),
     possui_fluxo_aprovacao: rascunho.possui_fluxo_aprovacao,
     contem_digital: rascunho.contem_digital,
     redes_sociais: rascunho.redes_sociais,
@@ -136,17 +127,15 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
       ? (numeroOuIndefinido(rascunho.prazo_minimo_regional_dias) ?? null)
       : null,
     max_pracas_por_acao: numeroOuIndefinido(rascunho.max_pracas_por_acao) ?? 3,
-    direitos_e_conexos: rascunho.aceita_regional ? paraNumero(rascunho.direitos_e_conexos) : null,
-    custo_producao_regional: rascunho.aceita_regional
-      ? paraNumero(rascunho.custo_producao_regional)
-      : null,
   }
 }
 
 /**
- * Formulário com os 19 campos do cadastro de programa mais o bloco
- * regional (6 campos, visível só com `aceita_regional` marcado) — Task 10,
- * Step 4.
+ * Formulário de cadastro de programa — Task 10, Step 4; Custos reestruturado
+ * na Entrega 3 (nacional TV/Digital, com "direitos e conexos" calculado —
+ * `BlocoDeCustos`). O bloco regional (dia da semana, prazo, teto de praças)
+ * fica visível só com `aceita_regional` marcado; os custos por praça saíram
+ * daqui e moram na aba Regional do programa.
  *
  * Agrupado em blocos (Identificação, Exibição, Regras de proposta, Custos,
  * Marcadores, Regional) para não virar um paredão de campos.
@@ -239,7 +228,7 @@ export function FormularioDePrograma({ programa }: { programa: Programa | null }
       <BlocoIdentificacao rascunho={rascunho} mudar={mudar} />
       <BlocoExibicao rascunho={rascunho} mudar={mudar} alternarDia={alternarDia} />
       <BlocoRegrasDeProposta rascunho={rascunho} mudar={mudar} />
-      <BlocoCustos rascunho={rascunho} mudar={mudar} />
+      <BlocoDeCustos rascunho={rascunho} mudar={mudar} />
       <BlocoMarcadores rascunho={rascunho} mudar={mudar} />
       <BlocoRegional rascunho={rascunho} mudar={mudar} />
 
@@ -305,32 +294,6 @@ function Campo({
       />
       {ajuda && <span className="text-[11.5px] text-[var(--texto-3)]">{ajuda}</span>}
     </label>
-  )
-}
-
-/**
- * Campo de dinheiro: exibe e aceita o formato brasileiro (`8.300,00`). A
- * pessoa pode digitar livremente (`8300`, `8.300`, `R$ 8.300,00`…); ao sair
- * do campo, o valor é normalizado para o padrão brasileiro com duas casas.
- * A conversão de verdade acontece no envio do formulário, com `paraNumero`.
- */
-function CampoDeMoeda({
-  rotulo,
-  valor,
-  aoMudar,
-}: {
-  rotulo: string
-  valor: string
-  aoMudar: (valor: string) => void
-}) {
-  return (
-    <Campo
-      rotulo={rotulo}
-      valor={valor}
-      placeholder="0,00"
-      aoMudar={aoMudar}
-      aoSairDoFoco={() => aoMudar(formatarMoeda(paraNumero(valor)))}
-    />
   )
 }
 
@@ -586,40 +549,10 @@ function BlocoRegrasDeProposta({ rascunho, mudar }: PropsDoBloco) {
       </div>
       <Marcador
         rotulo="Disponível para proposta"
-        descricao="Programas disponíveis exigem custo de mídia e de produção preenchidos."
+        descricao="Programas disponíveis exigem custo de mídia e de produção de TV preenchidos."
         marcado={rascunho.disponivel_para_proposta}
         aoMudar={(valor) => mudar('disponivel_para_proposta', valor)}
       />
-    </fieldset>
-  )
-}
-
-function BlocoCustos({ rascunho, mudar }: PropsDoBloco) {
-  return (
-    <fieldset className="flex flex-col gap-3 border-t border-[var(--borda)] pt-5">
-      <TituloDoBloco texto="Custos" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <CampoDeMoeda
-          rotulo="Custo de mídia"
-          valor={rascunho.custo_midia}
-          aoMudar={(valor) => mudar('custo_midia', valor)}
-        />
-        <CampoDeMoeda
-          rotulo="Custo de produção"
-          valor={rascunho.custo_producao}
-          aoMudar={(valor) => mudar('custo_producao', valor)}
-        />
-        <CampoDeMoeda
-          rotulo="% simulcast"
-          valor={rascunho.percentual_simulcast}
-          aoMudar={(valor) => mudar('percentual_simulcast', valor)}
-        />
-        <CampoDeMoeda
-          rotulo="Custo Multishow"
-          valor={rascunho.custo_multishow}
-          aoMudar={(valor) => mudar('custo_multishow', valor)}
-        />
-      </div>
     </fieldset>
   )
 }
@@ -663,6 +596,13 @@ function BlocoMarcadores({ rascunho, mudar }: PropsDoBloco) {
  * desmarcado, tanto porque os campos não fazem sentido para um programa que
  * não vende regional quanto porque `paraPrograma` já grava `null` neles
  * assim que o marcador é desligado.
+ *
+ * Os custos regionais (por praça: mídia/produção TV e digital, direitos
+ * calculados) saíram deste bloco na Entrega 3 — moram na aba Regional
+ * (`TabelaDeCustosRegionais`), porque passaram a variar por praça em vez de
+ * ter um valor único por programa. Aqui fica só o estrutural: em que dia da
+ * semana existe o slot regional, com que prazo, e quantas praças cabem numa
+ * ação.
  */
 function BlocoRegional({ rascunho, mudar }: PropsDoBloco) {
   if (!rascunho.aceita_regional) return null
@@ -702,17 +642,10 @@ function BlocoRegional({ rascunho, mudar }: PropsDoBloco) {
           aoMudar={(valor) => mudar('max_pracas_por_acao', valor)}
           ajuda="Quantas praças um mesmo cliente pode reunir numa única ação regional."
         />
-        <CampoDeMoeda
-          rotulo="Direitos e conexos"
-          valor={rascunho.direitos_e_conexos}
-          aoMudar={(valor) => mudar('direitos_e_conexos', valor)}
-        />
-        <CampoDeMoeda
-          rotulo="Custo de produção regional"
-          valor={rascunho.custo_producao_regional}
-          aoMudar={(valor) => mudar('custo_producao_regional', valor)}
-        />
       </div>
+      <p className="text-[11.5px] text-[var(--texto-3)]">
+        Os custos por praça (mídia, produção e direitos de TV e digital) ficam na aba Regional deste programa.
+      </p>
     </fieldset>
   )
 }

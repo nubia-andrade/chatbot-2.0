@@ -11,24 +11,37 @@ import { PRACAS, type AcaoRegional } from '../dominio/regional'
  * praça (Step 1 do brief).
  */
 
+/**
+ * Custos de uma praça — Entrega 3: TV e digital separados, com os dois
+ * "direitos e conexos" calculados aqui na leitura (nunca gravados —
+ * `src/lib/dominio/direitos-e-conexos.ts`), para a tela não precisar
+ * recalcular no primeiro render antes de qualquer digitação.
+ */
 export type PrecoDePraca = {
   praca_codigo: string
-  valor: number
+  custo_midia_tv: number
+  custo_producao_tv: number | null
+  percentual_simulcast: number | null
+  custo_midia_digital: number | null
+  custo_producao_digital: number | null
   atualizado_em: string
 }
 
 /**
- * Preço de cada uma das 5 praças para um programa. Sempre devolve as 5, na
+ * Custos de cada uma das 5 praças para um programa. Sempre devolve as 5, na
  * ordem de `PRACAS` — uma praça sem preço cadastrado ainda aparece na
- * tabela, com valor `0` e sem `atualizado_em`, para o formulário de preços
- * nunca "perder" uma praça por falta de linha no banco.
+ * tabela, com `custo_midia_tv` `0` e o resto `null`/sem `atualizado_em`, para
+ * o formulário de preços nunca "perder" uma praça por falta de linha no
+ * banco.
  */
 export async function listarPrecos(programaId: string): Promise<PrecoDePraca[]> {
   const supabase = await criarClienteServidor()
 
   const { data, error } = await supabase
     .from('preco_regional')
-    .select('praca_codigo, valor, atualizado_em')
+    .select(
+      'praca_codigo, custo_midia_tv, custo_producao_tv, percentual_simulcast, custo_midia_digital, custo_producao_digital, atualizado_em',
+    )
     .eq('programa_id', programaId)
 
   if (error) {
@@ -41,7 +54,11 @@ export async function listarPrecos(programaId: string): Promise<PrecoDePraca[]> 
     const existente = porPraca.get(praca)
     return {
       praca_codigo: praca,
-      valor: existente?.valor ?? 0,
+      custo_midia_tv: existente?.custo_midia_tv ?? 0,
+      custo_producao_tv: existente?.custo_producao_tv ?? null,
+      percentual_simulcast: existente?.percentual_simulcast ?? null,
+      custo_midia_digital: existente?.custo_midia_digital ?? null,
+      custo_producao_digital: existente?.custo_producao_digital ?? null,
       atualizado_em: existente?.atualizado_em ?? '',
     }
   })
