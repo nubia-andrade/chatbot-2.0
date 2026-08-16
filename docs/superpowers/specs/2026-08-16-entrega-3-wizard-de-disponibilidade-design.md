@@ -117,10 +117,25 @@ que forma uma faixa contígua legível de uma vez — e sinaliza que há mais de
 motivo; o detalhe da célula mostra os dois por extenso. Nenhuma informação se
 perde e a faixa de prazo não fica furada por uma célula de outra cor.
 
-**O sistema não tem calendário de feriados.** 25/12 é um dia como outro
-qualquer, a menos que alguém o tenha cadastrado em `datas_bloqueadas` (impede a
-venda) ou em `datas_especiais` (muda o preço). Nenhuma parte do cálculo deve
-supor feriados nacionais embutidos.
+**Feriado é ilustração, nunca regra.** O calendário mostra o nome do feriado na
+célula — "Natal", "Carnaval" — para o executivo se situar no mês sem abrir outra
+aba. Mas isso **não altera disponibilidade nem preço**: 25/12 só fecha se alguém
+o cadastrou em `datas_bloqueadas`, e só muda de valor se estiver dentro de um
+período de `datas_especiais`. Um feriado sem cadastro é um dia vendável como
+outro qualquer, e a célula continua verde.
+
+A separação precisa ser visível: o nome do feriado aparece como legenda discreta
+da célula, no mesmo lugar em qualquer estado, e **nunca** como um dos motivos de
+indisponibilidade. Quem lê "Natal" numa célula verde precisa entender que o
+programa vende naquele dia.
+
+`src/lib/dominio/feriados.ts` é uma função pura, sem banco: os feriados
+nacionais fixos (01/01, 21/04, 01/05, 07/09, 12/10, 02/11, 15/11, 25/12) e os
+móveis derivados da Páscoa — Carnaval, Sexta-feira Santa e Corpus Christi —,
+calculada pelo algoritmo de Meeus/Butcher. São os móveis que justificam a
+função existir: ninguém sabe de cabeça quando cai o Carnaval de 2027, e é o
+feriado que mais desloca grade comercial. Feriado estadual e municipal ficam de
+fora — são muitos, mudam por praça, e o que decide continua sendo o cadastro.
 
 **R16 — bloqueio mensal** entra nesta entrega, como a Entrega 2 registrou que
 entraria. Atingido o teto do mês — `bloqueio_mensal` no nacional,
@@ -288,6 +303,7 @@ Cobrem `src/lib/dominio`, sem banco nem tela:
 | R11/R12 na mesma data, R14 no nacional, R16 mensal | `disponibilidade.test.ts` |
 | Praças por data no regional, R10 fora do dia da semana | `disponibilidade.test.ts` |
 | Redução de nome e casamento com a carteira | `casamento-anunciante.test.ts` |
+| Feriados fixos e móveis, e que feriado não bloqueia | `feriados.test.ts` |
 | O que pode virar consulta gravada | `consulta.test.ts` |
 
 Os casos usam os números reais: Encontro com slot às sextas, 7 dias de prazo e
@@ -309,15 +325,19 @@ a casar com a redução — medidos, não inventados.
 7. Data dentro do prazo mínimo aparece amarela; data também bloqueada mostra os
    dois motivos no detalhe, sem furar a faixa amarela.
 8. Mês com o teto de ações atingido fecha, com o motivo por extenso.
-9. Data com ação de concorrente do cliente aparece vermelha, nomeando o
-   concorrente; data com anunciante não classificado segue disponível, com o
-   aviso de concorrência não verificada.
-10. O resumo discrimina mídia, direitos e produção, e nomeia o período especial
+9. Feriado aparece nomeado na célula e **não** altera o estado: um 25/12 sem
+   cadastro segue disponível e vendável; o mesmo 25/12 em `datas_bloqueadas`
+   fecha pelo bloqueio, não por ser feriado. Carnaval é calculado corretamente
+   em pelo menos três anos diferentes.
+10. Data com ação de concorrente do cliente aparece vermelha, nomeando o
+    concorrente; data com anunciante não classificado segue disponível, com o
+    aviso de concorrência não verificada.
+11. O resumo discrimina mídia, direitos e produção, e nomeia o período especial
     com o percentual.
-11. Chegar ao resumo grava uma linha em `consultas` e uma por data em
+12. Chegar ao resumo grava uma linha em `consultas` e uma por data em
     `consulta_itens` — verificado direto no banco.
-12. O aviso de que não há reserva de inventário está visível no resumo.
-13. `npm test` passa; `npm run build` e `npm run lint` completam sem erro.
+13. O aviso de que não há reserva de inventário está visível no resumo.
+14. `npm test` passa; `npm run build` e `npm run lint` completam sem erro.
 
 ## Pendências para confirmar com a área
 
