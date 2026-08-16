@@ -100,13 +100,28 @@ mesmo com o código correto.
    que já estava gravado; os `drop column` removem o que não existe mais no
    modelo novo — o cabeçalho do arquivo lista, coluna por coluna, o que
    acontece com cada valor existente. Idempotente.
-5. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
+5. **Aplicar a reestruturação de Produção Regional.** Ainda no `SQL Editor`,
+   cole `supabase/schema-entrega-2-producao-regional.sql` > `Run`. Roda
+   depois do arquivo anterior: reverte parte da mudança de Custos porque a
+   área decidiu que a produção regional é **única por programa**, não por
+   praça (um cliente que compra 3 praças paga a produção uma vez, não três)
+   — remove `preco_regional.custo_producao_tv` e
+   `preco_regional.custo_producao_digital` (nasceram nulas em todo mundo, o
+   arquivo confere isso antes do `drop`) e cria um único
+   `programas.custo_producao_regional`. Também cria
+   `programas.bloqueio_mensal_regional`: o documento da área diz "4 ações
+   bloqueiam o mês" no regional, um número diferente do `bloqueio_mensal`
+   nacional que a usuária já configurou (12 no Encontro, 2 no É de Casa) — as
+   duas grandezas não cabiam numa coluna só. A regra em si (4 ações fecham o
+   mês) ainda não é aplicada em lugar nenhum; só a coluna, o campo no
+   cadastro e a validação de não-negativo entram por este arquivo. Idempotente.
+6. **Carregar formatos e clientes.** Rode `npm run seed:gerar` (exige as
    planilhas em `dados/`) e aplique no SQL Editor, nesta ordem,
    `supabase/seed-formatos.sql` e `supabase/seed-clientes.sql`. São 73
    formatos e ~15,5 mil clientes.
-6. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
+7. **Criar o usuário no painel.** `Authentication` > `Users` > `Add user` >
    `Create new user`. Informe e-mail e senha e marque **Auto Confirm User**.
-7. **Tornar esse usuário administrador.** Na raiz do projeto:
+8. **Tornar esse usuário administrador.** Na raiz do projeto:
 
    ```bash
    npm run admin -- pessoa@empresa.com
@@ -115,21 +130,22 @@ mesmo com o código correto.
    Sem este passo ninguém enxerga Configurações: `perfil_usuario` nasce vazia
    e todo mundo cai no perfil `executivo`, que não administra nada. O script
    não cria contas — se o e-mail não existir, ele diz isso e manda voltar ao
-   passo 6. Repita o comando para cada pessoa que precisar administrar.
-8. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
+   passo 7. Repita o comando para cada pessoa que precisar administrar.
+9. **Importar as vendas.** `npm run importar`. Se a API devolver a página de
    login em vez de JSON, veja "Importar sem o comando de linha" abaixo — é o
    caminho normal, não um sinal de erro. Depois de importar,
    `Configurações > Importação` mostra a data do snapshot e o que veio.
-9. **Configurar as ações regionais.** Depois de cadastrar os programas
-   (`Configurações > Programas`), aplique `supabase/seed-regional.sql` no SQL
-   Editor. Ele configura o **Encontro** e o **É de Casa** com os valores de
-   `docs/regras-acoes-regionais.md`: dia da semana do slot regional, prazo
-   mínimo próprio, teto de praças e o preço de mídia de TV de cada uma das 5
-   praças (direitos e conexos e custo de produção regional ficam de fora do
-   seed — o primeiro é calculado, o segundo é por praça e a área ainda não
-   informou o valor de cada uma; ver o aviso no cabeçalho do arquivo).
-   Idempotente, e casa os programas pelo mnemônico (`FATI` e `CASA`) — se os
-   seus tiverem outro, ajuste o arquivo.
+10. **Configurar as ações regionais.** Depois de cadastrar os programas
+    (`Configurações > Programas`), aplique `supabase/seed-regional.sql` no
+    SQL Editor. Ele configura o **Encontro** e o **É de Casa** com os
+    valores de `docs/regras-acoes-regionais.md`: dia da semana do slot
+    regional, prazo mínimo próprio, teto de praças, o preço de mídia de TV
+    de cada uma das 5 praças, e agora também o custo de produção regional
+    (único por programa: R$ 7.797,00 no Encontro, R$ 7.910,00 no É de Casa)
+    e o bloqueio mensal regional (4 nos dois). Direitos e conexos continuam
+    fora do seed — é valor calculado, nunca gravado. Idempotente, e casa os
+    programas pelo mnemônico (`FATI` e `CASA`) — se os seus tiverem outro,
+    ajuste o arquivo.
 
    O mesmo arquivo corrige o mnemônico do É de Casa de `EDC` para `CASA`. Não
    é detalhe: a API manda `"CASA - E DE CASA"`, e com `EDC` nenhuma entrega

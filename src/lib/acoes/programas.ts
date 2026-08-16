@@ -82,6 +82,8 @@ export async function salvarPrograma(
     dia_da_semana_regional: dados.dia_da_semana_regional ?? null,
     prazo_minimo_regional_dias: dados.prazo_minimo_regional_dias ?? null,
     max_pracas_por_acao: dados.max_pracas_por_acao ?? 3,
+    custo_producao_regional: dados.custo_producao_regional ?? null,
+    bloqueio_mensal_regional: dados.bloqueio_mensal_regional ?? null,
   }
 
   const consulta = dados.id

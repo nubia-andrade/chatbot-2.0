@@ -37,17 +37,19 @@ function hojeIso(): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Um preço regional completo, por praça — Entrega 3: TV e digital, com
- * `custo_midia_tv` obrigatório (é o preço de venda da praça) e o resto
- * opcional, igual ao bloco nacional.
+ * Um preço regional completo, por praça — TV e digital, com `custo_midia_tv`
+ * obrigatório (é o preço de venda da praça) e o resto opcional, igual ao
+ * bloco nacional.
+ *
+ * Sem produção: a produção regional é única por PROGRAMA
+ * (`programas.custo_producao_regional`), não por praça — não se grava mais
+ * aqui.
  */
 export type EntradaDePreco = {
   praca_codigo: string
   custo_midia_tv: number
-  custo_producao_tv: number | null
   percentual_simulcast: number | null
   custo_midia_digital: number | null
-  custo_producao_digital: number | null
 }
 
 function validarPrecos(precos: EntradaDePreco[]): string[] {
@@ -85,10 +87,8 @@ export async function salvarPrecos(
       programa_id: programaId,
       praca_codigo: preco.praca_codigo,
       custo_midia_tv: preco.custo_midia_tv,
-      custo_producao_tv: preco.custo_producao_tv,
       percentual_simulcast: preco.percentual_simulcast,
       custo_midia_digital: preco.custo_midia_digital,
-      custo_producao_digital: preco.custo_producao_digital,
       atualizado_em: new Date().toISOString(),
     })),
     { onConflict: 'programa_id,praca_codigo' },

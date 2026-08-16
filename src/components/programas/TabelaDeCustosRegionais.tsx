@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { salvarPrecos, type EntradaDePreco } from '@/lib/acoes/regional'
 import { PRACAS } from '@/lib/dominio/regional'
 import { calcularDireitosTv, calcularDireitosDigital } from '@/lib/dominio/direitos-e-conexos'
+import { calcularCustoDaAcaoRegional } from '@/lib/dominio/custo-da-acao-regional'
 import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
 import { AvisoDeSaida } from '@/components/comum/AvisoDeSaida'
 import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
@@ -11,30 +12,21 @@ import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
 export type PrecoDePraca = {
   praca_codigo: string
   custo_midia_tv: number
-  custo_producao_tv: number | null
   percentual_simulcast: number | null
   custo_midia_digital: number | null
-  custo_producao_digital: number | null
   atualizado_em: string
 }
 
-/** Um dos cinco campos de dinheiro/percentual editáveis por praça. */
-type Campo =
-  | 'custo_midia_tv'
-  | 'custo_producao_tv'
-  | 'percentual_simulcast'
-  | 'custo_midia_digital'
-  | 'custo_producao_digital'
+/** Um dos três campos de dinheiro/percentual editáveis por praça. */
+type Campo = 'custo_midia_tv' | 'percentual_simulcast' | 'custo_midia_digital'
 
 type Rascunho = Record<Campo, string>
 
 function rascunhoDaPraca(preco: PrecoDePraca): Rascunho {
   return {
     custo_midia_tv: formatarMoeda(preco.custo_midia_tv),
-    custo_producao_tv: formatarMoeda(preco.custo_producao_tv),
     percentual_simulcast: formatarMoeda(preco.percentual_simulcast),
     custo_midia_digital: formatarMoeda(preco.custo_midia_digital),
-    custo_producao_digital: formatarMoeda(preco.custo_producao_digital),
   }
 }
 
@@ -46,13 +38,17 @@ function formatarDataHoraBR(iso: string): string {
 }
 
 /**
- * Custos regionais por praça — Entrega 3.
+ * Custos regionais por praça.
  *
- * Substitui a antiga "tabela de preços" (só `valor`, um número por praça) por
- * uma linha completa por praça: mídia e produção de TV, % simulcast, mídia e
- * produção de digital, e os dois direitos e conexos — TV e digital —,
- * calculados aqui (nunca digitados, `direitos-e-conexos.ts`) e recalculados
- * a cada tecla, igual ao bloco nacional do cadastro.
+ * Uma linha por praça: mídia de TV, % simulcast, mídia digital, e os dois
+ * direitos e conexos — TV e digital —, calculados aqui (nunca digitados,
+ * `direitos-e-conexos.ts`) e recalculados a cada tecla, igual ao bloco
+ * nacional do cadastro.
+ *
+ * A produção NÃO aparece mais por praça: é única por PROGRAMA
+ * (`custoProducaoRegional`, cadastrada no formulário do programa) — decisão
+ * da área, um cliente que compra 3 praças paga a produção uma vez, não três
+ * (`src/lib/dominio/custo-da-acao-regional.ts`).
  *
  * Os campos digitais ficam opcionais de propósito: a área ainda não
  * confirmou quais praças vendem digital.
@@ -60,9 +56,12 @@ function formatarDataHoraBR(iso: string): string {
 export function TabelaDeCustosRegionais({
   programaId,
   precosIniciais,
+  custoProducaoRegional,
 }: {
   programaId: string
   precosIniciais: PrecoDePraca[]
+  /** `programas.custo_producao_regional` — única por programa, somada uma vez no total. */
+  custoProducaoRegional: number | null
 }) {
   const [precos, setPrecos] = useState(precosIniciais)
   const [rascunhos, setRascunhos] = useState<Record<string, Rascunho>>(() =>
@@ -101,10 +100,8 @@ export function TabelaDeCustosRegionais({
       return {
         praca_codigo: praca,
         custo_midia_tv: paraNumero(rascunho.custo_midia_tv) ?? 0,
-        custo_producao_tv: paraNumero(rascunho.custo_producao_tv),
         percentual_simulcast: paraNumero(rascunho.percentual_simulcast),
         custo_midia_digital: paraNumero(rascunho.custo_midia_digital),
-        custo_producao_digital: paraNumero(rascunho.custo_producao_digital),
       }
     })
     const resultado = await salvarPrecos(programaId, entradas)
@@ -123,18 +120,14 @@ export function TabelaDeCustosRegionais({
   }
 
   // Total da ação: soma, das praças marcadas, o que já está salvo (não o
-  // rascunho não gravado) — mídia TV + produção TV + direitos de TV
-  // calculados. O digital fica fora da soma porque a venda regional, hoje,
-  // é uma venda de TV.
-  const totalDaAcao = useMemo(() => {
-    const porPraca = new Map(precos.map((p) => [p.praca_codigo, p]))
-    return pracasDoCalculo.reduce((total, codigo) => {
-      const preco = porPraca.get(codigo)
-      if (!preco) return total
-      const direitosTv = calcularDireitosTv(preco.custo_midia_tv, preco.percentual_simulcast) ?? 0
-      return total + preco.custo_midia_tv + (preco.custo_producao_tv ?? 0) + direitosTv
-    }, 0)
-  }, [pracasDoCalculo, precos])
+  // rascunho não gravado) — mídia TV + direitos de TV calculados por praça,
+  // mais a produção regional somada UMA vez (não por praça — decisão da
+  // área, `calcularCustoDaAcaoRegional`). O digital fica fora da soma
+  // porque a venda regional, hoje, é uma venda de TV.
+  const totalDaAcao = useMemo(
+    () => calcularCustoDaAcaoRegional(pracasDoCalculo, precos, custoProducaoRegional),
+    [pracasDoCalculo, precos, custoProducaoRegional],
+  )
 
   return (
     <section
@@ -280,20 +273,13 @@ function LinhaDaPraca({
       </div>
 
       <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--texto-3)]">TV</div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <CampoDePraca
           rotulo="Mídia TV"
           id={`${praca}-midia-tv`}
           valor={rascunho.custo_midia_tv}
           aoMudar={(valor) => aoMudarCampo('custo_midia_tv', valor)}
           aoSairDoFoco={() => aoSairDoFoco('custo_midia_tv')}
-        />
-        <CampoDePraca
-          rotulo="Produção TV"
-          id={`${praca}-producao-tv`}
-          valor={rascunho.custo_producao_tv}
-          aoMudar={(valor) => aoMudarCampo('custo_producao_tv', valor)}
-          aoSairDoFoco={() => aoSairDoFoco('custo_producao_tv')}
         />
         <CampoDePraca
           rotulo="% Simulcast"
@@ -308,20 +294,13 @@ function LinhaDaPraca({
       <div className="mb-1 mt-3 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[var(--texto-3)]">
         Digital <span className="font-normal normal-case text-[var(--texto-3)]">(opcional)</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2">
         <CampoDePraca
           rotulo="Mídia digital"
           id={`${praca}-midia-digital`}
           valor={rascunho.custo_midia_digital}
           aoMudar={(valor) => aoMudarCampo('custo_midia_digital', valor)}
           aoSairDoFoco={() => aoSairDoFoco('custo_midia_digital')}
-        />
-        <CampoDePraca
-          rotulo="Produção digital"
-          id={`${praca}-producao-digital`}
-          valor={rascunho.custo_producao_digital}
-          aoMudar={(valor) => aoMudarCampo('custo_producao_digital', valor)}
-          aoSairDoFoco={() => aoSairDoFoco('custo_producao_digital')}
         />
         <CampoCalculado rotulo="Direitos e conexos digital" valor={direitosDigital} />
       </div>

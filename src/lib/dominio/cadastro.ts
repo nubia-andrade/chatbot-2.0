@@ -37,6 +37,23 @@ export type Programa = {
   prazo_minimo_regional_dias: number | null
   /** Quantas praças uma mesma ação pode reunir. Padrão de banco: 3. */
   max_pracas_por_acao: number
+  /**
+   * Produção regional — Entrega "produção regional". Único por PROGRAMA, não
+   * por praça: um cliente que compra SP, RJ e BH paga a produção uma vez, não
+   * três (`src/lib/dominio/custo-da-acao-regional.ts`). Um só campo para a
+   * ação inteira — não separa TV de digital; se a área pedir produção digital
+   * própria depois, o campo se desdobra então.
+   */
+  custo_producao_regional: number | null
+  /**
+   * Bloqueio mensal do REGIONAL — diferente de `bloqueio_mensal` (nacional).
+   * O documento da área diz "4 ações bloqueiam o mês" no regional; a coluna
+   * nacional já vem preenchida com outro número (12 no Encontro, 2 no É de
+   * Casa) e as duas grandezas não cabem numa coluna só. A regra em si (4
+   * ações fecham o mês) ainda não é aplicada em lugar nenhum — só o dado
+   * mora aqui, à espera do calendário regional.
+   */
+  bloqueio_mensal_regional: number | null
 }
 
 function vazio(valor: string | undefined | null): boolean {
@@ -100,6 +117,17 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     if ((programa.max_pracas_por_acao ?? 0) < 1) {
       erros.push('O máximo de praças por ação regional precisa ser pelo menos 1.')
     }
+  }
+
+  // Bloqueio mensal regional é opcional — nem todo programa vende regional,
+  // e mesmo quem vende pode não ter recebido o número ainda. Só valida
+  // quando informado: não pode ser negativo.
+  if (
+    programa.bloqueio_mensal_regional !== null &&
+    programa.bloqueio_mensal_regional !== undefined &&
+    programa.bloqueio_mensal_regional < 0
+  ) {
+    erros.push('O bloqueio mensal regional não pode ser negativo.')
   }
 
   return erros

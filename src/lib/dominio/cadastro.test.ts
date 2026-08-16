@@ -146,6 +146,39 @@ describe('validarPrograma', () => {
     )
     expect(erros).toEqual([])
   })
+
+  // Bloqueio mensal regional — coluna própria, distinta do `bloqueio_mensal`
+  // nacional; opcional (nem todo programa vende regional), mas não-negativa.
+  it('aceita bloqueio mensal regional ausente — não é obrigatório', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: true,
+        dia_da_semana_regional: 5,
+        prazo_minimo_regional_dias: 7,
+        max_pracas_por_acao: 3,
+        bloqueio_mensal_regional: null,
+      }),
+    )
+    expect(erros).toEqual([])
+  })
+
+  it('aceita bloqueio mensal regional válido (4 ações, caso do Encontro e do É de Casa)', () => {
+    const erros = validarPrograma(
+      programa({
+        aceita_regional: true,
+        dia_da_semana_regional: 5,
+        prazo_minimo_regional_dias: 7,
+        max_pracas_por_acao: 3,
+        bloqueio_mensal_regional: 4,
+      }),
+    )
+    expect(erros).toEqual([])
+  })
+
+  it('recusa bloqueio mensal regional negativo', () => {
+    const erros = validarPrograma(programa({ bloqueio_mensal_regional: -1 }))
+    expect(erros).toContain('O bloqueio mensal regional não pode ser negativo.')
+  })
 })
 
 describe('vaiAoArEm', () => {

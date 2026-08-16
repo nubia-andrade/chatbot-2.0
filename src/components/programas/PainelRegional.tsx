@@ -13,6 +13,8 @@ type Props = {
   prazoMinimoRegionalDias: number
   maxPracasPorAcao: number
   precosIniciais: PrecoDePraca[]
+  /** `programas.custo_producao_regional` — única por programa, somada uma vez no total da ação. */
+  custoProducaoRegional: number | null
   acoesIniciais: AcaoRegionalDaMatriz[]
   /** Datas bloqueadas do programa — R12 vale para o regional igual ao nacional. */
   bloqueios: DataBloqueada[]
@@ -35,6 +37,7 @@ export function PainelRegional({
   prazoMinimoRegionalDias,
   maxPracasPorAcao,
   precosIniciais,
+  custoProducaoRegional,
   acoesIniciais,
   bloqueios,
   hojeIso,
@@ -44,7 +47,11 @@ export function PainelRegional({
 
   return (
     <div className="flex flex-col gap-6">
-      <TabelaDeCustosRegionais programaId={programaId} precosIniciais={precosIniciais} />
+      <TabelaDeCustosRegionais
+        programaId={programaId}
+        precosIniciais={precosIniciais}
+        custoProducaoRegional={custoProducaoRegional}
+      />
 
       <MatrizDePracas
         diaDaSemanaRegional={diaDaSemanaRegional}

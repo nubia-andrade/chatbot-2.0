@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { salvarPrograma } from '@/lib/acoes/programas'
 import { enviarImagemDePrograma } from '@/lib/acoes/imagens'
 import type { EstadoDoPrograma, Programa } from '@/lib/dominio/cadastro'
-import { paraNumero } from '@/lib/dominio/moeda'
+import { paraNumero, formatarMoeda } from '@/lib/dominio/moeda'
 import { urlDeImagemSegura } from '@/lib/seguranca/url-imagem'
 import { AvisoDeSaida, useNavegacaoSegura } from '@/components/comum/AvisoDeSaida'
 import { BotaoDeGravacao } from '@/components/comum/BotaoDeGravacao'
@@ -48,6 +48,8 @@ type Rascunho = {
   dia_da_semana_regional: string
   prazo_minimo_regional_dias: string
   max_pracas_por_acao: string
+  custo_producao_regional: string
+  bloqueio_mensal_regional: string
 } & RascunhoDeCustos
 
 function rascunhoInicial(programa: Programa | null): Rascunho {
@@ -78,6 +80,11 @@ function rascunhoInicial(programa: Programa | null): Rascunho {
         ? String(programa.prazo_minimo_regional_dias)
         : '',
     max_pracas_por_acao: programa ? String(programa.max_pracas_por_acao) : '3',
+    custo_producao_regional: formatarMoeda(programa?.custo_producao_regional),
+    bloqueio_mensal_regional:
+      programa?.bloqueio_mensal_regional !== null && programa?.bloqueio_mensal_regional !== undefined
+        ? String(programa.bloqueio_mensal_regional)
+        : '',
   }
 }
 
@@ -127,6 +134,10 @@ function paraPrograma(id: string | undefined, rascunho: Rascunho): Partial<Progr
       ? (numeroOuIndefinido(rascunho.prazo_minimo_regional_dias) ?? null)
       : null,
     max_pracas_por_acao: numeroOuIndefinido(rascunho.max_pracas_por_acao) ?? 3,
+    custo_producao_regional: rascunho.aceita_regional ? paraNumero(rascunho.custo_producao_regional) : null,
+    bloqueio_mensal_regional: rascunho.aceita_regional
+      ? (numeroOuIndefinido(rascunho.bloqueio_mensal_regional) ?? null)
+      : null,
   }
 }
 
@@ -597,12 +608,19 @@ function BlocoMarcadores({ rascunho, mudar }: PropsDoBloco) {
  * não vende regional quanto porque `paraPrograma` já grava `null` neles
  * assim que o marcador é desligado.
  *
- * Os custos regionais (por praça: mídia/produção TV e digital, direitos
- * calculados) saíram deste bloco na Entrega 3 — moram na aba Regional
- * (`TabelaDeCustosRegionais`), porque passaram a variar por praça em vez de
- * ter um valor único por programa. Aqui fica só o estrutural: em que dia da
- * semana existe o slot regional, com que prazo, e quantas praças cabem numa
- * ação.
+ * Os custos POR PRAÇA (mídia e direitos de TV e digital) não moram neste
+ * bloco — moram na aba Regional (`TabelaDeCustosRegionais`), porque variam
+ * por praça. Já o custo de produção regional é único para o programa
+ * inteiro (uma ação com 3 praças paga a produção uma vez, não três —
+ * `src/lib/dominio/custo-da-acao-regional.ts`) e por isso mora aqui, junto
+ * do resto do estrutural: em que dia da semana existe o slot regional, com
+ * que prazo, quantas praças cabem numa ação, e o bloqueio mensal — que é
+ * PRÓPRIO do regional, diferente do "Bloqueio mensal" nacional acima
+ * (`bloqueio_mensal`): o documento da área diz 4 ações por mês no regional,
+ * um número que não tem relação com o bloqueio mensal nacional já
+ * configurado (12 no Encontro, 2 no É de Casa). A regra em si (4 ações
+ * fecham o mês) ainda não é aplicada em lugar nenhum — só o dado é
+ * cadastrado aqui, à espera do calendário regional.
  */
 function BlocoRegional({ rascunho, mudar }: PropsDoBloco) {
   if (!rascunho.aceita_regional) return null
@@ -642,9 +660,30 @@ function BlocoRegional({ rascunho, mudar }: PropsDoBloco) {
           aoMudar={(valor) => mudar('max_pracas_por_acao', valor)}
           ajuda="Quantas praças um mesmo cliente pode reunir numa única ação regional."
         />
+        <label className="flex flex-col gap-1">
+          <span className="text-[12px] font-semibold text-[var(--texto-2)]">Custo de produção regional</span>
+          <input
+            type="text"
+            value={rascunho.custo_producao_regional}
+            placeholder="0,00"
+            onChange={(evento) => mudar('custo_producao_regional', evento.target.value)}
+            onBlur={() => mudar('custo_producao_regional', formatarMoeda(paraNumero(rascunho.custo_producao_regional)))}
+            className="h-[40px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[13.5px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+          />
+          <span className="text-[11.5px] text-[var(--texto-3)]">
+            Único para a ação inteira — não multiplica pelo número de praças compradas.
+          </span>
+        </label>
+        <Campo
+          rotulo="Bloqueio mensal regional"
+          tipo="number"
+          valor={rascunho.bloqueio_mensal_regional}
+          aoMudar={(valor) => mudar('bloqueio_mensal_regional', valor)}
+          ajuda="Quantas ações regionais fecham o mês para novas propostas — diferente do bloqueio mensal nacional acima."
+        />
       </div>
       <p className="text-[11.5px] text-[var(--texto-3)]">
-        Os custos por praça (mídia, produção e direitos de TV e digital) ficam na aba Regional deste programa.
+        Os custos por praça (mídia, direitos de TV e digital) ficam na aba Regional deste programa.
       </p>
     </fieldset>
   )

@@ -12,18 +12,22 @@ import { PRACAS, type AcaoRegional } from '../dominio/regional'
  */
 
 /**
- * Custos de uma praça — Entrega 3: TV e digital separados, com os dois
- * "direitos e conexos" calculados aqui na leitura (nunca gravados —
+ * Custos de uma praça — TV e digital, com os dois "direitos e conexos"
+ * calculados aqui na leitura (nunca gravados —
  * `src/lib/dominio/direitos-e-conexos.ts`), para a tela não precisar
  * recalcular no primeiro render antes de qualquer digitação.
+ *
+ * Produção regional NÃO mora mais aqui — decisão da área: a produção é única
+ * por PROGRAMA, não por praça (`programas.custo_producao_regional`,
+ * `src/lib/dominio/custo-da-acao-regional.ts`). Colunas de produção que
+ * existiram brevemente em `preco_regional` foram removidas por
+ * `supabase/schema-entrega-2-producao-regional.sql`.
  */
 export type PrecoDePraca = {
   praca_codigo: string
   custo_midia_tv: number
-  custo_producao_tv: number | null
   percentual_simulcast: number | null
   custo_midia_digital: number | null
-  custo_producao_digital: number | null
   atualizado_em: string
 }
 
@@ -39,9 +43,7 @@ export async function listarPrecos(programaId: string): Promise<PrecoDePraca[]> 
 
   const { data, error } = await supabase
     .from('preco_regional')
-    .select(
-      'praca_codigo, custo_midia_tv, custo_producao_tv, percentual_simulcast, custo_midia_digital, custo_producao_digital, atualizado_em',
-    )
+    .select('praca_codigo, custo_midia_tv, percentual_simulcast, custo_midia_digital, atualizado_em')
     .eq('programa_id', programaId)
 
   if (error) {
@@ -55,10 +57,8 @@ export async function listarPrecos(programaId: string): Promise<PrecoDePraca[]> 
     return {
       praca_codigo: praca,
       custo_midia_tv: existente?.custo_midia_tv ?? 0,
-      custo_producao_tv: existente?.custo_producao_tv ?? null,
       percentual_simulcast: existente?.percentual_simulcast ?? null,
       custo_midia_digital: existente?.custo_midia_digital ?? null,
-      custo_producao_digital: existente?.custo_producao_digital ?? null,
       atualizado_em: existente?.atualizado_em ?? '',
     }
   })
