@@ -157,6 +157,18 @@ mesmo com o código correto.
    Pricing". A aba Regional exibe esse aviso na tela. Quando Pricing
    confirmar, atualize `supabase/seed-regional.sql` **e**
    `docs/regras-acoes-regionais.md` juntos, para os dois não divergirem.
+11. **Aplicar Datas especiais.** No `SQL Editor`, cole
+    `supabase/schema-datas-especiais.sql` > `Run`. Roda depois de todos os
+    arquivos anteriores (usa `e_consultor_de`, criada no passo 2). Cria a
+    tabela `datas_especiais` — períodos com preço diferenciado por programa
+    (Black Friday, Natal…), diferentes de `datas_bloqueadas`: aquela impede a
+    venda, esta muda o preço, e as duas coexistem sem se tocar. O campo
+    `texto_investimento` é gravado agora mas só é lido na Entrega 4, quando a
+    página de valor da proposta for gerada — a tela avisa isso. A regra "dois
+    períodos do mesmo programa não podem se sobrepor" não é um `check` de
+    banco (exigiria a extensão `btree_gist`, que este projeto não usa em
+    lugar nenhum); é validada em `src/lib/dominio/datas-especiais.ts` antes da
+    escrita. Idempotente.
 
 ### Importar sem o comando de linha
 

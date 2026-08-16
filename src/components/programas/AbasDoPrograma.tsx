@@ -13,6 +13,7 @@ type Props = {
   programaId: string
   aceitaRegional: boolean
   contagemDatas: number
+  contagemDatasEspeciais: number
   contagemRestricoes: number
   contagemRegional: number
 }
@@ -38,6 +39,7 @@ export function AbasDoPrograma({
   programaId,
   aceitaRegional,
   contagemDatas,
+  contagemDatasEspeciais,
   contagemRestricoes,
   contagemRegional,
 }: Props) {
@@ -46,8 +48,11 @@ export function AbasDoPrograma({
 
   // Ordem pedida pela área: Regional vem logo depois do Cadastro, porque é a
   // continuação natural da configuração do programa — quem acabou de definir
-  // dias e slots segue para praças e preços. Datas bloqueadas e Restrições
-  // são ajustes posteriores, feitos ao longo do tempo.
+  // dias e slots segue para praças e preços. Datas bloqueadas, Datas
+  // especiais e Restrições são ajustes posteriores, feitos ao longo do
+  // tempo. Datas especiais vem logo depois de Datas bloqueadas por pedido
+  // da área — são conceitos vizinhos (bloqueio impede a venda, data
+  // especial muda o preço) e ficam lado a lado para não se confundirem.
   const abas: Aba[] = [{ rotulo: 'Cadastro', href: base }]
 
   if (aceitaRegional) {
@@ -56,6 +61,11 @@ export function AbasDoPrograma({
 
   abas.push(
     { rotulo: 'Datas bloqueadas', href: `${base}/datas`, contagem: contagemDatas },
+    {
+      rotulo: 'Datas especiais',
+      href: `${base}/datas-especiais`,
+      contagem: contagemDatasEspeciais,
+    },
     { rotulo: 'Restrições', href: `${base}/restricoes`, contagem: contagemRestricoes },
   )
 

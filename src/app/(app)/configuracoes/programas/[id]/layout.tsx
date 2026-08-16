@@ -4,6 +4,7 @@ import { obterSessao } from '@/lib/sessao-servidor'
 import { podeAdministrarProgramas, podeEditarPrograma } from '@/lib/dominio/perfis'
 import { obterPrograma } from '@/lib/dados/programas'
 import { contarDatasBloqueadas } from '@/lib/dados/datas-bloqueadas'
+import { contarDatasEspeciais } from '@/lib/dados/datas-especiais'
 import { contarRestricoes } from '@/lib/dados/restricoes'
 import { contarAcoesRegionais } from '@/lib/dados/acoes-regionais'
 import { CabecalhoDoPrograma } from '@/components/programas/CabecalhoDoPrograma'
@@ -51,8 +52,9 @@ export default async function LayoutDoPrograma({
     notFound()
   }
 
-  const [contagemDatas, contagemRestricoes, contagemRegional] = await Promise.all([
+  const [contagemDatas, contagemDatasEspeciais, contagemRestricoes, contagemRegional] = await Promise.all([
     contarDatasBloqueadas(programa.id),
+    contarDatasEspeciais(programa.id),
     contarRestricoes(programa.id),
     programa.aceita_regional ? contarAcoesRegionais(programa.id) : Promise.resolve(0),
   ])
@@ -64,6 +66,7 @@ export default async function LayoutDoPrograma({
         programaId={programa.id}
         aceitaRegional={programa.aceita_regional}
         contagemDatas={contagemDatas}
+        contagemDatasEspeciais={contagemDatasEspeciais}
         contagemRestricoes={contagemRestricoes}
         contagemRegional={contagemRegional}
       />
