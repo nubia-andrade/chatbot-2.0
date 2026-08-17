@@ -2,7 +2,7 @@ import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterPrograma, listarApelidos } from './programas'
 import { listarDatasBloqueadas } from './datas-bloqueadas'
 import { listarDatasEspeciais } from './datas-especiais'
-import { listarAcoesRegionais, listarPrecos } from './regional'
+import { listarAcoesRegionais, listarPrecos, type PrecoDePraca } from './regional'
 import { lerPaginado } from './paginacao'
 import { montarMapa } from '../dominio/formatos'
 import { indexarAnunciantes, type ClienteClassificado } from '../dominio/casamento-anunciante'
@@ -33,6 +33,15 @@ export type ResultadoDeDisponibilidade = {
   /** `null` quando `erro` está preenchido — programa ou cliente inexistente. */
   programa: Programa | null
   erro: string | null
+  /**
+   * As 5 praças com preço, cruas — quem grava uma consulta regional precisa
+   * recalcular o preço só das praças EFETIVAMENTE compradas
+   * (`calcularCustoDaAcaoRegional`), nunca reaproveitar `dia.valor_unitario`
+   * (que é o preço de levar TODAS as praças livres daquele dia — correto
+   * para pintar a célula do calendário, errado para gravar um retrato).
+   * Vazio quando `erro` está preenchido.
+   */
+  precosRegionais: PrecoDePraca[]
 }
 
 type LinhaDeCliente = {
@@ -89,7 +98,7 @@ export async function carregarDisponibilidade(params: {
 
   const programa = await obterPrograma(programaId)
   if (!programa) {
-    return { dias: [], programa: null, erro: ERRO_PROGRAMA }
+    return { dias: [], programa: null, erro: ERRO_PROGRAMA, precosRegionais: [] }
   }
 
   const supabase = await criarClienteServidor()
@@ -133,11 +142,11 @@ export async function carregarDisponibilidade(params: {
 
   if (respostaCliente.error) {
     console.error('Falha ao carregar cliente da consulta:', respostaCliente.error.message)
-    return { dias: [], programa: null, erro: ERRO_CARREGAMENTO }
+    return { dias: [], programa: null, erro: ERRO_CARREGAMENTO, precosRegionais: [] }
   }
   const cliente = respostaCliente.data as LinhaDeCliente | null
   if (!cliente) {
-    return { dias: [], programa: null, erro: ERRO_CLIENTE }
+    return { dias: [], programa: null, erro: ERRO_CLIENTE, precosRegionais: [] }
   }
 
   if (respostaAcoesVendidas.error) {
@@ -179,5 +188,6 @@ export async function carregarDisponibilidade(params: {
     dias: calcularDisponibilidadeDoMes(insumos),
     programa,
     erro: null,
+    precosRegionais,
   }
 }

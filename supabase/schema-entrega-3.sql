@@ -92,3 +92,95 @@ create policy "grava item de consulta propria" on consulta_itens
   for insert to authenticated with check (
     exists (select 1 from consultas c where c.id = consulta_id and c.usuario_id = auth.uid())
   );
+
+-- ---------------------------------------------------------------------------
+-- `gravar_consulta` — os dois inserts (`consultas` + `consulta_itens`) como
+-- UMA transação.
+--
+-- O código do app (Task 8) gravava com dois `.insert()` do PostgREST em
+-- sequência. Não são uma transação: se o segundo falhasse depois do primeiro
+-- ter sido aceito, sobrava uma `consultas` órfã — sem item, com
+-- `valor_total` de uma consulta que não existe mais, e sem jeito de apagar
+-- (o schema não concede `delete`: uma consulta gravada é um retrato, e um
+-- retrato que se apaga não é retrato). Uma função chamada via `rpc()` roda
+-- inteira dentro de uma única transação de banco — os dois inserts vingam
+-- juntos ou nenhum vinga, e a chamada HTTP some sem deixar rastro.
+--
+-- `security definer` é necessário para isto funcionar (uma função `security
+-- invoker` continuaria presa às mesmas duas transações separadas do RLS
+-- comum), e por isso CONTORNA as policies de insert acima. A checagem
+-- `p_usuario_id = auth.uid()` dentro do corpo da função é o que substitui a
+-- policy "grava consulta propria" neste caminho — sem ela, qualquer usuário
+-- autenticado gravaria consulta em nome de outro só trocando o parâmetro.
+-- `set search_path = public` é o mesmo endurecimento já usado em
+-- `tem_perfil`/`e_proprietario` (schema-entrega-2.sql): impede que um
+-- `search_path` malicioso troque o significado de `consultas`/`consulta_itens`
+-- dentro da função.
+-- ---------------------------------------------------------------------------
+create or replace function gravar_consulta(
+  p_usuario_id uuid,
+  p_cliente_id uuid,
+  p_cliente_nome text,
+  p_cliente_setor text,
+  p_cliente_industria text,
+  p_programa_id uuid,
+  p_programa_nome text,
+  p_modalidade text,
+  p_valor_total numeric,
+  p_avisos jsonb,
+  -- Um array jsonb de objetos, um por data:
+  -- { "data": "2026-08-28", "quantidade": 1, "pracas": ["SP","RJ"],
+  --   "valor_unitario": 63600, "valor_total": 63600,
+  --   "periodo_especial_nome": null, "periodo_especial_percentual": null }
+  p_itens jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_consulta_id uuid;
+begin
+  if p_usuario_id is distinct from auth.uid() then
+    raise exception 'usuario_id não corresponde ao usuário autenticado';
+  end if;
+
+  insert into consultas (
+    usuario_id, cliente_id, cliente_nome, cliente_setor, cliente_industria,
+    programa_id, programa_nome, modalidade, valor_total, avisos
+  )
+  values (
+    p_usuario_id, p_cliente_id, p_cliente_nome, p_cliente_setor, p_cliente_industria,
+    p_programa_id, p_programa_nome, p_modalidade, p_valor_total, coalesce(p_avisos, '[]'::jsonb)
+  )
+  returning id into v_consulta_id;
+
+  insert into consulta_itens (
+    consulta_id, data, quantidade, pracas, valor_unitario, valor_total,
+    periodo_especial_nome, periodo_especial_percentual
+  )
+  select
+    v_consulta_id,
+    (item ->> 'data')::date,
+    (item ->> 'quantidade')::integer,
+    coalesce(
+      (select array_agg(praca) from jsonb_array_elements_text(item -> 'pracas') as praca),
+      '{}'::text[]
+    ),
+    (item ->> 'valor_unitario')::numeric,
+    coalesce((item ->> 'valor_total')::numeric, 0),
+    item ->> 'periodo_especial_nome',
+    (item ->> 'periodo_especial_percentual')::numeric
+  from jsonb_array_elements(p_itens) as item;
+
+  return v_consulta_id;
+end;
+$$;
+
+revoke all on function gravar_consulta(
+  uuid, uuid, text, text, text, uuid, text, text, numeric, jsonb, jsonb
+) from public;
+grant execute on function gravar_consulta(
+  uuid, uuid, text, text, text, uuid, text, text, numeric, jsonb, jsonb
+) to authenticated;

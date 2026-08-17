@@ -3,11 +3,14 @@
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { podeConsultarRegional } from '../dominio/perfis'
+import { podeComprarRegional } from '../dominio/elegibilidade-regional'
 import { obterPrograma } from '../dados/programas'
 import { carregarDisponibilidade } from '../dados/disponibilidade'
+import { PRACAS } from '../dominio/regional'
+import { aplicarAcrescimo } from '../dominio/datas-especiais'
+import { calcularCustoDaAcaoRegional, type PrecoDaPracaParaCalculo } from '../dominio/custo-da-acao-regional'
 import {
   validarConsulta,
-  totalDaConsulta,
   type ConsultaEmMontagem,
 } from '../dominio/consulta'
 import type { DiaDeDisponibilidade } from '../dominio/disponibilidade'
@@ -16,13 +19,17 @@ import type { DiaDeDisponibilidade } from '../dominio/disponibilidade'
  * `gravarConsulta` — o ÚLTIMO portão antes do banco.
  *
  * Tudo que a tela validou é conveniência. O que vale de verdade roda aqui:
- * sessão presente, perfil autoriza a modalidade pedida, e a disponibilidade é
- * recalculada NO SERVIDOR — não confia no que o navegador mandou, porque
- * entre abrir o calendário e clicar em gravar alguém pode ter vendido a data.
+ * sessão presente, perfil autoriza a modalidade pedida, cliente é elegível
+ * quando a modalidade é regional, as praças pedidas são re-derivadas contra o
+ * que o servidor calculou (nunca o que o navegador mandou), o preço do
+ * retrato é recalculado sobre o que foi efetivamente comprado, e os dois
+ * inserts (`consultas` + `consulta_itens`) viram uma função de banco — uma
+ * transação de verdade, não dois `.insert()` separados que podem divergir.
  */
 
 const ERRO_SESSAO_EXPIRADA = 'Sessão expirada. Entre de novo.'
 const ERRO_SEM_PERMISSAO_REGIONAL = 'Você não tem permissão para consultar disponibilidade regional.'
+const ERRO_CLIENTE_NAO_ELEGIVEL_REGIONAL = 'Este cliente não é elegível para ações regionais.'
 const ERRO_PROGRAMA = 'Programa não encontrado.'
 const ERRO_CLIENTE = 'Cliente não encontrado.'
 const ERRO_GRAVACAO = 'Não foi possível gravar a consulta. Tente novamente.'
@@ -32,6 +39,19 @@ type LinhaDeCliente = {
   nome: string
   setor: string | null
   industria: string | null
+  apto_regional: boolean
+}
+
+type ItemAgrupado = { quantidade: number; pracas: Set<string> }
+
+type LinhaParaGravar = {
+  data: string
+  quantidade: number
+  pracas: string[]
+  valor_unitario: number | null
+  valor_total: number
+  periodo_especial_nome: string | null
+  periodo_especial_percentual: number | null
 }
 
 function anoMesDeData(dataIso: string): { ano: number; mes: number } {
@@ -51,6 +71,88 @@ function mesesDistintosDosItens(itens: ConsultaEmMontagem['itens']): { ano: numb
     chaves.set(`${ano}-${mes}`, { ano, mes })
   }
   return [...chaves.values()]
+}
+
+/** Itens agrupados por data — a tabela tem `unique (consulta_id, data)`, e a tela pode ter mandado mais de um item para a mesma data. */
+function agruparItensPorData(itens: ConsultaEmMontagem['itens']): Map<string, ItemAgrupado> {
+  const itensPorData = new Map<string, ItemAgrupado>()
+  for (const item of itens) {
+    const acumulado = itensPorData.get(item.data) ?? { quantidade: 0, pracas: new Set<string>() }
+    acumulado.quantidade += item.quantidade
+    for (const praca of item.pracas) acumulado.pracas.add(praca)
+    itensPorData.set(item.data, acumulado)
+  }
+  return itensPorData
+}
+
+/**
+ * Re-deriva as praças pedidas contra o que o servidor acabou de calcular —
+ * NUNCA confia em `item.pracas` como veio do navegador. `validarConsulta`
+ * (domínio, congelado) só confere a QUANTIDADE de praças por item; nada ali
+ * compara os códigos pedidos contra `PracaNoDia.disponivel`. Sem esta
+ * checagem, um executivo com o perfil certo pode pedir uma praça já vendida
+ * (ou um código inexistente) e a gravação aceitaria, porque `quantidade` e
+ * `length` continuam dentro do limite.
+ *
+ * Nacional nunca tem praça — pedir uma é sinal de payload forjado ou de bug
+ * na tela, e os dois merecem erro, não descarte silencioso.
+ */
+function validarPracasContraServidor(
+  itensPorData: Map<string, ItemAgrupado>,
+  dias: DiaDeDisponibilidade[],
+  modalidade: ConsultaEmMontagem['modalidade'],
+): string[] {
+  const erros: string[] = []
+  const porData = new Map(dias.map((dia) => [dia.data, dia]))
+
+  for (const [data, agrupado] of itensPorData) {
+    if (agrupado.pracas.size === 0) continue
+
+    if (modalidade === 'nacional') {
+      erros.push(`A data ${data} não aceita praças na modalidade nacional.`)
+      continue
+    }
+
+    const dia = porData.get(data)
+    for (const praca of agrupado.pracas) {
+      if (!PRACAS.includes(praca as (typeof PRACAS)[number])) {
+        erros.push(`Praça desconhecida: ${praca}.`)
+        continue
+      }
+      const pracaNoDia = dia?.pracas.find((p) => p.praca_codigo === praca)
+      if (!pracaNoDia || !pracaNoDia.disponivel) {
+        erros.push(`A praça ${praca} já está vendida na data ${data}.`)
+      }
+    }
+  }
+
+  return erros
+}
+
+/**
+ * Preço do retrato de uma data regional: mídia + direitos das praças
+ * EFETIVAMENTE compradas, mais a produção do programa — nunca
+ * `dia.valor_unitario`, que é o preço de levar TODAS as praças livres
+ * daquele dia (correto para pintar a célula do calendário; errado para
+ * gravar quanto o cliente vai pagar). O acréscimo do período especial, se
+ * houver, incide sobre a mídia de cada praça, igual ao motor
+ * (`disponibilidade.ts`).
+ */
+function calcularValorUnitarioRegional(
+  pracasCompradas: string[],
+  precosRegionais: PrecoDaPracaParaCalculo[],
+  custoProducaoRegional: number | null,
+  percentualAcrescimo: number,
+): number {
+  const precos =
+    percentualAcrescimo > 0
+      ? precosRegionais.map((preco) => ({
+          ...preco,
+          custo_midia_tv: aplicarAcrescimo(preco.custo_midia_tv, percentualAcrescimo),
+        }))
+      : precosRegionais
+
+  return calcularCustoDaAcaoRegional(pracasCompradas, precos, custoProducaoRegional)
 }
 
 /** Avisos de retrato: datas selecionadas cuja concorrência não pôde ser conferida (R14) por anunciante não classificado. */
@@ -93,7 +195,7 @@ export async function gravarConsulta(
 
   const { data: clienteLinha, error: erroCliente } = await supabase
     .from('clientes')
-    .select('id, nome, setor, industria')
+    .select('id, nome, setor, industria, apto_regional')
     .eq('id', consulta.clienteId)
     .maybeSingle()
 
@@ -103,6 +205,14 @@ export async function gravarConsulta(
   }
   const cliente = clienteLinha as LinhaDeCliente | null
   if (!cliente) return { id: null, erros: [ERRO_CLIENTE] }
+
+  // 2b. O segundo portão forjável: perfil autoriza a MODALIDADE, mas nada
+  // até aqui checou se ESTE cliente pode comprar regional. A tela só oferece
+  // a modalidade quando o cliente é `apto_regional` — esconder é conveniência,
+  // esta checagem é a proteção real, ao lado da de perfil.
+  if (consulta.modalidade === 'regional' && !podeComprarRegional(cliente)) {
+    return { id: null, erros: [ERRO_CLIENTE_NAO_ELEGIVEL_REGIONAL] }
+  }
 
   // 3. Recarrega a disponibilidade NO SERVIDOR, um mês por vez (nunca uma
   // consulta por célula), e revalida a consulta de novo sobre os dias
@@ -124,79 +234,83 @@ export async function gravarConsulta(
   if (cargaComErro) return { id: null, erros: [cargaComErro.erro!] }
 
   const dias = cargas.flatMap((carga) => carga.dias)
+  // `precosRegionais` não varia por mês (é do programa, não da data) — as
+  // cargas concordam entre si; a primeira serve para todas.
+  const precosRegionais = cargas[0]?.precosRegionais ?? []
 
-  const erros = validarConsulta(
+  const errosDeConsulta = validarConsulta(
     consulta,
     dias,
     programa.acoes_minimas,
     programa.acoes_maximas,
     programa.max_pracas_por_acao,
   )
-  if (erros.length > 0) return { id: null, erros }
+  if (errosDeConsulta.length > 0) return { id: null, erros: errosDeConsulta }
 
-  // 4. Grava o retrato: `consultas` primeiro, `consulta_itens` depois, num
-  // lote só, com o `id` que a policy de inserção de `consulta_itens` exige.
-  const valorTotal = totalDaConsulta(consulta, dias)
-  const avisos = montarAvisos(consulta.itens, dias)
+  const itensPorData = agruparItensPorData(consulta.itens)
 
-  const { data: consultaGravada, error: erroConsulta } = await supabase
-    .from('consultas')
-    .insert({
-      usuario_id: sessao.usuarioId,
-      cliente_id: cliente.id,
-      cliente_nome: cliente.nome,
-      cliente_setor: cliente.setor,
-      cliente_industria: cliente.industria,
-      programa_id: programa.id,
-      programa_nome: programa.nome,
-      modalidade: consulta.modalidade,
-      valor_total: valorTotal,
-      avisos,
-    })
-    .select('id')
-    .single()
+  // Segundo portão: as praças pedidas, re-derivadas contra o que o servidor
+  // calculou agora — não o que a tela mandou.
+  const errosDePraca = validarPracasContraServidor(itensPorData, dias, consulta.modalidade)
+  if (errosDePraca.length > 0) return { id: null, erros: errosDePraca }
 
-  if (erroConsulta || !consultaGravada) {
-    console.error('Falha ao gravar consulta:', erroConsulta?.message)
-    return { id: null, erros: [ERRO_GRAVACAO] }
-  }
-
+  // 4. Monta o retrato de cada data: preço recalculado sobre o que foi
+  // EFETIVAMENTE comprado (regional) ou o preço plano do dia (nacional, que
+  // não varia por quantidade nem por praça — não existe praça no nacional).
   const porData = new Map(dias.map((dia) => [dia.data, dia]))
 
-  // Itens agrupados por data — a tabela tem `unique (consulta_id, data)`, e a
-  // tela pode ter mandado mais de um item para a mesma data (ex.: praças
-  // adicionadas em passos diferentes do wizard).
-  const itensPorData = new Map<string, { quantidade: number; pracas: Set<string> }>()
-  for (const item of consulta.itens) {
-    const acumulado = itensPorData.get(item.data) ?? { quantidade: 0, pracas: new Set<string>() }
-    acumulado.quantidade += item.quantidade
-    for (const praca of item.pracas) acumulado.pracas.add(praca)
-    itensPorData.set(item.data, acumulado)
-  }
-
-  const linhas = [...itensPorData.entries()].map(([data, acumulado]) => {
+  const linhas: LinhaParaGravar[] = [...itensPorData.entries()].map(([data, agrupado]) => {
     const dia = porData.get(data)
-    const valorUnitario = dia?.valor_unitario ?? null
+    const pracas = [...agrupado.pracas]
+
+    const valorUnitario =
+      consulta.modalidade === 'regional'
+        ? calcularValorUnitarioRegional(
+            pracas,
+            precosRegionais,
+            programa.custo_producao_regional,
+            dia?.periodo_especial?.percentual ?? 0,
+          )
+        : (dia?.valor_unitario ?? null)
+
     return {
-      consulta_id: consultaGravada.id as string,
       data,
-      quantidade: acumulado.quantidade,
-      pracas: [...acumulado.pracas],
+      quantidade: agrupado.quantidade,
+      pracas,
       valor_unitario: valorUnitario,
-      valor_total: valorUnitario !== null ? valorUnitario * acumulado.quantidade : 0,
+      valor_total: valorUnitario !== null ? valorUnitario * agrupado.quantidade : 0,
       periodo_especial_nome: dia?.periodo_especial?.nome ?? null,
       periodo_especial_percentual: dia?.periodo_especial?.percentual ?? null,
     }
   })
 
-  const { error: erroItens } = await supabase.from('consulta_itens').insert(linhas)
+  const valorTotal = linhas.reduce((total, linha) => total + linha.valor_total, 0)
+  const avisos = montarAvisos(consulta.itens, dias)
 
-  if (erroItens) {
-    console.error('Falha ao gravar itens da consulta:', erroItens.message)
-    // A consulta já existe sem os itens — melhor avisar do que deixar a tela
-    // achar que nada foi gravado e o executivo tentar de novo, duplicando.
-    return { id: consultaGravada.id as string, erros: [ERRO_GRAVACAO] }
+  // 5. Grava o retrato — `consultas` e `consulta_itens` juntos, numa função
+  // de banco que roda como UMA transação (`gravar_consulta`,
+  // `supabase/schema-entrega-3.sql`). Dois `.insert()` separados por HTTP
+  // não são atômicos: se o segundo falhasse depois do primeiro vingar,
+  // ficaria uma consulta órfã, sem item e sem policy de `delete` para
+  // limpá-la.
+  const { data: idGravado, error: erroGravacao } = await supabase.rpc('gravar_consulta', {
+    p_usuario_id: sessao.usuarioId,
+    p_cliente_id: cliente.id,
+    p_cliente_nome: cliente.nome,
+    p_cliente_setor: cliente.setor,
+    p_cliente_industria: cliente.industria,
+    p_programa_id: programa.id,
+    p_programa_nome: programa.nome,
+    p_modalidade: consulta.modalidade,
+    p_valor_total: valorTotal,
+    p_avisos: avisos,
+    p_itens: linhas,
+  })
+
+  if (erroGravacao || !idGravado) {
+    console.error('Falha ao gravar consulta:', erroGravacao?.message)
+    return { id: null, erros: [ERRO_GRAVACAO] }
   }
 
-  return { id: consultaGravada.id as string, erros: [] }
+  return { id: idGravado as string, erros: [] }
 }

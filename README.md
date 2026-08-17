@@ -202,7 +202,11 @@ mesmo com o código correto.
     `consultas` e `consulta_itens` — o retrato do que foi validado no wizard
     de disponibilidade num instante (cliente, programa, preço, avisos), com
     RLS: o executivo só vê e grava as próprias, o proprietário vê todas, e
-    ninguém edita ou apaga uma consulta já gravada. Idempotente.
+    ninguém edita ou apaga uma consulta já gravada. Cria também a função
+    `gravar_consulta` (`security definer`), chamada via `rpc()` pelo app: os
+    dois inserts (`consultas` + `consulta_itens`) precisam vingar juntos como
+    uma transação, o que dois `.insert()` do PostgREST em sequência não
+    garantem. Idempotente.
 
 ### Importar sem o comando de linha
 
