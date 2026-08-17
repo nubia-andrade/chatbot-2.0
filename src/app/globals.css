@@ -40,6 +40,22 @@
   --reservado-fundo: #EEF1F5;
   --esgotado: #1E1B2E;
   --esgotado-fundo: #E9E7EE;
+  /*
+   * Task 12 (calendário de disponibilidade) precisou do mesmo tratamento do
+   * `--prazo-texto` acima para outros dois estados. `--disponivel` (#16A34A)
+   * como TEXTO sobre branco dá ≈3,30:1 e sobre `--disponivel-fundo` dá
+   * ≈2,99:1; `--concorrencia` (#E11D48) sobre `--concorrencia-fundo` dá
+   * ≈4,12:1 — os três abaixo do mínimo de 4,5:1. `--disponivel-texto`
+   * (#166534, verde-800) dá ≈7,13:1 sobre branco e ≈6,47:1 sobre
+   * `--disponivel-fundo`; `--concorrencia-texto` (#BE123C, rose-700) dá
+   * ≈6,29:1 sobre branco e ≈5,51:1 sobre `--concorrencia-fundo`. Cálculo pela
+   * fórmula do WCAG 2.1, mesma do comentário de `--prazo-texto`. `--esgotado`
+   * (#1E1B2E) já é escuro o bastante para servir de texto sem variante própria
+   * (≈16,78:1 sobre branco, ≈13,69:1 sobre `--esgotado-fundo`) — cobre tanto
+   * "bloqueado" quanto "esgotado", que compartilham a mesma cor no handoff.
+   */
+  --disponivel-texto: #166534;
+  --concorrencia-texto: #BE123C;
 
   --raio-janela: 16px;
   --raio-card: 12px;
