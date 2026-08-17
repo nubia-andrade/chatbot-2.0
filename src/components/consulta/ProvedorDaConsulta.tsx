@@ -55,6 +55,18 @@ function estadoInicial(): EstadoDaConsulta {
 
 type ContextoConsulta = {
   estado: EstadoDaConsulta
+  /**
+   * `false` até a leitura do `sessionStorage` terminar (com ou sem nada
+   * salvo — os dois casos marcam `hidratado` como concluídos, não só o
+   * caminho com dado salvo). Existe para `useGuardaDoPasso` não decidir
+   * em cima do `estadoInicial()` — achado Important #1 da revisão da
+   * Task 9: sem essa checagem, a guarda rodava com o estado ainda vazio
+   * antes da effect de hidratação do provider (que é ancestral) ter
+   * chance de rodar, porque o React dispara effects de descendente antes
+   * das do ancestral no mesmo commit — e mandava de volta para o passo 1
+   * uma consulta salva válida, a cada F5.
+   */
+  hidratado: boolean
   atualizar: (parcial: Partial<EstadoDaConsulta>) => void
   /**
    * Marca o passo Datas como concluído — é o que libera o Resumo em
@@ -146,7 +158,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Contexto.Provider value={{ estado, atualizar, confirmarDatas, limpar }}>
+    <Contexto.Provider value={{ estado, hidratado, atualizar, confirmarDatas, limpar }}>
       {children}
     </Contexto.Provider>
   )
@@ -199,18 +211,45 @@ export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
  * A guarda de cada página de passo. Entrar direto por uma URL adiante do
  * que o estado já justifica (ex.: `/consulta/resumo` sem cliente nem
  * programa escolhidos) devolve ao passo pendente em vez de quebrar a tela.
+ *
+ * Devolve `pronto`: `true` só quando o passo pode de fato renderizar seu
+ * conteúdo — depois da hidratação, e só se a guarda não estiver mandando
+ * embora. A página chamadora usa isso para não pintar nada (nem que seja
+ * o placeholder de hoje, ou dado de negócio de verdade nas Tasks 10-14)
+ * antes da decisão estar tomada — achado Important #2 da revisão.
+ *
+ * Espera `hidratado` antes de avaliar (achado Important #1): sem isso, a
+ * guarda de uma página descendente roda com `estadoInicial()` — o React
+ * dispara effects de descendente antes das do ancestral no mesmo commit,
+ * então a effect de hidratação do provider (ancestral, em
+ * `ProvedorDaConsulta`) ainda não tinha rodado. `primeiroPassoPendente`
+ * de um estado vazio é sempre `'cliente'`, e a guarda mandava de volta
+ * para lá mesmo com uma consulta salva e válida — a cada F5 em qualquer
+ * passo além do primeiro.
  */
-export function useGuardaDoPasso(slug: string): void {
-  const { estado } = useConsulta()
+export function useGuardaDoPasso(slug: string): boolean {
+  const { estado, hidratado } = useConsulta()
   const router = useRouter()
+  const [redirecionando, setRedirecionando] = useState(false)
 
   useEffect(() => {
+    if (!hidratado) return
+
     const pendente = primeiroPassoPendente(estado)
     const indexPendente = PASSOS.findIndex((passo) => passo.slug === pendente)
     const indexEstePasso = PASSOS.findIndex((passo) => passo.slug === slug)
 
     if (indexEstePasso > indexPendente) {
+      // Não é estado derivado de props/estado local: é a reação a uma
+      // decisão de navegação que só este effect pode tomar (depende de
+      // `hidratado` e de `router`, ambos externos ao render). Sem isso a
+      // página renderizaria seu conteúdo de novo por um instante antes de
+      // `router.replace` completar a troca de rota.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRedirecionando(true)
       router.replace(`/consulta/${pendente}`)
     }
-  }, [estado, router, slug])
+  }, [estado, hidratado, router, slug])
+
+  return hidratado && !redirecionando
 }

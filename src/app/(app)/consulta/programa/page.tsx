@@ -2,13 +2,18 @@
 
 import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 3 — Programa (tela 1d do handoff). Conteúdo real é a Task 11.
  */
 export default function PassoPrograma() {
-  useGuardaDoPasso('programa')
+  const pronto = useGuardaDoPasso('programa')
   const { estado } = useConsulta()
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">

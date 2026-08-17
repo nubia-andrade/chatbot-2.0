@@ -2,6 +2,7 @@
 
 import { useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 2 — Setor (tela 1c do handoff). Conteúdo real é a Task 10 (mesma
@@ -11,7 +12,11 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
  * automaticamente), então quem chega até aqui já pode seguir adiante.
  */
 export default function PassoSetor() {
-  useGuardaDoPasso('setor')
+  const pronto = useGuardaDoPasso('setor')
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">

@@ -2,6 +2,7 @@
 
 import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 1 — Cliente (tela 1b do handoff). Conteúdo real é a Task 10; aqui
@@ -9,8 +10,12 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
  * ponta.
  */
 export default function PassoCliente() {
-  useGuardaDoPasso('cliente')
+  const pronto = useGuardaDoPasso('cliente')
   const { estado } = useConsulta()
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">

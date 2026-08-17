@@ -2,6 +2,7 @@
 
 import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 4 — Calendário (tela 1e do handoff, a tela central). Conteúdo real
@@ -14,8 +15,12 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
  * `atualizar({ itens: [...] })` normalmente.
  */
 export default function PassoCalendario() {
-  useGuardaDoPasso('calendario')
+  const pronto = useGuardaDoPasso('calendario')
   const { estado } = useConsulta()
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">

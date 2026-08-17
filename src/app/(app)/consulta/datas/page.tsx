@@ -2,6 +2,7 @@
 
 import { useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 5 — Datas. Conteúdo real é a Task 13.
@@ -16,7 +17,11 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
  * comportamento esperado de um esqueleto que ainda não construiu o passo.
  */
 export default function PassoDatas() {
-  useGuardaDoPasso('datas')
+  const pronto = useGuardaDoPasso('datas')
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">

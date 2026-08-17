@@ -2,6 +2,7 @@
 
 import { useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
+import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 
 /**
  * Passo 6 — Resumo. Conteúdo real é a Task 14.
@@ -12,7 +13,11 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
  * decisão de escopo.
  */
 export default function PassoResumo() {
-  useGuardaDoPasso('resumo')
+  const pronto = useGuardaDoPasso('resumo')
+
+  if (!pronto) {
+    return <CarregandoDoPasso />
+  }
 
   return (
     <div className="flex flex-col gap-6">
