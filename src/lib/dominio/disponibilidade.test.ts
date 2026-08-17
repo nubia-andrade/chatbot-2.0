@@ -397,4 +397,31 @@ describe('calcularDisponibilidadeDoMes — regional', () => {
     // direitos 15% de cada = 14.400; produção 7.797 uma vez
     expect(dia(regionais(), '2026-09-11').valor_unitario).toBe(118197)
   })
+
+  /**
+   * R16 regional — caso discriminante. Os dois testes acima têm contagem de
+   * linha e contagem de ação coincidindo por construção (3 linhas/1 ação
+   * contra o teto 4; 4 linhas/4 ações contra o teto 4), então uma
+   * implementação ingênua que contasse LINHA de `acoes_regionais` em vez de
+   * AÇÃO distinta (`data|cliente_nome`) passaria nos dois sem ser pega.
+   *
+   * Este teste separa as duas leituras de propósito: 2 ações de 2 praças
+   * cada somam 4 linhas mas só 2 ações. Contando ação (correto): 2 < 4,
+   * mês continua aberto. Contando linha (bug): 4 >= 4, mês fecharia sem
+   * motivo. Se alguém inverter a leitura de R16 regional amanhã — e a área
+   * ainda não confirmou por escrito qual das duas é a certa — é este teste
+   * que quebra primeiro.
+   */
+  it('duas ações de 2 praças cada não fecham o mês — conta ação, não linha', () => {
+    const duasAcoesDeDuasPracas = [
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'SP', cliente_nome: 'NESTLE' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'RJ', cliente_nome: 'NESTLE' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'BH', cliente_nome: 'COCA-COLA' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'DF', cliente_nome: 'COCA-COLA' },
+    ]
+    // 4 linhas, 2 ações — bem abaixo do teto de 4 ações.
+    expect(
+      dia(regionais({ acoesRegionais: duasAcoesDeDuasPracas }), '2026-09-11').estado,
+    ).toBe('disponivel')
+  })
 })
