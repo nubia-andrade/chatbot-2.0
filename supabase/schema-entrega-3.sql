@@ -104,18 +104,36 @@ create policy "grava item de consulta propria" on consulta_itens
 -- (o schema não concede `delete`: uma consulta gravada é um retrato, e um
 -- retrato que se apaga não é retrato). Uma função chamada via `rpc()` roda
 -- inteira dentro de uma única transação de banco — os dois inserts vingam
--- juntos ou nenhum vinga, e a chamada HTTP some sem deixar rastro.
+-- juntos ou nenhum vinga, e a chamada HTTP some sem deixar rastro. A
+-- ATOMICIDADE vem do corpo em plpgsql ser uma unidade só, não do modo de
+-- segurança abaixo.
 --
--- `security definer` é necessário para isto funcionar (uma função `security
--- invoker` continuaria presa às mesmas duas transações separadas do RLS
--- comum), e por isso CONTORNA as policies de insert acima. A checagem
--- `p_usuario_id = auth.uid()` dentro do corpo da função é o que substitui a
--- policy "grava consulta propria" neste caminho — sem ela, qualquer usuário
--- autenticado gravaria consulta em nome de outro só trocando o parâmetro.
--- `set search_path = public` é o mesmo endurecimento já usado em
--- `tem_perfil`/`e_proprietario` (schema-entrega-2.sql): impede que um
--- `search_path` malicioso troque o significado de `consultas`/`consulta_itens`
--- dentro da função.
+-- `security invoker` (explícito, embora seja o padrão do Postgres — melhor
+-- escrito do que deixado implícito) roda a função com o privilégio de QUEM
+-- CHAMA. As policies de insert já existentes ("grava consulta propria",
+-- "grava item de consulta propria", acima) continuam valendo normalmente
+-- para os dois inserts — é a opção de MENOR privilégio: a identidade
+-- (`usuario_id = auth.uid()`) segue garantida onde ela deve morar, pela
+-- policy, e a função não precisa contornar RLS nenhum para ser atômica.
+-- A checagem `p_usuario_id = auth.uid()` dentro do corpo NÃO é o que impede
+-- gravar em nome de outro usuário — a policy já impede isso sozinha, com ou
+-- sem esta linha. Ela existe como defesa em profundidade: falha fechada,
+-- devolve uma mensagem legível ANTES de bater na policy, em vez de deixar o
+-- erro aparecer como uma violação de RLS crua (código `42501`) para quem
+-- chamar a função errado.
+--
+-- `set search_path = public` continua pinado mesmo com `security invoker`:
+-- um `search_path` que o próprio chamador controle (ex.: um schema anterior
+-- na busca, com uma tabela `consultas` homônima) poderia trocar em silêncio
+-- o que os nomes não qualificados dentro do corpo da função resolvem —
+-- isso não depende do modo de segurança, é sobre resolução de nome dentro
+-- da função em si.
+--
+-- Os `grant`/`revoke` de `execute` no fim do bloco continuam necessários:
+-- chamar uma função via `rpc()` exige o privilégio `EXECUTE`
+-- independentemente do modo de segurança — isso nunca teve relação com RLS,
+-- é uma permissão à parte, e sem ela nenhuma sessão autenticada conseguiria
+-- nem tentar.
 -- ---------------------------------------------------------------------------
 create or replace function gravar_consulta(
   p_usuario_id uuid,
@@ -136,7 +154,7 @@ create or replace function gravar_consulta(
 )
 returns uuid
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -144,6 +162,19 @@ declare
 begin
   if p_usuario_id is distinct from auth.uid() then
     raise exception 'usuario_id não corresponde ao usuário autenticado';
+  end if;
+
+  -- A função é chamável direto por qualquer sessão autenticada via
+  -- PostgREST, não só pelo app — sem esta guarda, `rpc('gravar_consulta',
+  -- { …, p_itens: [] })` gravaria a linha pai com zero itens: a MESMA
+  -- consulta órfã e impossível de limpar que esta função existe para
+  -- evitar, só que por chamada direta em vez de falha parcial no meio dos
+  -- dois inserts. `gravarConsulta` (`src/lib/acoes/consultas.ts`) nunca
+  -- chama com `p_itens` vazio — `validarConsulta` já recusa consulta sem
+  -- item antes disso —, mas a função não pode depender de quem a chama se
+  -- comportar.
+  if p_itens is null or jsonb_array_length(p_itens) = 0 then
+    raise exception 'A consulta precisa de ao menos um item.';
   end if;
 
   insert into consultas (

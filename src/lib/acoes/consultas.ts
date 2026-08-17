@@ -54,6 +54,11 @@ type LinhaParaGravar = {
   periodo_especial_percentual: number | null
 }
 
+/** Duas casas decimais — dinheiro não carrega resto de ponto flutuante. Mesma convenção do domínio (`consulta.ts`, `custo-da-acao-regional.ts`). */
+function arredondar(valor: number): number {
+  return Math.round((valor + Number.EPSILON) * 100) / 100
+}
+
 function anoMesDeData(dataIso: string): { ano: number; mes: number } {
   const [ano, mes] = dataIso.split('-').map(Number)
   return { ano, mes }
@@ -114,12 +119,21 @@ function validarPracasContraServidor(
     }
 
     const dia = porData.get(data)
+    // `validarConsulta` já recusou datas cujo `estado !== 'disponivel'` antes
+    // desta função ser chamada, então na prática `dia.pracas` sempre tem as 5
+    // praças aqui — mas a checagem fica explícita, com mensagem que diz o que
+    // de fato aconteceu, em vez de reaproveitar "já está vendida" para um caso
+    // que não é venda nenhuma.
+    if (!dia || dia.pracas.length === 0) {
+      erros.push(`A data ${data} não tem praças regionais disponíveis.`)
+      continue
+    }
     for (const praca of agrupado.pracas) {
       if (!PRACAS.includes(praca as (typeof PRACAS)[number])) {
         erros.push(`Praça desconhecida: ${praca}.`)
         continue
       }
-      const pracaNoDia = dia?.pracas.find((p) => p.praca_codigo === praca)
+      const pracaNoDia = dia.pracas.find((p) => p.praca_codigo === praca)
       if (!pracaNoDia || !pracaNoDia.disponivel) {
         erros.push(`A praça ${praca} já está vendida na data ${data}.`)
       }
@@ -278,13 +292,13 @@ export async function gravarConsulta(
       quantidade: agrupado.quantidade,
       pracas,
       valor_unitario: valorUnitario,
-      valor_total: valorUnitario !== null ? valorUnitario * agrupado.quantidade : 0,
+      valor_total: valorUnitario !== null ? arredondar(valorUnitario * agrupado.quantidade) : 0,
       periodo_especial_nome: dia?.periodo_especial?.nome ?? null,
       periodo_especial_percentual: dia?.periodo_especial?.percentual ?? null,
     }
   })
 
-  const valorTotal = linhas.reduce((total, linha) => total + linha.valor_total, 0)
+  const valorTotal = arredondar(linhas.reduce((total, linha) => total + linha.valor_total, 0))
   const avisos = montarAvisos(consulta.itens, dias)
 
   // 5. Grava o retrato — `consultas` e `consulta_itens` juntos, numa função
