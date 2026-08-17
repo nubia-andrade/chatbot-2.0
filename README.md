@@ -196,6 +196,13 @@ mesmo com o código correto.
     e faz upsert pelo `id`), nunca apaga e reinsere: `acoes_regionais`
     referencia `clientes.id`, e um `delete`+`insert` trocaria os ids e
     quebraria toda ação regional já vendida.
+14. **Aplicar Consultas gravadas.** No `SQL Editor`, cole
+    `supabase/schema-entrega-3.sql` > `Run`. Roda depois de todos os arquivos
+    anteriores (usa `e_proprietario()`, criada no passo 2). Cria as tabelas
+    `consultas` e `consulta_itens` — o retrato do que foi validado no wizard
+    de disponibilidade num instante (cliente, programa, preço, avisos), com
+    RLS: o executivo só vê e grava as próprias, o proprietário vê todas, e
+    ninguém edita ou apaga uma consulta já gravada. Idempotente.
 
 ### Importar sem o comando de linha
 
