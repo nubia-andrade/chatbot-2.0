@@ -95,6 +95,37 @@ describe('validarConsulta', () => {
       ),
     ).toContain('Selecione ao menos uma praça na data 2026-09-08.')
   })
+
+  it('mensagem de máximo usa plural correto quando limite > 1', () => {
+    const erros = validarConsulta(
+      { ...base, itens: [{ data: '2026-09-08', quantidade: 4, pracas: [] }] },
+      dias, 1, 5, 3,
+    )
+    expect(erros).toContain('A data 2026-09-08 comporta no máximo 3 ações.')
+    expect(erros).not.toContain('açãoões')
+  })
+
+  it('mensagem de mínimo usa "1 ação" quando acoesMinimas é 1', () => {
+    const erros = validarConsulta(
+      { ...base, itens: [{ data: '2026-09-08', quantidade: 0, pracas: [] }] },
+      dias, 1, 5, 3,
+    )
+    expect(erros).toContain('A data 2026-09-08 exige ao menos 1 ação.')
+  })
+
+  it('recusa quantidade total acima do limite quando data aparece em múltiplos itens', () => {
+    const erros = validarConsulta(
+      {
+        ...base,
+        itens: [
+          { data: '2026-09-09', quantidade: 1, pracas: [] },
+          { data: '2026-09-09', quantidade: 1, pracas: [] },
+        ],
+      },
+      dias, 1, 5, 3,
+    )
+    expect(erros).toContain('A data 2026-09-09 comporta no máximo 1 ação.')
+  })
 })
 
 describe('totalDaConsulta', () => {

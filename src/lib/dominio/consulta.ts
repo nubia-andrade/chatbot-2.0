@@ -50,28 +50,41 @@ export function validarConsulta(
 
   const porData = new Map(dias.map((dia) => [dia.data, dia]))
 
+  // Agrupar itens por data para validar a quantidade acumulada
+  const itensPorData = new Map<string, ItemDaConsulta[]>()
   for (const item of consulta.itens) {
-    const dia = porData.get(item.data)
+    const itens = itensPorData.get(item.data) ?? []
+    itens.push(item)
+    itensPorData.set(item.data, itens)
+  }
+
+  for (const [data, itens] of itensPorData) {
+    const dia = porData.get(data)
 
     if (!dia || dia.estado !== 'disponivel') {
-      erros.push(`A data ${item.data} não está disponível.`)
+      erros.push(`A data ${data} não está disponível.`)
       continue
     }
 
+    // Somar quantidades de todos os itens com essa data
+    const quantidadeTotal = itens.reduce((sum, item) => sum + item.quantidade, 0)
     const limite = limiteDeAcoesNoDia(dia, acoesMaximas)
-    if (item.quantidade > limite) {
-      erros.push(`A data ${item.data} comporta no máximo ${limite} ação${limite > 1 ? 'ões' : ''}.`)
+
+    if (quantidadeTotal > limite) {
+      erros.push(`A data ${data} comporta no máximo ${limite} ${limite === 1 ? 'ação' : 'ações'}.`)
     }
-    if (item.quantidade < acoesMinimas) {
-      erros.push(`A data ${item.data} exige ao menos ${acoesMinimas} ações.`)
+    if (quantidadeTotal < acoesMinimas) {
+      erros.push(`A data ${data} exige ao menos ${acoesMinimas} ${acoesMinimas === 1 ? 'ação' : 'ações'}.`)
     }
 
     if (consulta.modalidade === 'regional') {
-      if (item.pracas.length === 0) {
-        erros.push(`Selecione ao menos uma praça na data ${item.data}.`)
-      }
-      if (item.pracas.length > maxPracas) {
-        erros.push(`A data ${item.data} pode ter no máximo ${maxPracas} praças.`)
+      for (const item of itens) {
+        if (item.pracas.length === 0) {
+          erros.push(`Selecione ao menos uma praça na data ${data}.`)
+        }
+        if (item.pracas.length > maxPracas) {
+          erros.push(`A data ${data} pode ter no máximo ${maxPracas} praças.`)
+        }
       }
     }
   }
