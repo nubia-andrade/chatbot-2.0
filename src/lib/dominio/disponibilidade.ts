@@ -147,32 +147,50 @@ function acoesDoPrograma(
 
   return acoes.filter((acao) => {
     const mnemonico = extrairMnemonico(acao.programa)
-    if (mnemonico !== null) return mnemonico === mnemonicoAlvo
+    if (mnemonico !== null && mnemonico === mnemonicoAlvo) return true
     return apelidosAlvo.has(normalizarFormato(acao.programa))
   })
 }
 
+/** Ações regionais DISTINTAS (data + cliente) do mês — uma ação de 3 praças ocupa 3 linhas de `acoes_regionais` mas continua sendo uma ação só. */
+function acoesRegionaisDistintasNoMes(acoesRegionais: AcaoRegional[], doMes: Set<string>): number {
+  const distintas = new Set(
+    acoesRegionais
+      .filter((acao) => doMes.has(acao.data_de_exibicao))
+      .map((acao) => `${acao.data_de_exibicao}|${acao.cliente_nome}`),
+  )
+  return distintas.size
+}
+
 /**
  * R16 — quantas ações já caíram no mês. No nacional, ações de conteúdo
- * vendidas; no regional, ações DISTINTAS (data + cliente), porque uma ação
- * de 3 praças ocupa 3 linhas de `acoes_regionais` mas continua sendo uma
- * ação só para o teto de 4 do Manual de Práticas.
+ * vendidas mais — quando R15 (provisório, `regionalConsomeSlotNacional`) diz
+ * que a ação regional consome também um slot nacional do dia — as ações
+ * regionais DISTINTAS (data + cliente) do mês, mesma unidade usada na conta
+ * diária de `usadosNacional`: sem somar aqui, o teto mensal nacional ficaria
+ * cego para um consumo que o próprio motor já contabiliza dia a dia. No
+ * regional, ações DISTINTAS (data + cliente), porque uma ação de 3 praças
+ * ocupa 3 linhas de `acoes_regionais` mas continua sendo uma ação só para o
+ * teto de 4 do Manual de Práticas.
  */
 function acoesNoMes(insumos: InsumosDeDisponibilidade, dias: string[]): number {
   const doMes = new Set(dias)
 
   if (insumos.modalidade === 'regional') {
-    const distintas = new Set(
-      insumos.acoesRegionais
-        .filter((acao) => doMes.has(acao.data_de_exibicao))
-        .map((acao) => `${acao.data_de_exibicao}|${acao.cliente_nome}`),
-    )
-    return distintas.size
+    return acoesRegionaisDistintasNoMes(insumos.acoesRegionais, doMes)
   }
 
-  return acoesDoPrograma(insumos.acoesVendidas, insumos.programa, insumos.apelidosDoPrograma).filter(
-    (acao) => doMes.has(acao.data_de_exibicao) && ocupaSlot(acao.formato, insumos.formatos),
-  ).length
+  const vendidas = acoesDoPrograma(
+    insumos.acoesVendidas,
+    insumos.programa,
+    insumos.apelidosDoPrograma,
+  ).filter((acao) => doMes.has(acao.data_de_exibicao) && ocupaSlot(acao.formato, insumos.formatos)).length
+
+  const regionais = regionalConsomeSlotNacional()
+    ? acoesRegionaisDistintasNoMes(insumos.acoesRegionais, doMes)
+    : 0
+
+  return vendidas + regionais
 }
 
 export function calcularDisponibilidadeDoMes(

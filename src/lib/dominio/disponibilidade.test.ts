@@ -246,4 +246,41 @@ describe('calcularDisponibilidadeDoMes — nacional', () => {
     )
     expect(dia(dias, '2026-09-08').livres).toBe(1)
   })
+
+  // Fix de revisão: `extrairMnemonico` pode devolver um mnemônico que NÃO é
+  // o deste programa (prefixação inconsistente da própria API é a razão de
+  // apelido existir), e mesmo assim o texto integral estar cadastrado como
+  // apelido. `acoesDoPrograma` precisa cair para o apelido neste caso, igual
+  // a `encontrarProgramaId` — não pode parar no primeiro `return` só porque
+  // extraiu ALGUM mnemônico.
+  it('ação com prefixo de mnemônico errado ainda casa pelo apelido cadastrado do texto integral', () => {
+    const dias = calcularDisponibilidadeDoMes(
+      insumos({
+        apelidosDoPrograma: ['MV - MAIS VOCE'],
+        acoesVendidas: [
+          { programa: 'MV - MAIS VOCE', data_de_exibicao: '2026-09-08', formato: 'ACAO DE CONTEUDO', anunciante: 'NESTLE' },
+        ],
+      }),
+    )
+    expect(dia(dias, '2026-09-08').livres).toBe(1)
+  })
+
+  // Fix de revisão: R15 (provisório) diz que a ação regional consome também
+  // um slot nacional do dia — a contagem mensal do teto nacional (R16)
+  // precisa enxergar esse consumo, ou o motor fica cego para algo que ele
+  // mesmo contabiliza dia a dia. Uma ação regional distinta (data + cliente)
+  // conta como uma ação para o teto mensal nacional.
+  it('ação regional conta para o teto mensal nacional', () => {
+    const dias = calcularDisponibilidadeDoMes(
+      insumos({
+        programa: { ...mavo, bloqueio_mensal: 1 },
+        acoesRegionais: [
+          { data_de_exibicao: '2026-09-01', praca_codigo: 'SP', cliente_nome: 'NESTLE' },
+        ],
+      }),
+    )
+    const oito = dia(dias, '2026-09-08')
+    expect(oito.estado).toBe('bloqueado')
+    expect(oito.motivos.join(' ')).toContain('mês')
+  })
 })
