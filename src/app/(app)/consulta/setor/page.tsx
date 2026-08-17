@@ -4,7 +4,8 @@ import { useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
 
 /**
- * Passo 2 — Setor (tela 1c do handoff). Conteúdo real é a Task 11.
+ * Passo 2 — Setor (tela 1c do handoff). Conteúdo real é a Task 10 (mesma
+ * task do passo 1 — "Passos 1 e 2: cliente e classificação").
  *
  * Sem gate próprio: o setor nasce junto do cliente (detectado
  * automaticamente), então quem chega até aqui já pode seguir adiante.

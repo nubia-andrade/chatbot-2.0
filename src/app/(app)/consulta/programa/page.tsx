@@ -4,7 +4,7 @@ import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaC
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
 
 /**
- * Passo 3 — Programa (tela 1d do handoff). Conteúdo real é a Task 12.
+ * Passo 3 — Programa (tela 1d do handoff). Conteúdo real é a Task 11.
  */
 export default function PassoPrograma() {
   useGuardaDoPasso('programa')

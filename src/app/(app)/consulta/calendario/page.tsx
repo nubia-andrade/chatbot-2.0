@@ -5,7 +5,13 @@ import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
 
 /**
  * Passo 4 — Calendário (tela 1e do handoff, a tela central). Conteúdo real
- * é a Task 13.
+ * é a Task 12.
+ *
+ * Quando essa task escrever `itens` de verdade (via `atualizar`), a troca
+ * de datas invalida sozinha a confirmação do passo 5 — `atualizar` já
+ * zera `datasConfirmadas` sempre que `itens` está no parcial (ver
+ * `ProvedorDaConsulta.tsx`). Não é preciso fazer nada aqui além de chamar
+ * `atualizar({ itens: [...] })` normalmente.
  */
 export default function PassoCalendario() {
   useGuardaDoPasso('calendario')

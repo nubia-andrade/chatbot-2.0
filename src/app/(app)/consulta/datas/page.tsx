@@ -4,11 +4,16 @@ import { useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
 
 /**
- * Passo 5 — Datas. Conteúdo real é a Task 14.
+ * Passo 5 — Datas. Conteúdo real é a Task 13.
  *
- * Sem gate próprio: quem chega aqui já tem `itens` preenchido pelo passo
- * Calendário (é o que `primeiroPassoPendente` exige para liberar o
- * avanço).
+ * `primeiroPassoPendente` só libera o Resumo depois que este passo marcar
+ * `estado.datasConfirmadas`. **A Task 13 deve chamar
+ * `useConsulta().confirmarDatas()` no clique do botão "Avançar"** (o
+ * `<AcoesDoPasso avancarPara="resumo">` abaixo), antes ou junto da
+ * navegação — sem isso, a guarda do Resumo vai devolver para cá mesmo
+ * depois do clique. Até essa task existir, esta rota não chama
+ * `confirmarDatas`, então tentar seguir para o resumo é sempre barrado —
+ * comportamento esperado de um esqueleto que ainda não construiu o passo.
  */
 export default function PassoDatas() {
   useGuardaDoPasso('datas')
