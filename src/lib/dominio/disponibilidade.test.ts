@@ -284,3 +284,117 @@ describe('calcularDisponibilidadeDoMes — nacional', () => {
     expect(oito.motivos.join(' ')).toContain('mês')
   })
 })
+
+describe('calcularDisponibilidadeDoMes — regional', () => {
+  // Encontro: slot só às sextas (5), prazo regional de 7 dias, teto de 4
+  // ações no mês, produção regional única por ação.
+  const encontro = {
+    ...mavo,
+    id: 'p-2',
+    mnemonico: 'FATI',
+    dias_da_semana: [1, 2, 3, 4, 5],
+    aceita_regional: true,
+    dia_da_semana_regional: 5,
+    prazo_minimo_regional_dias: 7,
+    max_pracas_por_acao: 3,
+    custo_producao_regional: 7797,
+    bloqueio_mensal_regional: 4,
+  }
+
+  const precos = [
+    { praca_codigo: 'SP', custo_midia_tv: 49000, percentual_simulcast: null },
+    { praca_codigo: 'RJ', custo_midia_tv: 25000, percentual_simulcast: null },
+    { praca_codigo: 'BH', custo_midia_tv: 9000, percentual_simulcast: null },
+    { praca_codigo: 'DF', custo_midia_tv: 6000, percentual_simulcast: null },
+    { praca_codigo: 'PE1', custo_midia_tv: 7000, percentual_simulcast: null },
+  ]
+
+  function regionais(ajustes: Partial<InsumosDeDisponibilidade> = {}) {
+    return calcularDisponibilidadeDoMes(
+      insumos({
+        modalidade: 'regional',
+        programa: encontro,
+        precosRegionais: precos,
+        ...ajustes,
+      }),
+    )
+  }
+
+  // R10: fora da sexta não há "esgotado" — não existe ação regional.
+  it('quinta-feira não tem slot regional', () => {
+    expect(dia(regionais(), '2026-09-10').estado).toBe('sem_exibicao') // quinta
+    expect(dia(regionais(), '2026-09-10').pracas).toEqual([])
+  })
+
+  it('sexta sem venda traz as cinco praças livres', () => {
+    const sexta = dia(regionais(), '2026-09-11')
+    expect(sexta.estado).toBe('disponivel')
+    expect(sexta.total).toBe(5)
+    expect(sexta.livres).toBe(5)
+    expect(sexta.pracas.map((p) => p.praca_codigo)).toEqual(['SP', 'RJ', 'BH', 'DF', 'PE1'])
+  })
+
+  // R8: cada praça tem seu próprio slot na data.
+  it('vendidas SP, RJ e BH, sobram DF e PE1 na mesma sexta', () => {
+    const vendidas = ['SP', 'RJ', 'BH'].map((praca) => ({
+      data_de_exibicao: '2026-09-11',
+      praca_codigo: praca,
+      cliente_nome: 'NESTLE',
+    }))
+    const sexta = dia(regionais({ acoesRegionais: vendidas }), '2026-09-11')
+
+    expect(sexta.estado).toBe('disponivel')
+    expect(sexta.livres).toBe(2)
+    expect(sexta.pracas.filter((p) => p.disponivel).map((p) => p.praca_codigo)).toEqual(['DF', 'PE1'])
+    expect(sexta.pracas.find((p) => p.praca_codigo === 'SP')?.cliente_nome).toBe('NESTLE')
+  })
+
+  it('as cinco praças vendidas esgotam a data', () => {
+    const vendidas = ['SP', 'RJ', 'BH', 'DF', 'PE1'].map((praca) => ({
+      data_de_exibicao: '2026-09-11',
+      praca_codigo: praca,
+      cliente_nome: 'NESTLE',
+    }))
+    expect(dia(regionais({ acoesRegionais: vendidas }), '2026-09-11').estado).toBe('esgotado')
+  })
+
+  // R11: o prazo regional é PRÓPRIO — 7 dias no Encontro, não os 3 nacionais.
+  it('usa o prazo mínimo regional, não o nacional', () => {
+    const agosto = regionais({ ano: 2026, mes: 8 })
+    // 21/08 é sexta e está a 5 dias de 16/08: dentro dos 7 do regional.
+    expect(dia(agosto, '2026-08-21').estado).toBe('fora_do_prazo')
+    // 28/08 é sexta e está a 12 dias: fora do prazo mínimo, logo vendável.
+    expect(dia(agosto, '2026-08-28').estado).toBe('disponivel')
+  })
+
+  // R16 regional: 4 ações fecham o mês, contando AÇÃO, não linha de praça.
+  it('uma ação de 3 praças conta como uma ação para o teto do mês', () => {
+    const tresPracasNumaAcao = ['SP', 'RJ', 'BH'].map((praca) => ({
+      data_de_exibicao: '2026-09-04',
+      praca_codigo: praca,
+      cliente_nome: 'NESTLE',
+    }))
+    // 3 linhas, 1 ação — longe do teto de 4.
+    expect(dia(regionais({ acoesRegionais: tresPracasNumaAcao }), '2026-09-11').estado).toBe(
+      'disponivel',
+    )
+  })
+
+  it('quatro ações distintas fecham o mês', () => {
+    const quatroAcoes = [
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'SP', cliente_nome: 'CLIENTE A' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'RJ', cliente_nome: 'CLIENTE B' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'BH', cliente_nome: 'CLIENTE C' },
+      { data_de_exibicao: '2026-09-04', praca_codigo: 'DF', cliente_nome: 'CLIENTE D' },
+    ]
+    const onze = dia(regionais({ acoesRegionais: quatroAcoes }), '2026-09-11')
+    expect(onze.estado).toBe('bloqueado')
+    expect(onze.motivos.join(' ')).toContain('4 ações')
+  })
+
+  it('soma o valor das praças livres mais a produção, uma vez só', () => {
+    // 49.000 + 25.000 + 9.000 + 6.000 + 7.000 = 96.000 de mídia
+    // direitos 15% de cada = 14.400; produção 7.797 uma vez
+    expect(dia(regionais(), '2026-09-11').valor_unitario).toBe(118197)
+  })
+})
