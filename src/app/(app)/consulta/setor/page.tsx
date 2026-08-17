@@ -96,7 +96,7 @@ export default function PassoSetor() {
           className="rounded-[var(--raio-card)] border px-4 py-3"
           style={{ background: 'var(--prazo-fundo)', borderColor: 'var(--prazo)' }}
         >
-          <p className="text-[13px] font-bold" style={{ color: 'var(--prazo)' }}>
+          <p className="text-[13px] font-bold" style={{ color: 'var(--prazo-texto)' }}>
             Este cliente não tem setor e indústria na carteira.
           </p>
           <p className="mt-1 text-[12.5px] text-[var(--texto-2)]">

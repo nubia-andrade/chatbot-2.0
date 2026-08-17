@@ -25,6 +25,17 @@
   --concorrencia-fundo: #FDECEF;
   --prazo: #F59E0B;
   --prazo-fundo: #FEF4E6;
+  /*
+   * Âmbar escuro para TEXTO sobre `--prazo-fundo` — `--prazo` (#F59E0B) em
+   * cima de `--prazo-fundo` (#FEF4E6) dá contraste ≈1,97:1, abaixo do
+   * mínimo de 4,5:1 (achado Important da revisão da Task 10, no aviso
+   * "cliente sem setor/indústria" de `/consulta/setor`). `--prazo-texto`
+   * (#92400E) sobre `--prazo-fundo` dá ≈6,52:1 — calculado pela fórmula do
+   * WCAG 2.1 (luminância relativa de cada cor, depois
+   * (L-clara + 0,05) / (L-escura + 0,05)). Só para texto; `--prazo` continua
+   * valendo para preenchimento/borda, que não têm a mesma exigência.
+   */
+  --prazo-texto: #92400E;
   --reservado: #64748B;
   --reservado-fundo: #EEF1F5;
   --esgotado: #1E1B2E;
