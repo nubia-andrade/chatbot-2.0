@@ -1,48 +1,32 @@
-'use client'
-
-import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
-import { AcoesDoPasso } from '@/components/consulta/AcoesDoPasso'
-import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
+import { obterSessao } from '@/lib/sessao-servidor'
+import { listarProgramas } from '@/lib/dados/programas'
+import { podeConsultarRegional } from '@/lib/dominio/perfis'
+import { PassoPrograma } from '@/components/consulta/PassoPrograma'
 
 /**
- * Passo 3 — Programa (tela 1d do handoff). Conteúdo real é a Task 11.
+ * Passo 3 — Programa e modalidade (tela 1d do handoff). Task 11.
+ *
+ * Server Component: é o único lugar que pode chamar `listarProgramas` e
+ * `obterSessao` (dependem de `next/headers`, então não rodam num Client
+ * Component). O provider do wizard e a guarda do passo só existem no
+ * navegador, então a tela em si — e a checagem R13 do cliente escolhido —
+ * fica em `PassoPrograma`, um Client Component que recebe os dados prontos.
+ *
+ * Só entram na grade os programas `ativo` e `disponivel_para_proposta` —
+ * um programa inativo ou ainda em configuração não tem preço nem regra
+ * pronta para sustentar uma proposta.
  */
-export default function PassoPrograma() {
-  const pronto = useGuardaDoPasso('programa')
-  const { estado } = useConsulta()
+export default async function PaginaPrograma() {
+  const [sessao, programas] = await Promise.all([obterSessao(), listarProgramas()])
 
-  if (!pronto) {
-    return <CarregandoDoPasso />
-  }
+  const disponiveis = programas.filter(
+    (programa) => programa.estado === 'ativo' && programa.disponivel_para_proposta,
+  )
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2
-          className="text-[19px] font-bold text-[var(--texto)]"
-          style={{ fontFamily: 'var(--fonte-titulo)' }}
-        >
-          O que você está vendendo?
-        </h2>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Escolha o programa ou oportunidade comercial a consultar.
-        </p>
-      </div>
-
-      <div
-        className="rounded-[var(--raio-card)] border border-dashed border-[var(--borda-forte)] p-10 text-center text-[13.5px] text-[var(--texto-3)]"
-        style={{ background: 'var(--superficie)' }}
-      >
-        Conteúdo do passo vem aqui.
-      </div>
-
-      <AcoesDoPasso
-        voltarPara="setor"
-        avancarPara="calendario"
-        avancarRotulo="Ver calendário"
-        habilitado={estado.programaId !== null}
-        motivo="Selecione um programa para continuar"
-      />
-    </div>
+    <PassoPrograma
+      programas={disponiveis}
+      temPerfilRegional={podeConsultarRegional(sessao?.perfis ?? [])}
+    />
   )
 }
