@@ -77,6 +77,8 @@ export default function PassoCalendario() {
   const totalComSelecao = acoesCompradasNoMes + selecionadasNoMes
   const limiteAtingidoComSelecao = limiteMensal > 0 && totalComSelecao >= limiteMensal
   const datasSelecionadas = [...estado.itens].sort((a, b) => a.data.localeCompare(b.data))
+  const totalPracasSelecionadas = estado.itens.reduce((total, item) => total + item.pracas.length, 0)
+  const maxPracasPorAcao = Math.max(1, programa?.max_pracas_por_acao ?? 3)
 
   const digitalOfertado = programa?.contem_digital === true
   const digitalComPreco = programa?.custo_midia_digital !== null && programa?.custo_midia_digital !== undefined
@@ -118,6 +120,8 @@ export default function PassoCalendario() {
   }
 
   function alternarData(data: string) {
+    if (modalidade === 'regional') return
+
     const jaSelecionada = estado.itens.some((item) => item.data === data)
     if (jaSelecionada) {
       atualizar({ itens: estado.itens.filter((item) => item.data !== data) })
@@ -125,7 +129,7 @@ export default function PassoCalendario() {
       return
     }
 
-    if (modalidade === 'nacional' && data.startsWith(prefixoMes) && limiteMensal > 0 && totalComSelecao >= limiteMensal) {
+    if (data.startsWith(prefixoMes) && limiteMensal > 0 && totalComSelecao >= limiteMensal) {
       setAvisoLimite(`${cliente.nome} já atingiu o limite de ${limiteMensal} ações de ${estado.programaNome ?? 'este programa'} neste mês, considerando as compras existentes e esta seleção.`)
       return
     }
@@ -134,12 +138,60 @@ export default function PassoCalendario() {
     setAvisoLimite(null)
   }
 
+  function alternarPraca(data: string, pracaCodigo: string) {
+    if (modalidade !== 'regional') return
+
+    const dia = dias.find((item) => item.data === data)
+    const praca = dia?.pracas.find((item) => item.praca_codigo === pracaCodigo)
+    if (!dia || dia.estado !== 'disponivel' || !praca?.disponivel) return
+
+    const itemAtual = estado.itens.find((item) => item.data === data)
+    const pracasAtuais = itemAtual?.pracas ?? []
+    const jaSelecionada = pracasAtuais.includes(pracaCodigo)
+
+    if (jaSelecionada) {
+      const novasPracas = pracasAtuais.filter((codigo) => codigo !== pracaCodigo)
+      const novosItens = novasPracas.length === 0
+        ? estado.itens.filter((item) => item.data !== data)
+        : estado.itens.map((item) => item.data === data ? { ...item, pracas: novasPracas } : item)
+      atualizar({ itens: novosItens })
+      setAvisoLimite(null)
+      return
+    }
+
+    if (pracasAtuais.length >= maxPracasPorAcao) {
+      setAvisoLimite(`Cada ação regional de ${estado.programaNome ?? 'este programa'} pode combinar no máximo ${maxPracasPorAcao} ${maxPracasPorAcao === 1 ? 'praça' : 'praças'}. Remova uma praça antes de selecionar outra.`)
+      return
+    }
+
+    if (itemAtual) {
+      atualizar({
+        itens: estado.itens.map((item) =>
+          item.data === data
+            ? { ...item, pracas: [...item.pracas, pracaCodigo] }
+            : item,
+        ),
+      })
+    } else {
+      atualizar({ itens: [...estado.itens, { data, quantidade: 1, pracas: [pracaCodigo] }] })
+    }
+    setAvisoLimite(null)
+  }
+
+  function removerItem(data: string) {
+    atualizar({ itens: estado.itens.filter((item) => item.data !== data) })
+    setAvisoLimite(null)
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Disponibilidade elegível</h2>
         <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Disponibilidade elegível para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong>. Selecione as datas verdes e configure os complementos no painel ao lado.
+          Disponibilidade elegível para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong>.{' '}
+          {modalidade === 'regional'
+            ? `Selecione diretamente as praças verdes de cada data. Você pode combinar até ${maxPracasPorAcao} ${maxPracasPorAcao === 1 ? 'praça' : 'praças'} por ação.`
+            : 'Selecione as datas verdes e configure os complementos no painel ao lado.'}
         </p>
       </div>
 
@@ -154,6 +206,12 @@ export default function PassoCalendario() {
             <LegendaDeEstados />
           </div>
 
+          {modalidade === 'regional' && !carregando && !comErro && (
+            <div className="rounded-[10px] border border-[#DDD6FE] bg-[#F5F3FF] px-4 py-3 text-[11px] leading-[1.5] text-[var(--texto-2)]">
+              <strong className="text-[var(--roxo)]">Como selecionar:</strong> clique em SP, RJ, BH, DF ou PE dentro da própria data. Verde = livre, roxo = selecionada e escuro = já ocupada.
+            </div>
+          )}
+
           {carregando && <EsqueletoDaGrade />}
 
           {comErro && (
@@ -166,33 +224,77 @@ export default function PassoCalendario() {
           {mesTodoSemExibicao && <EstadoVazio titulo={`${estado.programaNome ?? 'Este programa'} não vai ao ar em ${NOMES_DOS_MESES[estado.mes - 1].toLowerCase()} de ${estado.ano}`} explicacao="Navegue para outro mês, ou volte e escolha outro programa." />}
 
           {!carregando && !comErro && !mesTodoSemExibicao && (
-            <GradeDoMes dias={diasParaExibir} ano={estado.ano} mes={estado.mes} selecionadas={estado.itens.map((item) => item.data)} aoAlternar={alternarData} />
+            <GradeDoMes
+              dias={diasParaExibir}
+              ano={estado.ano}
+              mes={estado.mes}
+              modalidade={modalidade}
+              itensSelecionados={estado.itens}
+              aoAlternar={alternarData}
+              aoAlternarPraca={alternarPraca}
+            />
           )}
         </div>
 
         <aside className="flex h-fit flex-col rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-5 xl:sticky xl:top-5">
           <div>
-            <h3 className="text-[14px] font-bold text-[var(--texto)]">Datas selecionadas</h3>
-            <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">A seleção fica salva enquanto você navega entre os meses.</p>
+            <h3 className="text-[14px] font-bold text-[var(--texto)]">{modalidade === 'regional' ? 'Ações regionais selecionadas' : 'Datas selecionadas'}</h3>
+            <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">
+              {modalidade === 'regional'
+                ? 'Cada data representa uma ação. Escolha uma ou mais praças livres para compor essa ação.'
+                : 'A seleção fica salva enquanto você navega entre os meses.'}
+            </p>
           </div>
 
           <div className="mt-4 flex max-h-[300px] flex-col gap-2 overflow-y-auto">
             {datasSelecionadas.length === 0 ? (
-              <div className="rounded-[var(--raio-card)] border border-dashed border-[var(--borda-forte)] bg-white p-4 text-[12px] leading-[1.5] text-[var(--texto-3)]">Selecione uma ou mais datas verdes no calendário.</div>
+              <div className="rounded-[var(--raio-card)] border border-dashed border-[var(--borda-forte)] bg-white p-4 text-[12px] leading-[1.5] text-[var(--texto-3)]">
+                {modalidade === 'regional'
+                  ? 'Selecione uma ou mais praças verdes diretamente no calendário.'
+                  : 'Selecione uma ou mais datas verdes no calendário.'}
+              </div>
             ) : datasSelecionadas.map((item) => (
-              <div key={item.data} className="flex items-center justify-between gap-3 rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--disponivel)]" />
-                  <div><p className="text-[12.5px] font-bold text-[var(--texto)]">{formatarData(item.data)}</p><p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">1 nova ação</p></div>
+              <div key={item.data} className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--disponivel)]" />
+                    <div>
+                      <p className="text-[12.5px] font-bold text-[var(--texto)]">{formatarData(item.data)}</p>
+                      <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">
+                        {modalidade === 'regional'
+                          ? `1 ação regional · ${item.pracas.length} ${item.pracas.length === 1 ? 'praça' : 'praças'}`
+                          : '1 nova ação'}
+                      </p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removerItem(item.data)} aria-label={`Remover ${formatarData(item.data)}`} className="cursor-pointer text-[16px] text-[var(--texto-3)]">×</button>
                 </div>
-                <button type="button" onClick={() => alternarData(item.data)} aria-label={`Remover ${formatarData(item.data)}`} className="cursor-pointer text-[16px] text-[var(--texto-3)]">×</button>
+
+                {modalidade === 'regional' && item.pracas.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 pl-[18px]">
+                    {item.pracas.map((codigo) => (
+                      <button
+                        key={codigo}
+                        type="button"
+                        onClick={() => alternarPraca(item.data, codigo)}
+                        className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-[10px] font-bold text-[var(--roxo)] outline-none hover:bg-[#EDE9FE] focus-visible:ring-2 focus-visible:ring-[var(--roxo)]"
+                        title={`Remover ${codigo}`}
+                      >
+                        {codigo} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
 
           <div className="mt-5 rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-4">
             <div className="flex justify-between text-[12px] text-[var(--texto-2)]"><span>Datas</span><strong className="text-[var(--texto)]">{estado.itens.length}</strong></div>
-            <div className="mt-2 flex justify-between text-[12px] text-[var(--texto-2)]"><span>Novas ações</span><strong className="text-[var(--texto)]">{estado.itens.length}</strong></div>
+            <div className="mt-2 flex justify-between text-[12px] text-[var(--texto-2)]"><span>{modalidade === 'regional' ? 'Ações regionais' : 'Novas ações'}</span><strong className="text-[var(--texto)]">{estado.itens.length}</strong></div>
+            {modalidade === 'regional' && (
+              <div className="mt-2 flex justify-between text-[12px] text-[var(--texto-2)]"><span>Praças selecionadas</span><strong className="text-[var(--roxo)]">{totalPracasSelecionadas}</strong></div>
+            )}
             {!carregando && !comErro && modalidade === 'nacional' && limiteMensal > 0 && (
               <div className="mt-3 border-t border-[var(--borda)] pt-3">
                 <div className="flex justify-between gap-3 text-[11.5px] text-[var(--texto-2)]"><span>Ações já compradas neste mês</span><strong className="whitespace-nowrap text-[var(--texto)]">{acoesCompradasNoMes}/{limiteMensal}</strong></div>
@@ -204,7 +306,7 @@ export default function PassoCalendario() {
           <div className="mt-4 rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-4">
             <div>
               <p className="text-[12px] font-bold text-[var(--texto)]">Complementos da proposta</p>
-              <p className="mt-1 text-[10.5px] leading-[1.45] text-[var(--texto-3)]">A opção escolhida vale para todas as datas selecionadas.</p>
+              <p className="mt-1 text-[10.5px] leading-[1.45] text-[var(--texto-3)]">A opção escolhida vale para todas as ações selecionadas.</p>
             </div>
             <div className="mt-3 flex flex-col gap-2.5">
               <OpcaoComplemento
