@@ -69,7 +69,10 @@ function linhaNacional(
 
   const midiaTvBase = programa.custo_midia_tv ?? 0
   const midiaTvUnit = percentual > 0 ? aplicarAcrescimo(midiaTvBase, percentual) : midiaTvBase
-  const midiaDigitalUnit = incluirDigital ? (programa.custo_midia_digital ?? 0) : 0
+  const midiaDigitalBase = incluirDigital ? (programa.custo_midia_digital ?? 0) : 0
+  const midiaDigitalUnit = incluirDigital && percentual > 0
+    ? aplicarAcrescimo(midiaDigitalBase, percentual)
+    : midiaDigitalBase
   const redesSociaisUnit = incluirRedesSociais ? (programa.custo_midia_redes_sociais ?? 0) : 0
   const simulcastUnit = arredondar(midiaTvUnit * ((programa.percentual_simulcast ?? 0) / 100))
   const producaoTvUnit = programa.custo_producao_tv ?? 0
@@ -134,7 +137,8 @@ function linhaRegional(
 
   for (const preco of precosSelecionados) {
     const tv = percentual > 0 ? aplicarAcrescimo(preco.custo_midia_tv, percentual) : preco.custo_midia_tv
-    const digital = incluirDigital ? (preco.custo_midia_digital ?? 0) : 0
+    const digitalBase = incluirDigital ? (preco.custo_midia_digital ?? 0) : 0
+    const digital = incluirDigital && percentual > 0 ? aplicarAcrescimo(digitalBase, percentual) : digitalBase
     const simulcast = arredondar(tv * ((preco.percentual_simulcast ?? 0) / 100))
 
     midiaTvUnit += tv
