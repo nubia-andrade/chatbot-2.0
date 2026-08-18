@@ -78,6 +78,25 @@ export default function PassoCalendario() {
   const limiteAtingidoComSelecao = limiteMensal > 0 && totalComSelecao >= limiteMensal
   const datasSelecionadas = [...estado.itens].sort((a, b) => a.data.localeCompare(b.data))
 
+  const digitalOfertado = programa?.contem_digital === true
+  const digitalComPreco = programa?.custo_midia_digital !== null && programa?.custo_midia_digital !== undefined
+  const digitalDisponivel = digitalOfertado && digitalComPreco
+  const redesOfertadas = programa?.redes_sociais === true
+  const redesComPreco = programa?.custo_midia_redes_sociais !== null && programa?.custo_midia_redes_sociais !== undefined
+  const redesDisponiveis = redesOfertadas && redesComPreco
+
+  const descricaoDigital = !digitalOfertado
+    ? 'Este programa não oferece Digital como complemento.'
+    : !digitalComPreco
+      ? 'Digital está habilitado no programa, mas falta cadastrar o valor de mídia digital.'
+      : 'Adiciona mídia, produção e direitos de Digital em todas as ações.'
+
+  const descricaoRedes = !redesOfertadas
+    ? 'Este programa não oferece Redes Sociais como complemento.'
+    : !redesComPreco
+      ? 'Redes Sociais está habilitado no programa, mas falta cadastrar seu valor comercial.'
+      : 'Adiciona Redes Sociais em todas as ações; produção entra apenas se estiver cadastrada.'
+
   const diasParaExibir = dias.map((dia) => {
     const selecionada = estado.itens.some((item) => item.data === dia.data)
     if (modalidade === 'nacional' && limiteAtingidoComSelecao && !selecionada && dia.estado === 'disponivel') {
@@ -190,16 +209,16 @@ export default function PassoCalendario() {
             <div className="mt-3 flex flex-col gap-2.5">
               <OpcaoComplemento
                 titulo="Incluir Digital"
-                descricao={programa?.contem_digital ? 'Adiciona mídia e produção digital em todas as ações.' : 'Este programa não está marcado como contendo Digital.'}
-                marcado={estado.incluirDigital}
-                desabilitado={!programa?.contem_digital}
+                descricao={descricaoDigital}
+                marcado={digitalDisponivel && estado.incluirDigital}
+                desabilitado={!digitalDisponivel}
                 aoMudar={(marcado) => atualizar({ incluirDigital: marcado })}
               />
               <OpcaoComplemento
                 titulo="Incluir Redes sociais"
-                descricao={programa?.redes_sociais ? 'Adiciona o complemento de Redes Sociais em todas as ações.' : 'Este programa não está marcado como tendo Redes Sociais.'}
-                marcado={estado.incluirRedesSociais}
-                desabilitado={!programa?.redes_sociais}
+                descricao={descricaoRedes}
+                marcado={redesDisponiveis && estado.incluirRedesSociais}
+                desabilitado={!redesDisponiveis}
                 aoMudar={(marcado) => atualizar({ incluirRedesSociais: marcado })}
               />
             </div>
