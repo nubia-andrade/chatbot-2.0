@@ -6,6 +6,7 @@ import { obterPrograma } from '../dados/programas'
 import { listarDatasEspeciais } from '../dados/datas-especiais'
 import { listarPrecos } from '../dados/regional'
 import { carregarDisponibilidade } from '../dados/disponibilidade'
+import { listarSlidesDoModelo } from '../dados/modelo-proposta'
 import { calcularResumoFinanceiro, type ItemParaResumoFinanceiro } from '../dominio/resumo-financeiro'
 import { gravarConsulta } from './consultas'
 import { gerarPdfDaProposta } from '../propostas/pdf'
@@ -118,9 +119,10 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   const programa = await obterPrograma(entrada.programaId)
   if (!programa) return resultadoFalha('Programa não encontrado.', { consultaId: consulta.id })
 
-  const [periodosEspeciais, precosRegionais] = await Promise.all([
+  const [periodosEspeciais, precosRegionais, slides] = await Promise.all([
     listarDatasEspeciais(entrada.programaId),
     entrada.modalidade === 'regional' ? listarPrecos(entrada.programaId) : Promise.resolve([]),
+    listarSlidesDoModelo(entrada.programaId),
   ])
 
   const resumo = calcularResumoFinanceiro({
@@ -184,6 +186,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       programaNome: entrada.programaNome,
       modalidade: entrada.modalidade,
       resumo,
+      slides,
     })
 
     const { error: erroUpload } = await supabase.storage
