@@ -19,6 +19,9 @@ function entrada(
     },
     ocupacao: 2,
     vendasNaData: [],
+    proprioAnuncianteNaData: false,
+    acoesDoAnuncianteNoMes: 0,
+    limiteMensalDoAnunciante: 12,
     bloqueios: [],
     restricoes: [],
     periodosEspeciais: [],
@@ -86,16 +89,63 @@ describe('avaliarDisponibilidadeDoDia', () => {
     expect(resultado.motivo).not.toContain('Outra Empresa')
   })
 
-  it('não trata o próprio anunciante como concorrente', () => {
+  it('sinaliza que o próprio anunciante já comprou a data', () => {
     const resultado = avaliarDisponibilidadeDoDia(
       entrada({
+        proprioAnuncianteNaData: true,
         vendasNaData: [{ anunciante: 'Nestlé Brasil', setor: 'Alimentos', industria: 'Café' }],
       }),
+    )
+    expect(resultado).toMatchObject({
+      estado: 'ja_comprado',
+      selecionavel: false,
+      motivo: 'Este anunciante já possui uma ação nesta data.',
+    })
+  })
+
+  it('concorrência real tem prioridade mesmo quando o próprio anunciante já está na data', () => {
+    const resultado = avaliarDisponibilidadeDoDia(
+      entrada({
+        proprioAnuncianteNaData: true,
+        vendasNaData: [
+          { anunciante: 'Nestlé Brasil', setor: 'Alimentos', industria: 'Café' },
+          { anunciante: 'Concorrente', setor: 'Alimentos', industria: 'Café' },
+        ],
+      }),
+    )
+    expect(resultado.estado).toBe('concorrencia')
+  })
+
+  it('bloqueia novas datas quando o anunciante atinge o limite mensal', () => {
+    const resultado = avaliarDisponibilidadeDoDia(
+      entrada({ acoesDoAnuncianteNoMes: 12, limiteMensalDoAnunciante: 12 }),
+    )
+    expect(resultado).toMatchObject({
+      estado: 'limite_mensal',
+      selecionavel: false,
+    })
+    expect(resultado.motivo).toContain('12 ações')
+  })
+
+  it('não aplica limite mensal quando o programa não definiu teto', () => {
+    const resultado = avaliarDisponibilidadeDoDia(
+      entrada({ acoesDoAnuncianteNoMes: 99, limiteMensalDoAnunciante: 0 }),
     )
     expect(resultado.estado).toBe('disponivel')
   })
 
-  it('marca esgotado quando não há slot livre', () => {
+  it('já comprado tem prioridade sobre limite mensal', () => {
+    const resultado = avaliarDisponibilidadeDoDia(
+      entrada({
+        proprioAnuncianteNaData: true,
+        acoesDoAnuncianteNoMes: 12,
+        limiteMensalDoAnunciante: 12,
+      }),
+    )
+    expect(resultado.estado).toBe('ja_comprado')
+  })
+
+  it('marca esgotado quando não há slot livre e o limite mensal ainda não foi atingido', () => {
     const resultado = avaliarDisponibilidadeDoDia(entrada({ ocupacao: 4 }))
     expect(resultado).toMatchObject({ estado: 'esgotado', slotsLivres: 0 })
   })
@@ -119,4 +169,3 @@ describe('avaliarDisponibilidadeDoDia', () => {
     })
   })
 })
-
