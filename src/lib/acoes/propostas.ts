@@ -20,6 +20,8 @@ export type EntradaGerarProposta = {
   programaNome: string
   modalidade: 'nacional' | 'regional'
   itens: ItemParaResumoFinanceiro[]
+  incluirDigital: boolean
+  incluirRedesSociais: boolean
 }
 
 export type ResultadoGerarProposta = {
@@ -102,7 +104,6 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   const erroLimite = await validarLimiteMensal(entrada)
   if (erroLimite) return resultadoFalha(erroLimite)
 
-  // Segundo portão: revalidação de datas/concorrência e gravação do retrato.
   const consulta = await gravarConsulta({
     clienteId: entrada.clienteId,
     programaId: entrada.programaId,
@@ -111,9 +112,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   })
 
   if (!consulta.id || consulta.erros.length > 0) {
-    return resultadoFalha(
-      consulta.erros[0] ?? 'Não foi possível validar a consulta antes da proposta.',
-    )
+    return resultadoFalha(consulta.erros[0] ?? 'Não foi possível validar a consulta antes da proposta.')
   }
 
   const programa = await obterPrograma(entrada.programaId)
@@ -130,6 +129,8 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
     itens: entrada.itens,
     periodosEspeciais,
     precosRegionais,
+    incluirDigital: entrada.incluirDigital,
+    incluirRedesSociais: entrada.incluirRedesSociais,
   })
 
   const supabase = await criarClienteServidor()
@@ -146,10 +147,16 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       programa_id: entrada.programaId,
       programa_nome: entrada.programaNome,
       modalidade: entrada.modalidade,
+      inclui_digital: resumo.incluir_digital,
+      inclui_redes_sociais: resumo.incluir_redes_sociais,
       valor_midia_tv: resumo.midia_tv,
       valor_midia_digital: resumo.midia_digital,
+      valor_redes_sociais: resumo.redes_sociais,
       valor_simulcast: resumo.simulcast,
       valor_total_comercial: resumo.total_comercial,
+      valor_producao_tv: resumo.producao_tv,
+      valor_producao_digital: resumo.producao_digital,
+      valor_producao_redes_sociais: resumo.producao_redes_sociais,
       valor_producao: resumo.producao,
       valor_direitos_tv: resumo.direitos_tv,
       valor_direitos_digital: resumo.direitos_digital,
@@ -185,10 +192,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
 
     if (erroUpload) throw new Error(erroUpload.message)
 
-    await supabase
-      .from('propostas')
-      .update({ pdf_path: pdfPath, status: 'gerada', erro: null })
-      .eq('id', propostaId)
+    await supabase.from('propostas').update({ pdf_path: pdfPath, status: 'gerada', erro: null }).eq('id', propostaId)
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : 'Falha ao gerar o PDF.'
     await supabase.from('propostas').update({ status: 'falha', erro: mensagem }).eq('id', propostaId)
@@ -205,8 +209,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
     return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id, pdfGerado: true })
   }
 
-  const destinatarios = ((destinatariosRpc ?? []) as DestinatarioRpc[])
-    .filter((item) => Boolean(item.email))
+  const destinatarios = ((destinatariosRpc ?? []) as DestinatarioRpc[]).filter((item) => Boolean(item.email))
 
   if (destinatarios.length > 0) {
     await supabase.from('proposta_destinatarios').upsert(
@@ -238,12 +241,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   if (destinatarios.length === 0) {
     const mensagem = 'PDF gerado, mas não há destinatários com e-mail para este programa.'
     await supabase.from('propostas').update({ status: 'gerada', erro: mensagem }).eq('id', propostaId)
-    return resultadoFalha(mensagem, {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: true,
-      emailConfigurado: true,
-    })
+    return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id, pdfGerado: true, emailConfigurado: true })
   }
 
   try {
