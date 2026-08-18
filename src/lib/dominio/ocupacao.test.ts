@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { montarMapa } from './formatos'
-import { contarOcupacao, ocupacaoEm, chaveDeOcupacao } from './ocupacao'
+import {
+  contarOcupacao,
+  ocupacaoEm,
+  chaveDeOcupacao,
+  contarRegionalNoInventarioNacional,
+} from './ocupacao'
 
 const mapa = montarMapa([
   { formato: 'AÇÃO PLENA', categoria: 'AÇÃO DE CONTEÚDO' },
@@ -45,5 +50,39 @@ describe('ocupacaoEm', () => {
 
   it('devolve zero para data sem venda', () => {
     expect(ocupacaoEm(acoes, mapa, 'DOMI - DOMINGAO', '2026-12-25')).toBe(0)
+  })
+})
+
+describe('contarRegionalNoInventarioNacional', () => {
+  it('SP + RJ + BH da mesma ação regional consomem um único slot nacional', () => {
+    const contagem = contarRegionalNoInventarioNacional([
+      { data_de_exibicao: '2026-09-05', cliente_id: 'c1', cliente_nome: 'Cliente 1', numero_da_entrega: null },
+      { data_de_exibicao: '2026-09-05', cliente_id: 'c1', cliente_nome: 'Cliente 1', numero_da_entrega: null },
+      { data_de_exibicao: '2026-09-05', cliente_id: 'c1', cliente_nome: 'Cliente 1', numero_da_entrega: null },
+    ])
+    expect(contagem.get('2026-09-05')).toBe(1)
+  })
+
+  it('duas ações regionais de clientes diferentes consomem dois slots', () => {
+    const contagem = contarRegionalNoInventarioNacional([
+      { data_de_exibicao: '2026-09-05', cliente_id: 'c1', cliente_nome: 'Cliente 1', numero_da_entrega: null },
+      { data_de_exibicao: '2026-09-05', cliente_id: 'c2', cliente_nome: 'Cliente 2', numero_da_entrega: null },
+    ])
+    expect(contagem.get('2026-09-05')).toBe(2)
+  })
+
+  it('não soma de novo uma entrega regional já contada pelo Take nacional', () => {
+    const contagem = contarRegionalNoInventarioNacional(
+      [
+        {
+          data_de_exibicao: '2026-09-05',
+          cliente_id: 'c1',
+          cliente_nome: 'Cliente 1',
+          numero_da_entrega: '123',
+        },
+      ],
+      new Set(['2026-09-05|123']),
+    )
+    expect(contagem.get('2026-09-05') ?? 0).toBe(0)
   })
 })
