@@ -13,6 +13,10 @@ export type MarcaDaCarteira = {
   apto_regional: boolean
 }
 
+type LinhaDaBuscaDeMarca = Omit<MarcaDaCarteira, 'apto_regional'> & {
+  apto_regional: boolean | null
+}
+
 const LIMITE_PADRAO = 20
 
 /**
@@ -42,8 +46,8 @@ export async function buscarMarcas(
     return []
   }
 
-  return (data ?? []).map((linha) => ({
+  return ((data ?? []) as LinhaDaBuscaDeMarca[]).map((linha) => ({
     ...linha,
     apto_regional: Boolean(linha.apto_regional),
-  })) as MarcaDaCarteira[]
+  }))
 }
