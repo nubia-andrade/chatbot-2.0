@@ -11,7 +11,7 @@ import {
   slidesDaSecao,
   type SecaoDoModeloDeProposta,
   type SlideDoModeloDeProposta,
-} from '@/lib/dados/modelo-proposta'
+} from '@/lib/dominio/modelo-proposta'
 
 type Props = {
   programaId: string
