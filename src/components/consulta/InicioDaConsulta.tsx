@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { CampoDeBuscaDeMarca } from '@/components/consulta/CampoDeBuscaDeMarca'
+import { CalendarioDeDisponibilidade } from '@/components/consulta/CalendarioDeDisponibilidade'
 import type { MarcaDaCarteira } from '@/lib/dados/busca-marcas'
 
 type ProgramaDaConsulta = {
@@ -16,7 +17,18 @@ type Props = { programas: ProgramaDaConsulta[] }
 export function InicioDaConsulta({ programas }: Props) {
   const [marca, setMarca] = useState<MarcaDaCarteira | null>(null)
   const [programaId, setProgramaId] = useState('')
+  const [noCalendario, setNoCalendario] = useState(false)
   const programa = programas.find((item) => item.id === programaId) ?? null
+
+  if (noCalendario && marca && programa) {
+    return (
+      <CalendarioDeDisponibilidade
+        marca={marca}
+        programa={programa}
+        aoVoltar={() => setNoCalendario(false)}
+      />
+    )
+  }
 
   return (
     <section className="overflow-hidden rounded-[var(--raio-janela)] border border-[var(--borda)] bg-[var(--superficie)] shadow-[var(--sombra-janela)]">
@@ -36,6 +48,7 @@ export function InicioDaConsulta({ programas }: Props) {
               aoEscolher={(novaMarca) => {
                 setMarca(novaMarca)
                 setProgramaId('')
+                setNoCalendario(false)
               }}
             />
 
@@ -79,7 +92,10 @@ export function InicioDaConsulta({ programas }: Props) {
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">2. Escolha o programa</h2>
             <select
               value={programaId}
-              onChange={(evento) => setProgramaId(evento.target.value)}
+              onChange={(evento) => {
+                setProgramaId(evento.target.value)
+                setNoCalendario(false)
+              }}
               className="h-[44px] w-full max-w-[520px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
             >
               <option value="">Selecione um programa</option>
@@ -116,12 +132,13 @@ export function InicioDaConsulta({ programas }: Props) {
 
           <div className="mt-auto">
             <div className="mb-3 rounded-[var(--raio-card)] bg-[var(--prazo-fundo)] px-4 py-3 text-[11.5px] leading-[1.5] text-[var(--texto-2)]">
-              O calendário de disponibilidade será conectado no próximo checkpoint.
+              O calendário considera vendas nacionais, ações regionais, concorrência, restrições, prazo, bloqueios e datas especiais.
             </div>
             <button
               type="button"
-              disabled
-              className="h-[48px] w-full rounded-[12px] text-[13px] font-bold text-white opacity-45"
+              disabled={!marca || !programa}
+              onClick={() => setNoCalendario(true)}
+              className="h-[48px] w-full rounded-[12px] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
               style={{ background: 'var(--marca)' }}
             >
               Continuar para calendário →
