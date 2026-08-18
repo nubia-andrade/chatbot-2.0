@@ -1,5 +1,6 @@
 import { obterPrograma } from '@/lib/dados/programas'
 import { listarSlidesDoModelo } from '@/lib/dados/modelo-proposta'
+import { listarDatasEspeciais } from '@/lib/dados/datas-especiais'
 import { obterSessao } from '@/lib/sessao-servidor'
 import { podeEditarPrograma } from '@/lib/dominio/perfis'
 import { calcularResumoFinanceiro } from '@/lib/dominio/resumo-financeiro'
@@ -37,9 +38,10 @@ export async function GET(
     return new Response('Sem permissão para visualizar o teste deste modelo.', { status: 403 })
   }
 
-  const [programa, slides] = await Promise.all([
+  const [programa, slides, periodosEspeciais] = await Promise.all([
     obterPrograma(id),
     listarSlidesDoModelo(id),
+    listarDatasEspeciais(id),
   ])
   if (!programa) return new Response('Programa não encontrado.', { status: 404 })
 
@@ -56,7 +58,7 @@ export async function GET(
     programa,
     modalidade: 'nacional',
     itens,
-    periodosEspeciais: [],
+    periodosEspeciais,
     incluirDigital,
     incluirRedesSociais,
   })
@@ -66,6 +68,7 @@ export async function GET(
     marcaNome: 'MARCA TESTE',
     clienteNome: 'ANUNCIANTE TESTE',
     programaNome: programa.nome,
+    objetivo: 'Apresentar a marca de forma contextualizada ao público do programa, reforçando a mensagem principal da campanha e a conexão com a audiência.',
     modalidade: 'nacional',
     resumo,
     slides,
