@@ -38,6 +38,17 @@ import type { Modalidade } from '../dominio/disponibilidade'
 const ERRO_SESSAO_EXPIRADA = 'Sessão expirada. Entre de novo.'
 const ERRO_SEM_PERMISSAO_REGIONAL = 'Você não tem permissão para consultar disponibilidade regional.'
 
+function resultadoVazioComErro(erro: string): ResultadoDeDisponibilidade {
+  return {
+    dias: [],
+    programa: null,
+    erro,
+    precosRegionais: [],
+    limiteMensal: 0,
+    acoesDoAnuncianteNoMes: 0,
+  }
+}
+
 export async function carregarDisponibilidadeDoCalendario(params: {
   programaId: string
   clienteId: string
@@ -48,13 +59,13 @@ export async function carregarDisponibilidadeDoCalendario(params: {
   // 1. Sem sessão, nada acontece — mesmo formato de `gravarConsulta`.
   const sessao = await obterSessao()
   if (!sessao) {
-    return { dias: [], programa: null, erro: ERRO_SESSAO_EXPIRADA, precosRegionais: [] }
+    return resultadoVazioComErro(ERRO_SESSAO_EXPIRADA)
   }
 
   // 2. Regional exige o perfil — esconder a modalidade na tela (`PassoPrograma.tsx`)
   // é conveniência, isto é a proteção real.
   if (params.modalidade === 'regional' && !podeConsultarRegional(sessao.perfis)) {
-    return { dias: [], programa: null, erro: ERRO_SEM_PERMISSAO_REGIONAL, precosRegionais: [] }
+    return resultadoVazioComErro(ERRO_SEM_PERMISSAO_REGIONAL)
   }
 
   return carregarDisponibilidade(params)
