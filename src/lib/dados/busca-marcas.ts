@@ -3,8 +3,9 @@
 import { criarClienteNavegador } from '../supabase/cliente-navegador'
 
 export type MarcaDaCarteira = {
-  marca_id: string
-  marca_nome: string
+  /** Nulos quando o executivo escolhe diretamente um cliente sem marca conhecida no Take. */
+  marca_id: string | null
+  marca_nome: string | null
   cliente_id: string
   cliente_nome: string
   cnpj: string | null
@@ -20,29 +21,27 @@ type LinhaDaBuscaDeMarca = Omit<MarcaDaCarteira, 'apto_regional'> & {
 const LIMITE_PADRAO = 20
 
 /**
- * Busca pela marca que o executivo conhece, mas devolve também o anunciante
- * oficial da carteira e a classificação usada pelas regras comerciais.
+ * Busca o alvo comercial da consulta por CLIENTE/ANUNCIANTE ou MARCA.
  *
- * `buscar_marcas` vive no Supabase porque a relação passa por três entidades:
- * marca -> alias do anunciante no Globo Take -> cliente da carteira. A função
- * só devolve aliases já resolvidos; pendências de casamento nunca aparecem
- * como opção de venda até serem associadas com segurança.
+ * O RPC `buscar_marcas` também aplica a carteira do executivo logado. Para
+ * proprietário/consultor, a função libera a carteira completa. Termo vazio é
+ * válido: permite abrir o campo e enxergar imediatamente clientes da carteira.
+ *
+ * Clientes que ainda não possuem marca aprendida no Globo Take continuam
+ * selecionáveis, com `marca_id` e `marca_nome` nulos.
  */
 export async function buscarMarcas(
   termo: string,
   limite: number = LIMITE_PADRAO,
 ): Promise<MarcaDaCarteira[]> {
-  const termoLimpo = termo.trim()
-  if (termoLimpo === '') return []
-
   const supabase = criarClienteNavegador()
   const { data, error } = await supabase.rpc('buscar_marcas', {
-    termo_busca: termoLimpo,
+    termo_busca: termo.trim(),
     limite_busca: limite,
   })
 
   if (error) {
-    console.error('Falha ao buscar marcas:', error.message)
+    console.error('Falha ao buscar clientes e marcas:', error.message)
     return []
   }
 
