@@ -8,10 +8,8 @@ import type { ItemDaConsulta } from '@/lib/dominio/consulta'
 
 /** Estado persistido da consulta dentro da aba. */
 export type EstadoDaConsulta = {
-  /** Marca escolhida pelo executivo na entrada da consulta. */
   marcaId: string | null
   marcaNome: string | null
-  /** Anunciante oficial da carteira associado à marca. */
   cliente: Cliente | null
   programaId: string | null
   programaNome: string | null
@@ -81,11 +79,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   function atualizar(parcial: Partial<EstadoDaConsulta>) {
     setEstado((atual) => {
       const proximo = { ...atual, ...parcial }
-
-      if ('itens' in parcial) {
-        proximo.datasConfirmadas = false
-      }
-
+      if ('itens' in parcial) proximo.datasConfirmadas = false
       return proximo
     })
   }
@@ -112,27 +106,19 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
 
 export function useConsulta(): ContextoConsulta {
   const contexto = useContext(Contexto)
-  if (!contexto) {
-    throw new Error('useConsulta precisa ser chamado dentro de <ProvedorDaConsulta>')
-  }
+  if (!contexto) throw new Error('useConsulta precisa ser chamado dentro de <ProvedorDaConsulta>')
   return contexto
 }
 
-/** Fluxo enxuto: a seleção das datas acontece dentro do próprio Calendário. */
+/** A proposta é gerada como ação final do Resumo, não como uma tela adicional. */
 export const PASSOS: { slug: string; rotulo: string }[] = [
   { slug: 'cliente', rotulo: 'Cliente' },
   { slug: 'setor', rotulo: 'Setor' },
   { slug: 'programa', rotulo: 'Programa' },
   { slug: 'calendario', rotulo: 'Calendário' },
   { slug: 'resumo', rotulo: 'Resumo' },
-  { slug: 'proposta', rotulo: 'Proposta' },
 ]
 
-/**
- * O passo mais adiantado que o estado atual justifica. As datas não formam
- * mais uma etapa própria: assim que existe ao menos uma data selecionada no
- * calendário, o próximo passo possível é o Resumo.
- */
 export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
   if (!estado.cliente) return 'cliente'
   if (!estado.programaId) return 'programa'
