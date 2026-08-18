@@ -151,7 +151,7 @@ export function CelulaDoDia({
                   opacity: habilitada || marcada ? 1 : 0.72,
                 }}
               >
-                {marcada ? '✓' : praca.praca_codigo.slice(0, 2)}
+                {praca.praca_codigo.slice(0, 2)}
               </button>
             )
           })}
