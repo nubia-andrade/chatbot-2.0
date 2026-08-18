@@ -26,6 +26,18 @@ create index if not exists programa_modelo_slides_programa_ordem_idx
 create index if not exists programa_modelo_slides_programa_secao_ordem_idx
   on programa_modelo_slides (programa_id, secao, ordem, criado_em);
 
+create unique index if not exists programa_modelo_slides_capa_unica_idx
+  on programa_modelo_slides (programa_id)
+  where secao = 'capa';
+
+create unique index if not exists programa_modelo_slides_valor_unico_idx
+  on programa_modelo_slides (programa_id)
+  where secao = 'valor';
+
+create unique index if not exists programa_modelo_slides_contracapa_unica_idx
+  on programa_modelo_slides (programa_id)
+  where secao = 'contracapa';
+
 alter table programa_modelo_slides enable row level security;
 
 drop policy if exists "modelo proposta leitura autenticada" on programa_modelo_slides;
