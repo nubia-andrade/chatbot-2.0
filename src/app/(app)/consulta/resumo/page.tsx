@@ -6,7 +6,7 @@ import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaC
 import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 import { carregarResumoFinanceiro } from '@/lib/acoes/resumo-financeiro'
 import { gerarProposta, type ResultadoGerarProposta } from '@/lib/acoes/propostas'
-import type { ResumoFinanceiroDaProposta } from '@/lib/dominio/resumo-financeiro'
+import type { DetalheFinanceiroDaPraca, ResumoFinanceiroDaProposta } from '@/lib/dominio/resumo-financeiro'
 import { descreverAcaoDaProposta } from '@/lib/dominio/texto-proposta'
 
 function moeda(valor: number): string {
@@ -27,6 +27,10 @@ export default function PassoResumo() {
   const [resultado, setResultado] = useState<ResultadoGerarProposta | null>(null)
 
   const chaveItens = useMemo(() => JSON.stringify(estado.itens), [estado.itens])
+  const totalPracas = useMemo(
+    () => estado.itens.reduce((total, item) => total + item.pracas.length, 0),
+    [estado.itens],
+  )
   const textoDaAcao = useMemo(() => {
     if (!estado.programaNome || estado.itens.length === 0) return ''
     return descreverAcaoDaProposta({
@@ -105,9 +109,10 @@ export default function PassoResumo() {
           <Campo rotulo="Produto" valor={estado.produto} />
           <Campo rotulo="Objetivo" valor={estado.objetivo} />
           <Campo rotulo="Modalidade" valor={estado.modalidade === 'regional' ? 'Regional' : 'Nacional'} />
-          <Campo rotulo="Novas ações" valor={String(estado.itens.length)} />
-          <Campo rotulo="Digital" valor={estado.incluirDigital ? 'Incluído em todas as datas' : 'Não incluído'} />
-          <Campo rotulo="Redes sociais" valor={estado.incluirRedesSociais ? 'Incluído em todas as datas' : 'Não incluído'} />
+          <Campo rotulo={estado.modalidade === 'regional' ? 'Ações regionais' : 'Novas ações'} valor={String(estado.itens.length)} />
+          {estado.modalidade === 'regional' && <Campo rotulo="Praças selecionadas" valor={String(totalPracas)} />}
+          <Campo rotulo="Digital" valor={estado.incluirDigital ? 'Incluído em todas as ações' : 'Não incluído'} />
+          <Campo rotulo="Redes sociais" valor={estado.incluirRedesSociais ? 'Incluído em todas as ações' : 'Não incluído'} />
         </aside>
 
         <div className="flex flex-col gap-4">
@@ -128,25 +133,46 @@ export default function PassoResumo() {
           {resumo && (
             <>
               <section className="overflow-hidden rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)]">
-                <header className="border-b border-[var(--borda)] bg-[var(--superficie-suave)] px-4 py-3"><h3 className="text-[13.5px] font-bold text-[var(--texto)]">Datas e valores</h3></header>
+                <header className="border-b border-[var(--borda)] bg-[var(--superficie-suave)] px-4 py-3">
+                  <h3 className="text-[13.5px] font-bold text-[var(--texto)]">{estado.modalidade === 'regional' ? 'Ações regionais e valores' : 'Datas e valores'}</h3>
+                </header>
                 <div className="divide-y divide-[var(--borda)]">
                   {resumo.linhas.map((linha) => (
-                    <div key={linha.data} className="grid gap-3 px-4 py-4 xl:grid-cols-[150px_1fr_150px]">
-                      <div>
-                        <p className="text-[13px] font-bold text-[var(--texto)]">{formatarData(linha.data)}</p>
-                        {linha.pracas.length > 0 && <p className="mt-1 text-[11px] text-[var(--texto-3)]">{linha.pracas.join(', ')}</p>}
-                        {linha.periodo_especial_nome && <p className="mt-1 text-[10.5px] font-semibold text-[var(--roxo)]">{linha.periodo_especial_nome} · +{linha.periodo_especial_percentual}%</p>}
+                    <div key={linha.data}>
+                      <div className="grid gap-3 px-4 py-4 xl:grid-cols-[150px_1fr_150px]">
+                        <div>
+                          <p className="text-[13px] font-bold text-[var(--texto)]">{formatarData(linha.data)}</p>
+                          {linha.pracas.length > 0 && <p className="mt-1 text-[11px] font-semibold text-[var(--roxo)]">{linha.pracas.join(' · ')}</p>}
+                          {linha.periodo_especial_nome && <p className="mt-1 text-[10.5px] font-semibold text-[var(--roxo)]">{linha.periodo_especial_nome} · +{linha.periodo_especial_percentual}%</p>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-[11.5px] text-[var(--texto-2)] sm:grid-cols-3">
+                          <Valor rotulo="Mídia TV" valor={linha.midia_tv} />
+                          {resumo.incluir_digital && <Valor rotulo="Digital" valor={linha.midia_digital} />}
+                          {resumo.incluir_redes_sociais && <Valor rotulo="Redes sociais" valor={linha.redes_sociais} />}
+                          <Valor rotulo="Simulcast" valor={linha.simulcast} />
+                          <Valor rotulo="Produção" valor={linha.producao} />
+                          <Valor rotulo="Direitos TV" valor={linha.direitos_tv} />
+                          {resumo.incluir_digital && <Valor rotulo="Direitos Digital" valor={linha.direitos_digital} />}
+                        </div>
+                        <div className="text-right"><p className="text-[10.5px] uppercase text-[var(--texto-3)]">Total comercial</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{moeda(linha.total_comercial)}</p></div>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-[11.5px] text-[var(--texto-2)] sm:grid-cols-3">
-                        <Valor rotulo="Mídia TV" valor={linha.midia_tv} />
-                        {resumo.incluir_digital && <Valor rotulo="Digital" valor={linha.midia_digital} />}
-                        {resumo.incluir_redes_sociais && <Valor rotulo="Redes sociais" valor={linha.redes_sociais} />}
-                        <Valor rotulo="Simulcast" valor={linha.simulcast} />
-                        <Valor rotulo="Produção" valor={linha.producao} />
-                        <Valor rotulo="Direitos TV" valor={linha.direitos_tv} />
-                        {resumo.incluir_digital && <Valor rotulo="Direitos Digital" valor={linha.direitos_digital} />}
-                      </div>
-                      <div className="text-right"><p className="text-[10.5px] uppercase text-[var(--texto-3)]">Total comercial</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{moeda(linha.total_comercial)}</p></div>
+
+                      {estado.modalidade === 'regional' && linha.detalhe_pracas.length > 0 && (
+                        <div className="border-t border-[var(--borda)] bg-[var(--superficie-suave)] px-4 py-4">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-[10.5px] font-bold uppercase tracking-[.05em] text-[var(--texto-3)]">Detalhamento por regional</p>
+                              <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">Mídia e direitos variam por praça. A produção regional é cobrada uma única vez por ação.</p>
+                            </div>
+                            <span className="rounded-full bg-[#EDE9FE] px-2.5 py-1 text-[10px] font-bold text-[var(--roxo)]">{linha.detalhe_pracas.length} {linha.detalhe_pracas.length === 1 ? 'praça' : 'praças'}</span>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                            {linha.detalhe_pracas.map((praca) => (
+                              <DetalheDaPraca key={praca.praca_codigo} praca={praca} incluirDigital={resumo.incluir_digital} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -186,6 +212,29 @@ export default function PassoResumo() {
 function Campo({ rotulo, valor }: { rotulo: string; valor: string }) { return <div className="border-b border-[var(--borda)] py-3 first:pt-0 last:border-0 last:pb-0"><p className="text-[10px] font-bold uppercase tracking-[.05em] text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 whitespace-pre-wrap text-[13px] font-semibold leading-[1.45] text-[var(--texto)]">{valor}</p></div> }
 function Valor({ rotulo, valor }: { rotulo: string; valor: number }) { return <p><span className="text-[var(--texto-3)]">{rotulo}: </span><strong className="text-[var(--texto)]">{moeda(valor)}</strong></p> }
 function CartaoValor({ rotulo, valor, subtitulo }: { rotulo: string; valor: number; subtitulo?: string }) { return <div className="rounded-[11px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-3"><p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{moeda(valor)}</p>{subtitulo && <p className="mt-1 text-[10px] text-[var(--texto-3)]">{subtitulo}</p>}</div> }
+
+function DetalheDaPraca({ praca, incluirDigital }: { praca: DetalheFinanceiroDaPraca; incluirDigital: boolean }) {
+  const totalComercial = praca.midia_tv + praca.midia_digital + praca.simulcast
+  return (
+    <div className="rounded-[11px] border border-[var(--borda)] bg-white p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex h-7 min-w-9 items-center justify-center rounded-[8px] bg-[#F5F3FF] px-2 text-[11px] font-bold text-[var(--roxo)]">{praca.praca_codigo}</span>
+        <strong className="text-[12.5px] text-[var(--texto)]">{moeda(totalComercial)}</strong>
+      </div>
+      <div className="mt-2.5 grid gap-1 text-[10.5px] text-[var(--texto-2)]">
+        <ValorCompacto rotulo="Mídia TV" valor={praca.midia_tv} />
+        {incluirDigital && <ValorCompacto rotulo="Digital" valor={praca.midia_digital} />}
+        <ValorCompacto rotulo="Simulcast" valor={praca.simulcast} />
+        <ValorCompacto rotulo="Direitos TV" valor={praca.direitos_tv} />
+        {incluirDigital && <ValorCompacto rotulo="Direitos Digital" valor={praca.direitos_digital} />}
+      </div>
+    </div>
+  )
+}
+
+function ValorCompacto({ rotulo, valor }: { rotulo: string; valor: number }) {
+  return <div className="flex items-center justify-between gap-3"><span>{rotulo}</span><strong className="whitespace-nowrap text-[var(--texto)]">{moeda(valor)}</strong></div>
+}
 
 function ResultadoDaGeracao({ resultado }: { resultado: ResultadoGerarProposta }) {
   const sucessoPdf = resultado.pdfGerado
