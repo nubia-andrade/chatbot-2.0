@@ -13,6 +13,9 @@ export type EstadoDaConsulta = {
   cliente: Cliente | null
   programaId: string | null
   programaNome: string | null
+  /** Contexto livre informado pelo executivo antes do calendário. */
+  produto: string
+  objetivo: string
   modalidade: Modalidade
   ano: number
   mes: number
@@ -34,6 +37,8 @@ function estadoInicial(): EstadoDaConsulta {
     cliente: null,
     programaId: null,
     programaNome: null,
+    produto: '',
+    objetivo: '',
     modalidade: 'nacional',
     ano: agora.getFullYear(),
     mes: agora.getMonth() + 1,
@@ -126,7 +131,7 @@ export const PASSOS: { slug: string; rotulo: string }[] = [
 
 export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
   if (!estado.cliente) return 'cliente'
-  if (!estado.programaId) return 'programa'
+  if (!estado.programaId || estado.produto.trim() === '' || estado.objetivo.trim() === '') return 'programa'
   if (estado.itens.length === 0) return 'calendario'
   return 'resumo'
 }
