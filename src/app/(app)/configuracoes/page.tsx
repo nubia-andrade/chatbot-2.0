@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
+import { temPerfil } from '@/lib/dominio/perfis'
 
-type Secao = { href: string; titulo: string; descricao: string }
+type Secao = { href: string; titulo: string; descricao: string; somenteProprietario?: boolean }
 
 const SECOES: Secao[] = [
   {
@@ -9,6 +10,13 @@ const SECOES: Secao[] = [
     titulo: 'Programas',
     descricao:
       'Cadastro dos programas, suas regras comerciais e os apelidos que casam com o nome vindo da API.',
+  },
+  {
+    href: '/configuracoes/perfis',
+    titulo: 'Perfis e acessos',
+    descricao:
+      'Perfis dos usuários e vínculos dos consultores com os programas. Esses vínculos também definem quem recebe cada proposta.',
+    somenteProprietario: true,
   },
   {
     href: '/configuracoes/importacao',
@@ -53,6 +61,9 @@ export default async function PaginaConfiguracoes() {
     )
   }
 
+  const proprietario = Boolean(sessao && temPerfil(sessao.perfis, 'proprietario'))
+  const secoesVisiveis = SECOES.filter((secao) => !secao.somenteProprietario || proprietario)
+
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -68,7 +79,7 @@ export default async function PaginaConfiguracoes() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {SECOES.map((secao) => (
+        {secoesVisiveis.map((secao) => (
           <Link
             key={secao.href}
             href={secao.href}
