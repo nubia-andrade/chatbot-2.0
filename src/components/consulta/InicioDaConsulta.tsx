@@ -17,13 +17,14 @@ type Props = { programas: ProgramaDaConsulta[] }
 
 export function InicioDaConsulta({ programas }: Props) {
   const router = useRouter()
-  const { atualizar } = useConsulta()
+  const { estado, atualizar } = useConsulta()
   const [marca, setMarca] = useState<MarcaDaCarteira | null>(null)
   const [programaId, setProgramaId] = useState('')
   const programa = programas.find((item) => item.id === programaId) ?? null
+  const contextoCompleto = estado.produto.trim() !== '' && estado.objetivo.trim() !== ''
 
   function continuar() {
-    if (!marca || !programa) return
+    if (!marca || !programa || !contextoCompleto) return
 
     atualizar({
       marcaId: marca.marca_id,
@@ -38,6 +39,8 @@ export function InicioDaConsulta({ programas }: Props) {
       },
       programaId: programa.id,
       programaNome: programa.nome,
+      produto: estado.produto.trim(),
+      objetivo: estado.objetivo.trim(),
       modalidade: 'nacional',
       itens: [],
       incluirDigital: false,
@@ -58,7 +61,7 @@ export function InicioDaConsulta({ programas }: Props) {
         <span className="text-[12px] font-semibold text-[var(--texto-3)]">Início da consulta</span>
       </header>
 
-      <div className="grid min-h-[560px] lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid min-h-[620px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex flex-col gap-8 p-7 lg:border-r lg:border-[var(--borda)]">
           <div>
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Qual marca deseja consultar?</h2>
@@ -66,6 +69,7 @@ export function InicioDaConsulta({ programas }: Props) {
               aoEscolher={(novaMarca) => {
                 setMarca(novaMarca)
                 setProgramaId('')
+                atualizar({ produto: '', objetivo: '' })
               }}
             />
 
@@ -123,6 +127,45 @@ export function InicioDaConsulta({ programas }: Props) {
               Somente programas ativos e liberados para proposta aparecem aqui.
             </p>
           </div>
+
+          <div className={marca && programa ? '' : 'pointer-events-none opacity-45'}>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-[15px] font-bold text-[var(--texto)]">3. Informações da proposta</h2>
+                <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">Produto e objetivo são obrigatórios e acompanham a proposta até o histórico.</p>
+              </div>
+              <span className="text-[10.5px] font-semibold text-[var(--texto-3)]">Obrigatórios</span>
+            </div>
+
+            <div className="grid max-w-[700px] gap-4">
+              <label className="grid gap-1.5">
+                <span className="text-[11.5px] font-bold text-[var(--texto-2)]">Produto</span>
+                <input
+                  type="text"
+                  value={estado.produto}
+                  maxLength={120}
+                  onChange={(evento) => atualizar({ produto: evento.target.value })}
+                  placeholder="Ex.: Cartão de crédito, nova coleção, campanha de Black Friday"
+                  className="h-[44px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[13.5px] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+                />
+              </label>
+
+              <label className="grid gap-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11.5px] font-bold text-[var(--texto-2)]">Objetivo</span>
+                  <span className="text-[10px] text-[var(--texto-3)]">{estado.objetivo.length}/420</span>
+                </div>
+                <textarea
+                  value={estado.objetivo}
+                  maxLength={420}
+                  rows={4}
+                  onChange={(evento) => atualizar({ objetivo: evento.target.value })}
+                  placeholder="Descreva o objetivo da marca para esta proposta. Este texto aparecerá no slide comercial."
+                  className="resize-y rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 py-2.5 text-[13.5px] leading-[1.5] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+                />
+              </label>
+            </div>
+          </div>
         </div>
 
         <aside className="flex flex-col gap-5 bg-[var(--superficie-suave)] p-6">
@@ -140,6 +183,11 @@ export function InicioDaConsulta({ programas }: Props) {
             <div className="my-3 border-t border-[var(--borda)]" />
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Programa</p>
             <p className="mt-1 text-[13px] font-semibold">{programa?.nome ?? 'Ainda não selecionado'}</p>
+            <div className="my-3 border-t border-[var(--borda)]" />
+            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Produto</p>
+            <p className="mt-1 text-[12px] font-semibold">{estado.produto.trim() || 'Ainda não informado'}</p>
+            <p className="mt-3 text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Objetivo</p>
+            <p className="mt-1 line-clamp-4 text-[11px] leading-[1.45] text-[var(--texto-2)]">{estado.objetivo.trim() || 'Ainda não informado'}</p>
           </div>
 
           <div className="mt-auto">
@@ -148,7 +196,7 @@ export function InicioDaConsulta({ programas }: Props) {
             </div>
             <button
               type="button"
-              disabled={!marca || !programa}
+              disabled={!marca || !programa || !contextoCompleto}
               onClick={continuar}
               className="h-[48px] w-full rounded-[12px] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
               style={{ background: 'var(--marca)' }}
