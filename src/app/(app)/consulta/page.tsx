@@ -1,11 +1,19 @@
-import { redirect } from 'next/navigation'
+import { InicioDaConsulta } from '@/components/consulta/InicioDaConsulta'
+import { listarProgramas } from '@/lib/dados/programas'
 
-/**
- * `/consulta` não é mais uma tela própria — é a entrada do wizard de 7
- * passos (Task 9). Manda direto para o primeiro passo em vez de deixar a
- * rota sem conteúdo: a barra lateral (`BarraLateral.tsx`) aponta "Nova
- * consulta" para cá.
- */
-export default function PaginaConsulta() {
-  redirect('/consulta/cliente')
+export default async function PaginaConsulta() {
+  const programas = (await listarProgramas())
+    .filter(
+      (programa) =>
+        programa.estado === 'ativo' &&
+        programa.disponivel_para_proposta
+    )
+    .map((programa) => ({
+      id: programa.id,
+      nome: programa.nome,
+      canal: programa.canal,
+      aceita_regional: programa.aceita_regional,
+    }))
+
+  return <InicioDaConsulta programas={programas} />
 }
