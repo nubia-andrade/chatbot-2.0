@@ -15,6 +15,7 @@ export type LinhaFinanceiraDaProposta = {
   pracas: string[]
   periodo_especial_nome: string | null
   periodo_especial_percentual: number
+  periodo_especial_texto: string | null
   midia_tv: number
   midia_digital: number
   redes_sociais: number
@@ -100,6 +101,7 @@ function linhaNacional(
     pracas: [],
     periodo_especial_nome: periodo?.nome ?? null,
     periodo_especial_percentual: percentual,
+    periodo_especial_texto: periodo?.texto_investimento?.trim() || null,
     midia_tv: midiaTv,
     midia_digital: midiaDigital,
     redes_sociais: redesSociais,
@@ -167,6 +169,7 @@ function linhaRegional(
     pracas: [...item.pracas],
     periodo_especial_nome: periodo?.nome ?? null,
     periodo_especial_percentual: percentual,
+    periodo_especial_texto: periodo?.texto_investimento?.trim() || null,
     midia_tv: midiaTv,
     midia_digital: midiaDigital,
     redes_sociais: redesSociais,
