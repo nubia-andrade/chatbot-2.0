@@ -77,7 +77,7 @@ export async function corrigirRelacionamentoMarca(
       {
         cliente_id_override: clienteId,
         corrigido_em: new Date().toISOString(),
-        corrigido_por: sessao.usuario.id,
+        corrigido_por: sessao.usuarioId,
       },
       { count: 'exact' },
     )
