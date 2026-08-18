@@ -5,6 +5,7 @@ import { obterSessao } from '../sessao-servidor'
 import { obterPrograma } from '../dados/programas'
 import { listarDatasEspeciais } from '../dados/datas-especiais'
 import { listarPrecos } from '../dados/regional'
+import { carregarDisponibilidade } from '../dados/disponibilidade'
 import { calcularResumoFinanceiro, type ItemParaResumoFinanceiro } from '../dominio/resumo-financeiro'
 import { gravarConsulta } from './consultas'
 import { gerarPdfDaProposta } from '../propostas/pdf'
@@ -37,21 +38,71 @@ type DestinatarioRpc = {
   tipo: 'executivo' | 'consultor_programa'
 }
 
-export async function gerarProposta(entrada: EntradaGerarProposta): Promise<ResultadoGerarProposta> {
-  const sessao = await obterSessao()
-  if (!sessao) {
-    return {
-      propostaId: null,
-      consultaId: null,
-      pdfGerado: false,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: 'Sessão expirada. Entre de novo.',
+function resultadoFalha(erro: string, extras: Partial<ResultadoGerarProposta> = {}): ResultadoGerarProposta {
+  return {
+    propostaId: null,
+    consultaId: null,
+    pdfGerado: false,
+    emailEnviado: false,
+    emailConfigurado: emailMicrosoftConfigurado(),
+    destinatarios: [],
+    erro,
+    ...extras,
+  }
+}
+
+function mesesDaEntrada(itens: ItemParaResumoFinanceiro[]): { ano: number; mes: number; quantidade: number }[] {
+  const mapa = new Map<string, Set<string>>()
+  for (const item of itens) {
+    const chave = item.data.slice(0, 7)
+    const datas = mapa.get(chave) ?? new Set<string>()
+    datas.add(item.data)
+    mapa.set(chave, datas)
+  }
+  return [...mapa.entries()].map(([chave, datas]) => {
+    const [ano, mes] = chave.split('-').map(Number)
+    return { ano, mes, quantidade: datas.size }
+  })
+}
+
+async function validarLimiteMensal(entrada: EntradaGerarProposta): Promise<string | null> {
+  if (entrada.modalidade !== 'nacional') return null
+
+  for (const mes of mesesDaEntrada(entrada.itens)) {
+    const carga = await carregarDisponibilidade({
+      programaId: entrada.programaId,
+      clienteId: entrada.clienteId,
+      modalidade: entrada.modalidade,
+      ano: mes.ano,
+      mes: mes.mes,
+    })
+    if (carga.erro) return carga.erro
+    if (carga.limiteMensal > 0 && carga.acoesDoAnuncianteNoMes + mes.quantidade > carga.limiteMensal) {
+      return `O anunciante ultrapassaria o limite de ${carga.limiteMensal} ações no programa em ${String(mes.mes).padStart(2, '0')}/${mes.ano}.`
     }
   }
 
-  // Primeiro portão: revalidação e gravação do retrato da consulta.
+  return null
+}
+
+function escaparHtml(valor: string): string {
+  return valor
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+export async function gerarProposta(entrada: EntradaGerarProposta): Promise<ResultadoGerarProposta> {
+  const sessao = await obterSessao()
+  if (!sessao) return resultadoFalha('Sessão expirada. Entre de novo.')
+  if (entrada.itens.length === 0) return resultadoFalha('Selecione ao menos uma data para gerar a proposta.')
+
+  const erroLimite = await validarLimiteMensal(entrada)
+  if (erroLimite) return resultadoFalha(erroLimite)
+
+  // Segundo portão: revalidação de datas/concorrência e gravação do retrato.
   const consulta = await gravarConsulta({
     clienteId: entrada.clienteId,
     programaId: entrada.programaId,
@@ -60,29 +111,13 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   })
 
   if (!consulta.id || consulta.erros.length > 0) {
-    return {
-      propostaId: null,
-      consultaId: null,
-      pdfGerado: false,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: consulta.erros[0] ?? 'Não foi possível validar a consulta antes da proposta.',
-    }
+    return resultadoFalha(
+      consulta.erros[0] ?? 'Não foi possível validar a consulta antes da proposta.',
+    )
   }
 
   const programa = await obterPrograma(entrada.programaId)
-  if (!programa) {
-    return {
-      propostaId: null,
-      consultaId: consulta.id,
-      pdfGerado: false,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: 'Programa não encontrado.',
-    }
-  }
+  if (!programa) return resultadoFalha('Programa não encontrado.', { consultaId: consulta.id })
 
   const [periodosEspeciais, precosRegionais] = await Promise.all([
     listarDatasEspeciais(entrada.programaId),
@@ -127,15 +162,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
 
   if (erroProposta || !proposta?.id) {
     console.error('Falha ao criar proposta:', erroProposta?.message)
-    return {
-      propostaId: null,
-      consultaId: consulta.id,
-      pdfGerado: false,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: 'Não foi possível criar a proposta.',
-    }
+    return resultadoFalha('Não foi possível criar a proposta.', { consultaId: consulta.id })
   }
 
   const propostaId = proposta.id as string
@@ -165,15 +192,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : 'Falha ao gerar o PDF.'
     await supabase.from('propostas').update({ status: 'falha', erro: mensagem }).eq('id', propostaId)
-    return {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: false,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: mensagem,
-    }
+    return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id })
   }
 
   const { data: destinatariosRpc, error: erroDestinatarios } = await supabase.rpc('destinatarios_da_proposta', {
@@ -183,15 +202,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   if (erroDestinatarios) {
     const mensagem = 'PDF gerado, mas não foi possível resolver os destinatários.'
     await supabase.from('propostas').update({ status: 'falha', erro: mensagem }).eq('id', propostaId)
-    return {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: true,
-      emailEnviado: false,
-      emailConfigurado: emailMicrosoftConfigurado(),
-      destinatarios: [],
-      erro: mensagem,
-    }
+    return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id, pdfGerado: true })
   }
 
   const destinatarios = ((destinatariosRpc ?? []) as DestinatarioRpc[])
@@ -227,15 +238,12 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   if (destinatarios.length === 0) {
     const mensagem = 'PDF gerado, mas não há destinatários com e-mail para este programa.'
     await supabase.from('propostas').update({ status: 'gerada', erro: mensagem }).eq('id', propostaId)
-    return {
+    return resultadoFalha(mensagem, {
       propostaId,
       consultaId: consulta.id,
       pdfGerado: true,
-      emailEnviado: false,
       emailConfigurado: true,
-      destinatarios: [],
-      erro: mensagem,
-    }
+    })
   }
 
   try {
@@ -246,7 +254,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       assunto: `Proposta ${entrada.marcaNome ?? entrada.clienteNome} · ${entrada.programaNome}`,
       html: `
         <p>Olá,</p>
-        <p>Uma nova proposta foi gerada para <strong>${entrada.marcaNome ?? entrada.clienteNome}</strong> no programa <strong>${entrada.programaNome}</strong>.</p>
+        <p>Uma nova proposta foi gerada para <strong>${escaparHtml(entrada.marcaNome ?? entrada.clienteNome)}</strong> no programa <strong>${escaparHtml(entrada.programaNome)}</strong>.</p>
         <p>Total comercial: <strong>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.total_comercial)}</strong>.</p>
         <p>O PDF da proposta segue em anexo.</p>
       `,
