@@ -22,6 +22,8 @@ export function InicioDaConsulta({ programas }: Props) {
   const [programaId, setProgramaId] = useState('')
   const programa = programas.find((item) => item.id === programaId) ?? null
   const contextoCompleto = estado.produto.trim() !== '' && estado.objetivo.trim() !== ''
+  const regionalDisponivel = Boolean(programa?.aceita_regional && marca?.apto_regional)
+  const modalidade = regionalDisponivel && estado.modalidade === 'regional' ? 'regional' : 'nacional'
 
   function continuar() {
     if (!marca || !programa || !contextoCompleto) return
@@ -41,7 +43,7 @@ export function InicioDaConsulta({ programas }: Props) {
       programaNome: programa.nome,
       produto: estado.produto.trim(),
       objetivo: estado.objetivo.trim(),
-      modalidade: 'nacional',
+      modalidade,
       itens: [],
       incluirDigital: false,
       incluirRedesSociais: false,
@@ -56,7 +58,7 @@ export function InicioDaConsulta({ programas }: Props) {
       <header className="flex items-center justify-between border-b border-[var(--borda)] px-7 py-5">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--roxo)]">Nova consulta</p>
-          <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Marca e programa</h1>
+          <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Cliente, marca e programa</h1>
         </div>
         <span className="text-[12px] font-semibold text-[var(--texto-3)]">Início da consulta</span>
       </header>
@@ -64,12 +66,12 @@ export function InicioDaConsulta({ programas }: Props) {
       <div className="grid min-h-[620px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex flex-col gap-8 p-7 lg:border-r lg:border-[var(--borda)]">
           <div>
-            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Qual marca deseja consultar?</h2>
+            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Qual cliente ou marca deseja consultar?</h2>
             <CampoDeBuscaDeMarca
               aoEscolher={(novaMarca) => {
                 setMarca(novaMarca)
                 setProgramaId('')
-                atualizar({ produto: '', objetivo: '' })
+                atualizar({ produto: '', objetivo: '', modalidade: 'nacional' })
               }}
             />
 
@@ -77,8 +79,13 @@ export function InicioDaConsulta({ programas }: Props) {
               <div className="mt-4 rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca selecionada</p>
-                    <p className="mt-1 text-[16px] font-bold text-[var(--texto)]">{marca.marca_nome}</p>
+                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante selecionado</p>
+                    <p className="mt-1 text-[16px] font-bold text-[var(--texto)]">{marca.cliente_nome}</p>
+                    {marca.marca_nome && (
+                      <p className="mt-1 text-[12px] text-[var(--texto-2)]">
+                        Marca: <strong>{marca.marca_nome}</strong>
+                      </p>
+                    )}
                   </div>
                   <span
                     className="rounded-full px-3 py-1 text-[11px] font-bold"
@@ -91,11 +98,7 @@ export function InicioDaConsulta({ programas }: Props) {
                   </span>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante</p>
-                    <p className="mt-1 text-[13px] font-semibold">{marca.cliente_nome}</p>
-                  </div>
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Setor</p>
                     <p className="mt-1 text-[13px] font-semibold">{marca.setor ?? 'Não informado'}</p>
@@ -113,19 +116,47 @@ export function InicioDaConsulta({ programas }: Props) {
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">2. Escolha o programa</h2>
             <select
               value={programaId}
-              onChange={(evento) => setProgramaId(evento.target.value)}
+              onChange={(evento) => {
+                setProgramaId(evento.target.value)
+                atualizar({ modalidade: 'nacional', itens: [] })
+              }}
               className="h-[44px] w-full max-w-[520px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
             >
               <option value="">Selecione um programa</option>
               {programas.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.nome} · {item.canal}{item.aceita_regional ? ' · Regional' : ''}
+                  {item.nome} · {item.canal}
                 </option>
               ))}
             </select>
             <p className="mt-2 text-[11.5px] text-[var(--texto-3)]">
               Somente programas ativos e liberados para proposta aparecem aqui.
             </p>
+
+            {programa?.aceita_regional && (
+              <div className="mt-4 max-w-[520px] rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4">
+                <label className={`flex items-start gap-3 ${marca?.apto_regional ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <input
+                    type="checkbox"
+                    checked={modalidade === 'regional'}
+                    disabled={!marca?.apto_regional}
+                    onChange={(evento) => atualizar({
+                      modalidade: evento.target.checked ? 'regional' : 'nacional',
+                      itens: [],
+                    })}
+                    className="mt-0.5 h-4 w-4 accent-[#A031F5]"
+                  />
+                  <span>
+                    <span className="block text-[12.5px] font-bold text-[var(--texto)]">Ação regional</span>
+                    <span className="mt-0.5 block text-[11px] leading-[1.45] text-[var(--texto-3)]">
+                      {marca?.apto_regional
+                        ? 'Opcional. Desmarcado, a proposta segue como Nacional. Marcado, o calendário e os preços usam as regras regionais.'
+                        : 'Este programa aceita Regional, mas o anunciante selecionado não está elegível para proposta regional.'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
 
           <div className={marca && programa ? '' : 'pointer-events-none opacity-45'}>
@@ -172,17 +203,27 @@ export function InicioDaConsulta({ programas }: Props) {
           <div>
             <h2 className="text-[14px] font-bold text-[var(--texto)]">Resumo da consulta</h2>
             <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--texto-3)]">
-              A marca identifica o anunciante oficial da carteira. Setor e indústria desse anunciante alimentam as regras de concorrência do calendário.
+              O cliente vem da carteira do executivo. Quando houver uma marca conhecida, ela também acompanha a proposta. Setor e indústria alimentam as regras de concorrência do calendário.
             </p>
           </div>
 
           <div className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-4">
-            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca</p>
-            <p className="mt-1 text-[13px] font-semibold">{marca?.marca_nome ?? 'Ainda não selecionada'}</p>
-            {marca && <p className="mt-1 text-[11px] text-[var(--texto-3)]">{marca.cliente_nome}</p>}
+            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante</p>
+            <p className="mt-1 text-[13px] font-semibold">{marca?.cliente_nome ?? 'Ainda não selecionado'}</p>
+            {marca?.marca_nome && (
+              <>
+                <p className="mt-3 text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca</p>
+                <p className="mt-1 text-[12px] font-semibold">{marca.marca_nome}</p>
+              </>
+            )}
             <div className="my-3 border-t border-[var(--borda)]" />
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Programa</p>
             <p className="mt-1 text-[13px] font-semibold">{programa?.nome ?? 'Ainda não selecionado'}</p>
+            {programa && (
+              <p className="mt-1 text-[11px] font-semibold text-[var(--texto-3)]">
+                Modalidade: {modalidade === 'regional' ? 'Regional' : 'Nacional'}
+              </p>
+            )}
             <div className="my-3 border-t border-[var(--borda)]" />
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Produto</p>
             <p className="mt-1 text-[12px] font-semibold">{estado.produto.trim() || 'Ainda não informado'}</p>
