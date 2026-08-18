@@ -97,20 +97,34 @@ export function EditorDeModeloDeProposta({
 
   async function adicionar(arquivos: File[]) {
     if (!secaoParaUpload || arquivos.length === 0) return
+    const secao = secaoParaUpload
     setOcupado(true)
     setErro(null)
 
-    const formulario = new FormData()
-    arquivos.forEach((arquivo) => formulario.append('arquivos', arquivo))
-    const resultado = await adicionarSlidesAoModelo(programaId, secaoParaUpload.id, formulario)
+    // A seleção continua múltipla para o usuário, mas cada imagem é enviada
+    // em uma Server Action própria. Assim o tamanho total de 6, 10 ou mais
+    // slides não precisa caber em um único corpo de requisição.
+    for (let indice = 0; indice < arquivos.length; indice += 1) {
+      const arquivo = arquivos[indice]
+      const formulario = new FormData()
+      formulario.append('arquivos', arquivo)
+      const resultado = await adicionarSlidesAoModelo(programaId, secao.id, formulario)
+
+      if (resultado.erro) {
+        setOcupado(false)
+        if (input.current) input.current.value = ''
+        setErro(
+          arquivos.length > 1
+            ? `Falha no arquivo ${indice + 1} de ${arquivos.length} (“${arquivo.name}”): ${resultado.erro}`
+            : resultado.erro,
+        )
+        router.refresh()
+        return
+      }
+    }
 
     setOcupado(false)
     if (input.current) input.current.value = ''
-    if (resultado.erro) {
-      setErro(resultado.erro)
-      return
-    }
-
     setSecaoParaUpload(null)
     router.refresh()
   }
