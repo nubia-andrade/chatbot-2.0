@@ -1,10 +1,19 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib'
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  type PDFFont,
+  type PDFPage,
+} from 'pdf-lib'
 import type { ResumoFinanceiroDaProposta } from '../dominio/resumo-financeiro'
-import type { SlideDoModeloDeProposta } from '../dados/modelo-proposta'
+import {
+  slidesDaSecao,
+  type SlideDoModeloDeProposta,
+} from '../dados/modelo-proposta'
 
 const LARGURA = 960
 const ALTURA = 540
-const MARGEM = 48
+const MARGEM = 44
 
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -17,30 +26,32 @@ function dataBr(dataIso: string): string {
 
 function cortar(texto: string, maximo: number): string {
   if (texto.length <= maximo) return texto
-  return `${texto.slice(0, Math.max(0, maximo - 1))}…`
+  return `${texto.slice(0, Math.max(0, maximo - 3))}...`
+}
+
+async function carregarImagemDoSlide(pdf: PDFDocument, slide: SlideDoModeloDeProposta) {
+  let resposta: Response
+  try {
+    resposta = await fetch(slide.imagem_url, { cache: 'no-store' })
+  } catch {
+    throw new Error('Não foi possível carregar uma imagem do modelo de proposta.')
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível carregar uma imagem do modelo de proposta.')
+  }
+
+  const bytes = new Uint8Array(await resposta.arrayBuffer())
+  const tipo = resposta.headers.get('content-type')?.toLowerCase() ?? ''
+  return tipo.includes('png') || slide.imagem_url.toLowerCase().includes('.png')
+    ? pdf.embedPng(bytes)
+    : pdf.embedJpg(bytes)
 }
 
 async function adicionarSlideImagem(
   pdf: PDFDocument,
   slide: SlideDoModeloDeProposta,
-  indice: number,
-): Promise<void> {
-  let resposta: Response
-  try {
-    resposta = await fetch(slide.imagem_url, { cache: 'no-store' })
-  } catch {
-    throw new Error(`Não foi possível carregar a imagem do slide ${indice + 1}.`)
-  }
-  if (!resposta.ok) {
-    throw new Error(`Não foi possível carregar a imagem do slide ${indice + 1}.`)
-  }
-
-  const bytes = new Uint8Array(await resposta.arrayBuffer())
-  const tipo = resposta.headers.get('content-type')?.toLowerCase() ?? ''
-  const imagem = tipo.includes('png') || slide.imagem_url.toLowerCase().includes('.png')
-    ? await pdf.embedPng(bytes)
-    : await pdf.embedJpg(bytes)
-
+): Promise<PDFPage> {
+  const imagem = await carregarImagemDoSlide(pdf, slide)
   const pagina = pdf.addPage([LARGURA, ALTURA])
   pagina.drawRectangle({ x: 0, y: 0, width: LARGURA, height: ALTURA, color: rgb(1, 1, 1) })
 
@@ -53,76 +64,38 @@ async function adicionarSlideImagem(
     width: largura,
     height: altura,
   })
+
+  return pagina
 }
 
-function titulo(
-  pagina: ReturnType<PDFDocument['addPage']>,
-  negrito: PDFFont,
-  texto: string,
-  subtitulo?: string,
-) {
-  pagina.drawText(texto, {
-    x: MARGEM,
-    y: ALTURA - 72,
-    size: 25,
-    font: negrito,
-    color: rgb(0.14, 0.1, 0.22),
-  })
-  if (subtitulo) {
-    pagina.drawText(subtitulo, {
-      x: MARGEM,
-      y: ALTURA - 94,
-      size: 10,
-      font: negrito,
-      color: rgb(0.46, 0.36, 0.72),
-    })
+async function novaPaginaDeValor(
+  pdf: PDFDocument,
+  fundo: SlideDoModeloDeProposta | undefined,
+): Promise<PDFPage> {
+  const pagina = fundo
+    ? await adicionarSlideImagem(pdf, fundo)
+    : pdf.addPage([LARGURA, ALTURA])
+
+  if (!fundo) {
+    pagina.drawRectangle({ x: 0, y: 0, width: LARGURA, height: ALTURA, color: rgb(1, 1, 1) })
   }
-  pagina.drawRectangle({
-    x: MARGEM,
-    y: ALTURA - 108,
-    width: 54,
-    height: 4,
-    color: rgb(0.48, 0.18, 0.95),
-  })
-}
 
-function etiqueta(
-  pagina: ReturnType<PDFDocument['addPage']>,
-  fonte: PDFFont,
-  negrito: PDFFont,
-  x: number,
-  y: number,
-  rotulo: string,
-  valor: string,
-  largura = 190,
-) {
   pagina.drawRectangle({
-    x,
-    y: y - 50,
-    width: largura,
-    height: 50,
-    color: rgb(0.975, 0.97, 0.99),
+    x: 30,
+    y: 28,
+    width: LARGURA - 60,
+    height: ALTURA - 56,
+    color: rgb(1, 1, 1),
+    opacity: fundo ? 0.94 : 1,
     borderColor: rgb(0.9, 0.88, 0.94),
-    borderWidth: 1,
+    borderWidth: fundo ? 1 : 0,
   })
-  pagina.drawText(rotulo.toUpperCase(), {
-    x: x + 12,
-    y: y - 17,
-    size: 7.5,
-    font: negrito,
-    color: rgb(0.47, 0.44, 0.53),
-  })
-  pagina.drawText(cortar(valor, 34), {
-    x: x + 12,
-    y: y - 36,
-    size: 10.5,
-    font: fonte,
-    color: rgb(0.14, 0.1, 0.22),
-  })
+
+  return pagina
 }
 
-function adicionarPaginaDeDatas(params: {
-  pdf: PDFDocument
+function escreverCabecalhoValor(params: {
+  pagina: PDFPage
   fonte: PDFFont
   negrito: PDFFont
   marcaNome: string | null
@@ -130,113 +103,204 @@ function adicionarPaginaDeDatas(params: {
   programaNome: string
   modalidade: 'nacional' | 'regional'
   resumo: ResumoFinanceiroDaProposta
-  inicio: number
-  fim: number
-  numero: number
+  paginaAtual: number
   totalPaginas: number
 }) {
-  const pagina = params.pdf.addPage([LARGURA, ALTURA])
-  pagina.drawRectangle({ x: 0, y: 0, width: LARGURA, height: ALTURA, color: rgb(1, 1, 1) })
-  titulo(
-    pagina,
-    params.negrito,
-    params.numero === 1 ? 'Resumo da proposta' : 'Datas da proposta',
-    `${params.programaNome} · ${params.modalidade === 'regional' ? 'Regional' : 'Nacional'}`,
+  const { pagina, fonte, negrito } = params
+
+  pagina.drawText('RESUMO COMERCIAL', {
+    x: MARGEM,
+    y: 466,
+    size: 10,
+    font: negrito,
+    color: rgb(0.48, 0.18, 0.95),
+  })
+  pagina.drawText(cortar(params.marcaNome ?? params.clienteNome, 46), {
+    x: MARGEM,
+    y: 435,
+    size: 22,
+    font: negrito,
+    color: rgb(0.14, 0.1, 0.22),
+  })
+  pagina.drawText(
+    cortar(`${params.programaNome} - ${params.modalidade === 'regional' ? 'Regional' : 'Nacional'}`, 70),
+    { x: MARGEM, y: 414, size: 10, font: fonte, color: rgb(0.45, 0.42, 0.5) },
   )
 
-  if (params.numero === 1) {
-    etiqueta(pagina, params.fonte, params.negrito, MARGEM, 390, 'Marca', params.marcaNome ?? '—', 250)
-    etiqueta(pagina, params.fonte, params.negrito, 314, 390, 'Anunciante', params.clienteNome, 250)
-    etiqueta(pagina, params.fonte, params.negrito, 580, 390, 'Entregas adicionais', [
-      params.resumo.incluir_digital ? 'Digital' : null,
-      params.resumo.incluir_redes_sociais ? 'Redes sociais' : null,
-    ].filter(Boolean).join(' + ') || 'Somente TV', 300)
-  }
+  const adicionais = [
+    params.resumo.incluir_digital ? 'Digital' : null,
+    params.resumo.incluir_redes_sociais ? 'Redes sociais' : null,
+  ].filter(Boolean).join(' + ') || 'TV'
 
-  const topoTabela = params.numero === 1 ? 315 : 390
-  const linhas = params.resumo.linhas.slice(params.inicio, params.fim)
-  pagina.drawRectangle({
-    x: MARGEM,
-    y: topoTabela - 30,
-    width: LARGURA - MARGEM * 2,
-    height: 30,
-    color: rgb(0.16, 0.13, 0.21),
+  pagina.drawText(`Entregas: ${adicionais}`, {
+    x: 650,
+    y: 442,
+    size: 9,
+    font: negrito,
+    color: rgb(0.35, 0.31, 0.4),
   })
-
-  const colunas = [MARGEM + 12, 190, 360, 500, 650, 805]
-  const cabecalhos = ['Data', 'TV', 'Digital / Redes', 'Simulcast', 'Produção + Direitos', 'Total comercial']
-  cabecalhos.forEach((cabecalho, i) => {
-    pagina.drawText(cabecalho, { x: colunas[i], y: topoTabela - 20, size: 8, font: params.negrito, color: rgb(1, 1, 1) })
-  })
-
-  linhas.forEach((linha, i) => {
-    const y = topoTabela - 30 - (i + 1) * 48
-    if (i % 2 === 0) {
-      pagina.drawRectangle({ x: MARGEM, y, width: LARGURA - MARGEM * 2, height: 48, color: rgb(0.985, 0.982, 0.992) })
-    }
-    pagina.drawText(dataBr(linha.data), { x: colunas[0], y: y + 27, size: 9, font: params.negrito, color: rgb(0.14, 0.1, 0.22) })
-    if (linha.periodo_especial_nome) {
-      pagina.drawText(cortar(`${linha.periodo_especial_nome} +${linha.periodo_especial_percentual}%`, 24), { x: colunas[0], y: y + 13, size: 7, font: params.fonte, color: rgb(0.48, 0.18, 0.95) })
-    }
-    pagina.drawText(moeda(linha.midia_tv), { x: colunas[1], y: y + 23, size: 8.5, font: params.fonte, color: rgb(0.14, 0.1, 0.22) })
-    const adicionais = [
-      params.resumo.incluir_digital ? `Dig. ${moeda(linha.midia_digital)}` : null,
-      params.resumo.incluir_redes_sociais ? `Redes ${moeda(linha.redes_sociais)}` : null,
-    ].filter(Boolean)
-    pagina.drawText(cortar(adicionais.join(' | ') || '—', 34), { x: colunas[2], y: y + 23, size: 8, font: params.fonte, color: rgb(0.14, 0.1, 0.22) })
-    pagina.drawText(moeda(linha.simulcast), { x: colunas[3], y: y + 23, size: 8.5, font: params.fonte, color: rgb(0.14, 0.1, 0.22) })
-    pagina.drawText(cortar(`${moeda(linha.producao)} + ${moeda(linha.direitos_total)}`, 25), { x: colunas[4], y: y + 23, size: 8, font: params.fonte, color: rgb(0.14, 0.1, 0.22) })
-    pagina.drawText(moeda(linha.total_comercial), { x: colunas[5], y: y + 23, size: 8.5, font: params.negrito, color: rgb(0.14, 0.1, 0.22) })
-  })
-
-  pagina.drawText(`${params.numero}/${params.totalPaginas}`, {
-    x: LARGURA - 75,
-    y: 24,
+  pagina.drawText(`Página ${params.paginaAtual}/${params.totalPaginas}`, {
+    x: 780,
+    y: 414,
     size: 8,
-    font: params.fonte,
+    font: fonte,
     color: rgb(0.55, 0.52, 0.6),
   })
 }
 
-function adicionarPaginaFinanceira(params: {
-  pdf: PDFDocument
+function escreverTabelaDeDatas(params: {
+  pagina: PDFPage
   fonte: PDFFont
   negrito: PDFFont
   resumo: ResumoFinanceiroDaProposta
-  propostaId: string
+  inicio: number
+  fim: number
 }) {
-  const pagina = params.pdf.addPage([LARGURA, ALTURA])
-  pagina.drawRectangle({ x: 0, y: 0, width: LARGURA, height: ALTURA, color: rgb(1, 1, 1) })
-  titulo(pagina, params.negrito, 'Investimento', `Proposta ${params.propostaId.slice(0, 8).toUpperCase()}`)
+  const { pagina, fonte, negrito, resumo } = params
+  const linhas = resumo.linhas.slice(params.inicio, params.fim)
+  const topo = 382
+  const alturaCabecalho = 26
+  const alturaLinha = 28
+  const colunas = [MARGEM + 8, 158, 285, 416, 548, 682, 814]
+  const cabecalhos = ['Data', 'TV', 'Digital', 'Redes', 'Simulcast', 'Prod. + Direitos', 'Total comercial']
 
-  const cards: Array<[string, number]> = [
-    ['Mídia TV', params.resumo.midia_tv],
-    ['Simulcast', params.resumo.simulcast],
-  ]
-  if (params.resumo.incluir_digital) cards.splice(1, 0, ['Mídia Digital', params.resumo.midia_digital])
-  if (params.resumo.incluir_redes_sociais) cards.splice(cards.length - 1, 0, ['Redes sociais', params.resumo.redes_sociais])
-
-  const larguraCard = 200
-  cards.slice(0, 4).forEach(([rotulo, valor], indice) => {
-    const x = MARGEM + indice * 214
-    pagina.drawRectangle({ x, y: 338, width: larguraCard, height: 72, color: rgb(0.975, 0.97, 0.99), borderColor: rgb(0.9, 0.88, 0.94), borderWidth: 1 })
-    pagina.drawText(rotulo.toUpperCase(), { x: x + 14, y: 385, size: 8, font: params.negrito, color: rgb(0.47, 0.44, 0.53) })
-    pagina.drawText(moeda(valor), { x: x + 14, y: 358, size: 15, font: params.negrito, color: rgb(0.14, 0.1, 0.22) })
+  pagina.drawRectangle({
+    x: MARGEM,
+    y: topo - alturaCabecalho,
+    width: LARGURA - MARGEM * 2,
+    height: alturaCabecalho,
+    color: rgb(0.15, 0.12, 0.2),
   })
 
-  pagina.drawRectangle({ x: MARGEM, y: 252, width: LARGURA - MARGEM * 2, height: 64, color: rgb(0.95, 0.925, 1) })
-  pagina.drawText('TOTAL COMERCIAL', { x: MARGEM + 18, y: 278, size: 10, font: params.negrito, color: rgb(0.35, 0.17, 0.68) })
-  const total = moeda(params.resumo.total_comercial)
-  pagina.drawText(total, { x: LARGURA - MARGEM - 18 - params.negrito.widthOfTextAtSize(total, 22), y: 270, size: 22, font: params.negrito, color: rgb(0.48, 0.18, 0.95) })
+  cabecalhos.forEach((texto, indice) => {
+    pagina.drawText(texto, {
+      x: colunas[indice],
+      y: topo - 17,
+      size: 7.2,
+      font: negrito,
+      color: rgb(1, 1, 1),
+    })
+  })
 
-  etiqueta(pagina, params.fonte, params.negrito, MARGEM, 218, 'Produção TV', moeda(params.resumo.producao_tv), 200)
-  etiqueta(pagina, params.fonte, params.negrito, 262, 218, 'Produção Digital', params.resumo.incluir_digital ? moeda(params.resumo.producao_digital) : 'Não incluída', 200)
-  etiqueta(pagina, params.fonte, params.negrito, 476, 218, 'Produção Redes', params.resumo.incluir_redes_sociais ? moeda(params.resumo.producao_redes_sociais) : 'Não incluída', 200)
-  etiqueta(pagina, params.fonte, params.negrito, 690, 218, 'Direitos e conexos', moeda(params.resumo.direitos_total), 202)
+  linhas.forEach((linha, indice) => {
+    const y = topo - alturaCabecalho - (indice + 1) * alturaLinha
+    if (indice % 2 === 0) {
+      pagina.drawRectangle({
+        x: MARGEM,
+        y,
+        width: LARGURA - MARGEM * 2,
+        height: alturaLinha,
+        color: rgb(0.982, 0.978, 0.99),
+      })
+    }
 
-  pagina.drawText('Total geral para registro', { x: MARGEM, y: 96, size: 9, font: params.fonte, color: rgb(0.48, 0.46, 0.53) })
-  pagina.drawText(moeda(params.resumo.total_geral), { x: MARGEM, y: 65, size: 18, font: params.negrito, color: rgb(0.14, 0.1, 0.22) })
-  pagina.drawText('Produção e Direitos/Conexos são apresentados separadamente do Total Comercial.', { x: MARGEM, y: 38, size: 8, font: params.fonte, color: rgb(0.55, 0.52, 0.6) })
+    const textoData = linha.periodo_especial_nome
+      ? `${dataBr(linha.data)} *`
+      : dataBr(linha.data)
+
+    pagina.drawText(textoData, { x: colunas[0], y: y + 10, size: 7.8, font: negrito, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(moeda(linha.midia_tv), { x: colunas[1], y: y + 10, size: 7.4, font: fonte, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(resumo.incluir_digital ? moeda(linha.midia_digital) : '-', { x: colunas[2], y: y + 10, size: 7.4, font: fonte, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(resumo.incluir_redes_sociais ? moeda(linha.redes_sociais) : '-', { x: colunas[3], y: y + 10, size: 7.4, font: fonte, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(moeda(linha.simulcast), { x: colunas[4], y: y + 10, size: 7.4, font: fonte, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(cortar(`${moeda(linha.producao)} + ${moeda(linha.direitos_total)}`, 28), { x: colunas[5], y: y + 10, size: 7.1, font: fonte, color: rgb(0.14, 0.1, 0.22) })
+    pagina.drawText(moeda(linha.total_comercial), { x: colunas[6], y: y + 10, size: 7.4, font: negrito, color: rgb(0.14, 0.1, 0.22) })
+  })
+
+  const especiais = linhas.filter((linha) => linha.periodo_especial_nome)
+  if (especiais.length > 0) {
+    const descricoes = [...new Set(especiais.map((linha) => `${linha.periodo_especial_nome} +${linha.periodo_especial_percentual}%`))]
+    pagina.drawText(`* ${cortar(descricoes.join(' | '), 110)}`, {
+      x: MARGEM,
+      y: 113,
+      size: 7,
+      font: fonte,
+      color: rgb(0.48, 0.18, 0.95),
+    })
+  }
+}
+
+function escreverTotais(params: {
+  pagina: PDFPage
+  fonte: PDFFont
+  negrito: PDFFont
+  resumo: ResumoFinanceiroDaProposta
+}) {
+  const { pagina, fonte, negrito, resumo } = params
+
+  pagina.drawRectangle({
+    x: MARGEM,
+    y: 56,
+    width: 508,
+    height: 46,
+    color: rgb(0.95, 0.93, 1),
+  })
+  pagina.drawText('TOTAL COMERCIAL', {
+    x: MARGEM + 14,
+    y: 83,
+    size: 8.5,
+    font: negrito,
+    color: rgb(0.35, 0.17, 0.68),
+  })
+  pagina.drawText(moeda(resumo.total_comercial), {
+    x: MARGEM + 14,
+    y: 65,
+    size: 16,
+    font: negrito,
+    color: rgb(0.48, 0.18, 0.95),
+  })
+
+  const x = 570
+  pagina.drawText(`Produção: ${moeda(resumo.producao)}`, { x, y: 89, size: 8.3, font: fonte, color: rgb(0.35, 0.31, 0.4) })
+  pagina.drawText(`Direitos e conexos: ${moeda(resumo.direitos_total)}`, { x, y: 73, size: 8.3, font: fonte, color: rgb(0.35, 0.31, 0.4) })
+  pagina.drawText(`Total geral: ${moeda(resumo.total_geral)}`, { x, y: 56, size: 9.2, font: negrito, color: rgb(0.14, 0.1, 0.22) })
+}
+
+async function adicionarResumoComercial(params: {
+  pdf: PDFDocument
+  fonte: PDFFont
+  negrito: PDFFont
+  fundo?: SlideDoModeloDeProposta
+  marcaNome: string | null
+  clienteNome: string
+  programaNome: string
+  modalidade: 'nacional' | 'regional'
+  resumo: ResumoFinanceiroDaProposta
+}) {
+  const porPagina = 8
+  const totalPaginas = Math.max(1, Math.ceil(params.resumo.linhas.length / porPagina))
+
+  for (let indice = 0; indice < totalPaginas; indice += 1) {
+    const pagina = await novaPaginaDeValor(params.pdf, params.fundo)
+    escreverCabecalhoValor({
+      pagina,
+      fonte: params.fonte,
+      negrito: params.negrito,
+      marcaNome: params.marcaNome,
+      clienteNome: params.clienteNome,
+      programaNome: params.programaNome,
+      modalidade: params.modalidade,
+      resumo: params.resumo,
+      paginaAtual: indice + 1,
+      totalPaginas,
+    })
+    escreverTabelaDeDatas({
+      pagina,
+      fonte: params.fonte,
+      negrito: params.negrito,
+      resumo: params.resumo,
+      inicio: indice * porPagina,
+      fim: (indice + 1) * porPagina,
+    })
+    escreverTotais({ pagina, fonte: params.fonte, negrito: params.negrito, resumo: params.resumo })
+  }
+}
+
+async function adicionarSlides(
+  pdf: PDFDocument,
+  slides: SlideDoModeloDeProposta[],
+) {
+  for (const slide of slides) await adicionarSlideImagem(pdf, slide)
 }
 
 export async function gerarPdfDaProposta(params: {
@@ -247,34 +311,55 @@ export async function gerarPdfDaProposta(params: {
   modalidade: 'nacional' | 'regional'
   resumo: ResumoFinanceiroDaProposta
   slides?: SlideDoModeloDeProposta[]
+  modoTeste?: boolean
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   const fonte = await pdf.embedFont(StandardFonts.Helvetica)
   const negrito = await pdf.embedFont(StandardFonts.HelveticaBold)
+  const slides = params.slides ?? []
 
-  for (let i = 0; i < (params.slides ?? []).length; i += 1) {
-    await adicionarSlideImagem(pdf, params.slides![i], i)
+  await adicionarSlides(pdf, slidesDaSecao(slides, 'capa'))
+  await adicionarSlides(pdf, slidesDaSecao(slides, 'conteudo'))
+
+  if (params.resumo.incluir_digital) {
+    await adicionarSlides(pdf, slidesDaSecao(slides, 'digital'))
   }
 
-  const porPagina = 5
-  const paginasDeDatas = Math.max(1, Math.ceil(params.resumo.linhas.length / porPagina))
-  for (let pagina = 0; pagina < paginasDeDatas; pagina += 1) {
-    adicionarPaginaDeDatas({
-      pdf,
-      fonte,
-      negrito,
-      marcaNome: params.marcaNome,
-      clienteNome: params.clienteNome,
-      programaNome: params.programaNome,
-      modalidade: params.modalidade,
-      resumo: params.resumo,
-      inicio: pagina * porPagina,
-      fim: (pagina + 1) * porPagina,
-      numero: pagina + 1,
-      totalPaginas: paginasDeDatas,
-    })
+  if (params.resumo.incluir_redes_sociais) {
+    await adicionarSlides(pdf, slidesDaSecao(slides, 'redes_sociais'))
   }
 
-  adicionarPaginaFinanceira({ pdf, fonte, negrito, resumo: params.resumo, propostaId: params.propostaId })
+  await adicionarResumoComercial({
+    pdf,
+    fonte,
+    negrito,
+    fundo: slidesDaSecao(slides, 'valor')[0],
+    marcaNome: params.marcaNome,
+    clienteNome: params.clienteNome,
+    programaNome: params.programaNome,
+    modalidade: params.modalidade,
+    resumo: params.resumo,
+  })
+
+  await adicionarSlides(pdf, slidesDaSecao(slides, 'observacoes'))
+  await adicionarSlides(pdf, slidesDaSecao(slides, 'contracapa'))
+
+  if (params.modoTeste) {
+    for (const pagina of pdf.getPages()) {
+      pagina.drawText('PREVIA - TESTE', {
+        x: LARGURA - 132,
+        y: 14,
+        size: 8,
+        font: negrito,
+        color: rgb(0.48, 0.18, 0.95),
+        opacity: 0.75,
+      })
+    }
+  }
+
+  pdf.setTitle(`Proposta - ${params.marcaNome ?? params.clienteNome} - ${params.programaNome}`)
+  pdf.setSubject(params.modoTeste ? 'Prévia do modelo de proposta' : 'Proposta comercial')
+  pdf.setCreator('Chatbot 2.0')
+
   return pdf.save()
 }
