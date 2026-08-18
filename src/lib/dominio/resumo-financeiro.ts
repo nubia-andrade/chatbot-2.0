@@ -9,10 +9,21 @@ export type ItemParaResumoFinanceiro = {
   pracas: string[]
 }
 
+export type DetalheFinanceiroDaPraca = {
+  praca_codigo: string
+  midia_tv: number
+  midia_digital: number
+  simulcast: number
+  direitos_tv: number
+  direitos_digital: number
+}
+
 export type LinhaFinanceiraDaProposta = {
   data: string
   quantidade: number
   pracas: string[]
+  /** Vazio no Nacional. No Regional permite conferir quanto cada praça compõe. */
+  detalhe_pracas: DetalheFinanceiroDaPraca[]
   periodo_especial_nome: string | null
   periodo_especial_percentual: number
   periodo_especial_texto: string | null
@@ -99,6 +110,7 @@ function linhaNacional(
     data: item.data,
     quantidade: item.quantidade,
     pracas: [],
+    detalhe_pracas: [],
     periodo_especial_nome: periodo?.nome ?? null,
     periodo_especial_percentual: percentual,
     periodo_especial_texto: periodo?.texto_investimento?.trim() || null,
@@ -137,23 +149,37 @@ function linhaRegional(
   let direitosTvUnit = 0
   let direitosDigitalUnit = 0
 
+  const detalhePracas: DetalheFinanceiroDaPraca[] = []
+
   for (const preco of precosSelecionados) {
     const tv = percentual > 0 ? aplicarAcrescimo(preco.custo_midia_tv, percentual) : preco.custo_midia_tv
     const digitalBase = incluirDigital ? (preco.custo_midia_digital ?? 0) : 0
     const digital = incluirDigital && percentual > 0 ? aplicarAcrescimo(digitalBase, percentual) : digitalBase
     const simulcast = arredondar(tv * ((preco.percentual_simulcast ?? 0) / 100))
+    const direitosTv = calcularDireitosTv(tv, preco.percentual_simulcast) ?? 0
+    const direitosDigital = incluirDigital ? (calcularDireitosDigital(digital) ?? 0) : 0
+
+    detalhePracas.push({
+      praca_codigo: preco.praca_codigo,
+      midia_tv: multiplicar(tv, item.quantidade),
+      midia_digital: multiplicar(digital, item.quantidade),
+      simulcast: multiplicar(simulcast, item.quantidade),
+      direitos_tv: multiplicar(direitosTv, item.quantidade),
+      direitos_digital: multiplicar(direitosDigital, item.quantidade),
+    })
 
     midiaTvUnit += tv
     midiaDigitalUnit += digital
     simulcastUnit += simulcast
-    direitosTvUnit += calcularDireitosTv(tv, preco.percentual_simulcast) ?? 0
-    direitosDigitalUnit += incluirDigital ? (calcularDireitosDigital(digital) ?? 0) : 0
+    direitosTvUnit += direitosTv
+    direitosDigitalUnit += direitosDigital
   }
 
   const midiaTv = multiplicar(arredondar(midiaTvUnit), item.quantidade)
   const midiaDigital = multiplicar(arredondar(midiaDigitalUnit), item.quantidade)
   const redesSociais = multiplicar(incluirRedesSociais ? (programa.custo_midia_redes_sociais ?? 0) : 0, item.quantidade)
   const simulcast = multiplicar(arredondar(simulcastUnit), item.quantidade)
+  // Produção regional é uma vez por AÇÃO, independentemente de 1, 2 ou 3 praças.
   const producaoTv = multiplicar(programa.custo_producao_regional ?? 0, item.quantidade)
   const producaoDigital = 0
   const producaoRedesSociais = multiplicar(incluirRedesSociais ? (programa.custo_producao_redes_sociais ?? 0) : 0, item.quantidade)
@@ -167,6 +193,7 @@ function linhaRegional(
     data: item.data,
     quantidade: item.quantidade,
     pracas: [...item.pracas],
+    detalhe_pracas: detalhePracas,
     periodo_especial_nome: periodo?.nome ?? null,
     periodo_especial_percentual: percentual,
     periodo_especial_texto: periodo?.texto_investimento?.trim() || null,
@@ -195,9 +222,6 @@ export function calcularResumoFinanceiro(params: {
   incluirDigital?: boolean
   incluirRedesSociais?: boolean
 }): ResumoFinanceiroDaProposta {
-  // Não basta o marcador estar ativo: sem valor comercial cadastrado, o
-  // complemento fica indisponível para evitar uma proposta de R$ 0,00 por
-  // configuração incompleta.
   const incluirDigital = Boolean(
     params.incluirDigital &&
     params.programa.contem_digital &&
