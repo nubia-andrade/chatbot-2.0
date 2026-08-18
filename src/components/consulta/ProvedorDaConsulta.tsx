@@ -19,6 +19,7 @@ export type EstadoDaConsulta = {
   ano: number
   mes: number
   itens: ItemDaConsulta[]
+  /** Mantido por compatibilidade com sessões já abertas; não é mais gate de navegação. */
   datasConfirmadas: boolean
 }
 
@@ -81,7 +82,6 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
     setEstado((atual) => {
       const proximo = { ...atual, ...parcial }
 
-      // Qualquer alteração das datas reabre o passo de confirmação.
       if ('itens' in parcial) {
         proximo.datasConfirmadas = false
       }
@@ -118,27 +118,25 @@ export function useConsulta(): ContextoConsulta {
   return contexto
 }
 
-/** As 7 pílulas do stepper, na ordem do fluxo. */
+/** Fluxo enxuto: a seleção das datas acontece dentro do próprio Calendário. */
 export const PASSOS: { slug: string; rotulo: string }[] = [
   { slug: 'cliente', rotulo: 'Cliente' },
   { slug: 'setor', rotulo: 'Setor' },
   { slug: 'programa', rotulo: 'Programa' },
   { slug: 'calendario', rotulo: 'Calendário' },
-  { slug: 'datas', rotulo: 'Datas' },
   { slug: 'resumo', rotulo: 'Resumo' },
   { slug: 'proposta', rotulo: 'Proposta' },
 ]
 
 /**
- * O passo mais adiantado que o estado atual justifica. Marca e anunciante
- * nascem juntos na entrada consolidada; `cliente` continua sendo o gate
- * técnico porque é ele que alimenta todas as regras de carteira.
+ * O passo mais adiantado que o estado atual justifica. As datas não formam
+ * mais uma etapa própria: assim que existe ao menos uma data selecionada no
+ * calendário, o próximo passo possível é o Resumo.
  */
 export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
   if (!estado.cliente) return 'cliente'
   if (!estado.programaId) return 'programa'
   if (estado.itens.length === 0) return 'calendario'
-  if (!estado.datasConfirmadas) return 'datas'
   return 'resumo'
 }
 
