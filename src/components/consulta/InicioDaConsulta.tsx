@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { CampoDeBuscaDeCliente } from '@/components/comum/CampoDeBuscaDeCliente'
-import type { Cliente } from '@/lib/dados/busca-clientes'
+import { CampoDeBuscaDeMarca } from '@/components/consulta/CampoDeBuscaDeMarca'
+import type { MarcaDaCarteira } from '@/lib/dados/busca-marcas'
 
 type ProgramaDaConsulta = {
   id: string
@@ -14,7 +14,7 @@ type ProgramaDaConsulta = {
 type Props = { programas: ProgramaDaConsulta[] }
 
 export function InicioDaConsulta({ programas }: Props) {
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [marca, setMarca] = useState<MarcaDaCarteira | null>(null)
   const [programaId, setProgramaId] = useState('')
   const programa = programas.find((item) => item.id === programaId) ?? null
 
@@ -23,7 +23,7 @@ export function InicioDaConsulta({ programas }: Props) {
       <header className="flex items-center justify-between border-b border-[var(--borda)] px-7 py-5">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--roxo)]">Nova consulta</p>
-          <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Cliente e programa</h1>
+          <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Marca e programa</h1>
         </div>
         <span className="text-[12px] font-semibold text-[var(--texto-3)]">Etapa 1 de 7</span>
       </header>
@@ -31,36 +31,51 @@ export function InicioDaConsulta({ programas }: Props) {
       <div className="grid min-h-[560px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex flex-col gap-8 p-7 lg:border-r lg:border-[var(--borda)]">
           <div>
-            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Selecione o cliente</h2>
-            <CampoDeBuscaDeCliente
-              aoEscolher={(novoCliente) => {
-                setCliente(novoCliente)
+            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Qual marca deseja consultar?</h2>
+            <CampoDeBuscaDeMarca
+              aoEscolher={(novaMarca) => {
+                setMarca(novaMarca)
                 setProgramaId('')
               }}
-              placeholder="Busque pelo nome do cliente…"
             />
 
-            {cliente && (
-              <div className="mt-4 grid gap-3 rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Setor</p>
-                  <p className="mt-1 text-[13px] font-semibold">{cliente.setor ?? 'Não informado'}</p>
+            {marca && (
+              <div className="mt-4 rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca selecionada</p>
+                    <p className="mt-1 text-[16px] font-bold text-[var(--texto)]">{marca.marca_nome}</p>
+                  </div>
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-bold"
+                    style={{
+                      color: marca.apto_regional ? 'var(--disponivel)' : 'var(--texto-3)',
+                      background: marca.apto_regional ? 'var(--disponivel-fundo)' : 'var(--esgotado-fundo)',
+                    }}
+                  >
+                    {marca.apto_regional ? 'Elegível para regional' : 'Não elegível para regional'}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Indústria</p>
-                  <p className="mt-1 text-[13px] font-semibold">{cliente.industria ?? 'Não informada'}</p>
-                </div>
-                <div>
-                  <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Regional</p>
-                  <p className="mt-1 text-[13px] font-semibold text-[var(--texto-2)]">
-                    {cliente.apto_regional ? 'Cliente elegível' : 'Não elegível'}
-                  </p>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante</p>
+                    <p className="mt-1 text-[13px] font-semibold">{marca.cliente_nome}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Setor</p>
+                    <p className="mt-1 text-[13px] font-semibold">{marca.setor ?? 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Indústria</p>
+                    <p className="mt-1 text-[13px] font-semibold">{marca.industria ?? 'Não informada'}</p>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className={cliente ? '' : 'pointer-events-none opacity-45'}>
+          <div className={marca ? '' : 'pointer-events-none opacity-45'}>
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">2. Escolha o programa</h2>
             <select
               value={programaId}
@@ -84,13 +99,16 @@ export function InicioDaConsulta({ programas }: Props) {
           <div>
             <h2 className="text-[14px] font-bold text-[var(--texto)]">Resumo da consulta</h2>
             <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--texto-3)]">
-              O cliente selecionado definirá concorrência, restrições e elegibilidade no calendário.
+              A marca identifica o anunciante da carteira. Setor e indústria desse anunciante alimentarão as regras de concorrência do calendário.
             </p>
           </div>
 
           <div className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-4">
-            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Cliente</p>
-            <p className="mt-1 text-[13px] font-semibold">{cliente?.nome ?? 'Ainda não selecionado'}</p>
+            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca</p>
+            <p className="mt-1 text-[13px] font-semibold">{marca?.marca_nome ?? 'Ainda não selecionada'}</p>
+            {marca && (
+              <p className="mt-1 text-[11px] text-[var(--texto-3)]">{marca.cliente_nome}</p>
+            )}
             <div className="my-3 border-t border-[var(--borda)]" />
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Programa</p>
             <p className="mt-1 text-[13px] font-semibold">{programa?.nome ?? 'Ainda não selecionado'}</p>
