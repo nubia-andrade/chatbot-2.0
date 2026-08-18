@@ -17,6 +17,9 @@ export type EstadoDaConsulta = {
   ano: number
   mes: number
   itens: ItemDaConsulta[]
+  /** Complementos globais: quando marcados, valem para todas as datas selecionadas. */
+  incluirDigital: boolean
+  incluirRedesSociais: boolean
   /** Mantido por compatibilidade com sessões já abertas; não é mais gate de navegação. */
   datasConfirmadas: boolean
 }
@@ -35,6 +38,8 @@ function estadoInicial(): EstadoDaConsulta {
     ano: agora.getFullYear(),
     mes: agora.getMonth() + 1,
     itens: [],
+    incluirDigital: false,
+    incluirRedesSociais: false,
     datasConfirmadas: false,
   }
 }
