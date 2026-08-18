@@ -126,7 +126,7 @@ create policy "pdf proposta: leitura autorizada" on storage.objects
     and exists (
       select 1
       from propostas p
-      where p.id::text = split_part(name, '/', 2)
+      where (p.id::text || '.pdf') = split_part(name, '/', 2)
         and (
           p.usuario_id = auth.uid()
           or (p.programa_id is not null and e_consultor_de(p.programa_id))
