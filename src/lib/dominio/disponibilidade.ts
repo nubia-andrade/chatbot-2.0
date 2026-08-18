@@ -13,12 +13,6 @@ import { extrairMnemonico } from './programas'
 /**
  * O MOTOR. Único lugar do sistema que sabe em que ORDEM as regras se aplicam.
  *
- * Não reimplementa regra nenhuma: `contarOcupacao`, `estaBloqueada`,
- * `dentroDoPrazoMinimo`, `concorrenteNaData`, `temSlotRegionalEm`,
- * `periodoEspecialEm` e os cálculos de custo já existem e já têm teste. Esta
- * função os ordena e devolve, por dia do mês, o que a célula do calendário
- * precisa mostrar.
- *
  * É pura: sem banco, sem tela, sem `Date.now()`. `hojeIso` entra por
  * parâmetro — é o que torna o prazo mínimo testável.
  */
@@ -28,6 +22,8 @@ export type EstadoDoDia =
   | 'fora_do_prazo'
   | 'bloqueado'
   | 'concorrencia'
+  | 'ja_comprado'
+  | 'limite_mensal'
   | 'esgotado'
   | 'disponivel'
 
@@ -46,11 +42,7 @@ export type DiaDeDisponibilidade = {
   livres: number
   /** Slots do dia no nacional; 5 praças no regional. `0` em dia sem exibição. */
   total: number
-  /**
-   * TODOS os motivos que valem, não só o que deu a cor. Uma data pode estar
-   * ao mesmo tempo fora do prazo e bloqueada, e esconder o segundo faria o
-   * executivo achar que resolver o primeiro liberaria a venda.
-   */
+  /** TODOS os motivos válidos para a data. */
   motivos: string[]
   /** Ilustração pura — nunca entra em `motivos`, nunca altera `estado`. */
   feriado: string | null
@@ -99,14 +91,17 @@ export type InsumosDeDisponibilidade = {
   indiceDeAnunciantes: IndiceDeAnunciantes
   precosRegionais: PrecoDaPracaParaCalculo[]
   /**
-   * R6 — 4 dos 23 programas chegam da API sem "MNEMONICO - NOME" e dependem
-   * de apelido cadastrado em `programa_apelidos`. Padrão: lista vazia, o que
-   * preserva o casamento só por mnemônico. Quem chama com os apelidos reais
-   * (Task 8, via `listarApelidos`) evita o pior erro possível: sem isto, uma
-   * ação desses 4 programas nunca casaria e o calendário mostraria
-   * disponibilidade sempre cheia, vendendo espaço já vendido.
+   * R6 — programas que chegam sem mnemônico dependem de apelido cadastrado.
    */
   apelidosDoPrograma?: string[]
+  /**
+   * Fatos já resolvidos pela camada de dados usando a identidade efetiva
+   * Marca → Anunciante. Quando presentes, ativam as regras por anunciante:
+   * uma data já comprada ganha estado próprio e o teto mensal deixa de ser
+   * calculado pelo total do programa.
+   */
+  datasJaCompradasPeloCliente?: string[]
+  acoesDoClienteNoMes?: number
 }
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
@@ -126,17 +121,7 @@ function diaDaSemana(dataIso: string): number {
   return new Date(`${dataIso}T00:00:00Z`).getUTCDay()
 }
 
-/**
- * As ações vendidas DESTE programa, casadas por mnemônico ou por apelido.
- *
- * R6 — 4 dos 23 programas chegam da API sem "MNEMONICO - NOME" e só têm
- * apelido cadastrado (ex.: "MAIS VOCE", sem "MAVO - "). `extrairMnemonico`
- * devolve `null` para esses textos, então casar só por mnemônico deixaria
- * essas ações sem programa — e o calendário mostraria disponibilidade
- * sempre cheia, o pior erro possível, porque vende espaço já vendido. Segue
- * a mesma lógica de `encontrarProgramaId` (`./programas`): mnemônico
- * primeiro, apelido como recurso, sobre o texto integral normalizado.
- */
+/** Ações vendidas deste programa, por mnemônico ou apelido. */
 function acoesDoPrograma(
   acoes: AcaoVendidaComAnunciante[],
   programa: ProgramaParaDisponibilidade,
@@ -152,7 +137,7 @@ function acoesDoPrograma(
   })
 }
 
-/** Ações regionais DISTINTAS (data + cliente) do mês — uma ação de 3 praças ocupa 3 linhas de `acoes_regionais` mas continua sendo uma ação só. */
+/** Ações regionais distintas (data + cliente) do mês. */
 function acoesRegionaisDistintasNoMes(acoesRegionais: AcaoRegional[], doMes: Set<string>): number {
   const distintas = new Set(
     acoesRegionais
@@ -163,18 +148,18 @@ function acoesRegionaisDistintasNoMes(acoesRegionais: AcaoRegional[], doMes: Set
 }
 
 /**
- * R16 — quantas ações já caíram no mês. No nacional, ações de conteúdo
- * vendidas mais — quando R15 (provisório, `regionalConsomeSlotNacional`) diz
- * que a ação regional consome também um slot nacional do dia — as ações
- * regionais DISTINTAS (data + cliente) do mês, mesma unidade usada na conta
- * diária de `usadosNacional`: sem somar aqui, o teto mensal nacional ficaria
- * cego para um consumo que o próprio motor já contabiliza dia a dia. No
- * regional, ações DISTINTAS (data + cliente), porque uma ação de 3 praças
- * ocupa 3 linhas de `acoes_regionais` mas continua sendo uma ação só para o
- * teto de 4 do Manual de Práticas.
+ * R16 — contagem mensal. No nacional, quando a camada de dados já resolveu
+ * `acoesDoClienteNoMes`, esse valor é a fonte da regra de negócio: o teto é
+ * do anunciante naquele programa e mês. O cálculo legado pelo total do
+ * programa permanece como fallback para os chamadores antigos e para a
+ * modalidade regional, até a regra regional ser revisada separadamente.
  */
 function acoesNoMes(insumos: InsumosDeDisponibilidade, dias: string[]): number {
   const doMes = new Set(dias)
+
+  if (insumos.modalidade === 'nacional' && insumos.acoesDoClienteNoMes !== undefined) {
+    return Math.max(0, Math.floor(insumos.acoesDoClienteNoMes))
+  }
 
   if (insumos.modalidade === 'regional') {
     return acoesRegionaisDistintasNoMes(insumos.acoesRegionais, doMes)
@@ -199,8 +184,11 @@ export function calcularDisponibilidadeDoMes(
   const dias = diasDoMes(insumos.ano, insumos.mes)
   const regional = insumos.modalidade === 'regional'
   const programa = insumos.programa
-
   const doPrograma = acoesDoPrograma(insumos.acoesVendidas, programa, insumos.apelidosDoPrograma)
+  const datasJaCompradas = new Set(insumos.datasJaCompradasPeloCliente ?? [])
+  const usaRegrasPorAnunciante =
+    !regional &&
+    (insumos.acoesDoClienteNoMes !== undefined || insumos.datasJaCompradasPeloCliente !== undefined)
 
   const prazo = regional
     ? (programa.prazo_minimo_regional_dias ?? 0)
@@ -213,7 +201,6 @@ export function calcularDisponibilidadeDoMes(
     const feriado = feriadoEm(data)?.nome ?? null
     const motivos: string[] = []
 
-    // 1. Existe inventário neste dia? Se não, não é estado nenhum — é ausência.
     const temInventario = regional
       ? temSlotRegionalEm(
           {
@@ -240,7 +227,6 @@ export function calcularDisponibilidadeDoMes(
       }
     }
 
-    // Ocupação — nacional por slots, regional por praças.
     const vendidasNaData = doPrograma.filter((acao) => acao.data_de_exibicao === data)
     const regionaisNaData = insumos.acoesRegionais.filter((acao) => acao.data_de_exibicao === data)
 
@@ -253,12 +239,6 @@ export function calcularDisponibilidadeDoMes(
         }))
       : []
 
-    /**
-     * R1 — só formato de categoria AÇÃO DE CONTEÚDO ocupa slot.
-     * R15 (provisório) — a ação regional consome também um slot nacional do
-     * dia. Uma ação de 3 praças é UMA ação: por isso conta clientes
-     * distintos, não linhas de `acoes_regionais`.
-     */
     const usadosNacional =
       vendidasNaData.filter((acao) => ocupaSlot(acao.formato, insumos.formatos)).length +
       (regionalConsomeSlotNacional()
@@ -270,7 +250,6 @@ export function calcularDisponibilidadeDoMes(
       ? pracas.filter((praca) => praca.disponivel).length
       : Math.max(0, programa.slots - usadosNacional)
 
-    // Preço do dia, com o acréscimo do período especial já aplicado.
     const periodo = periodoEspecialEm(insumos.periodosEspeciais, data)
     const acrescimo = periodo?.percentual_acrescimo ?? 0
     const periodo_especial = periodo ? { nome: periodo.nome, percentual: acrescimo } : null
@@ -295,7 +274,6 @@ export function calcularDisponibilidadeDoMes(
           acrescimo,
         )
 
-    // Concorrência (R14) — só no que casou com a carteira.
     const classificadas = vendidasNaData.map((acao) => ({
       acao,
       cliente: classificarAnunciante(acao.anunciante, insumos.indiceDeAnunciantes),
@@ -313,7 +291,6 @@ export function calcularDisponibilidadeDoMes(
       insumos.cliente,
     )
 
-    // 2. Os motivos, todos, na ordem em que pintam a célula.
     const foraDoPrazo = dentroDoPrazoMinimo(insumos.hojeIso, data, prazo)
     if (foraDoPrazo) {
       motivos.push(`Fora do prazo mínimo de ${prazo} dias para este programa.`)
@@ -323,7 +300,11 @@ export function calcularDisponibilidadeDoMes(
     if (bloqueio) motivos.push(bloqueio.motivo)
 
     if (mesFechado) {
-      motivos.push(`O mês já atingiu o limite de ${tetoMensal} ações deste programa.`)
+      motivos.push(
+        usaRegrasPorAnunciante
+          ? `O anunciante atingiu o limite de ${tetoMensal} ações neste programa neste mês.`
+          : `O mês já atingiu o limite de ${tetoMensal} ações deste programa.`,
+      )
     }
 
     if (concorrente) {
@@ -332,24 +313,44 @@ export function calcularDisponibilidadeDoMes(
       )
     }
 
+    const proprioAnuncianteNaData = usaRegrasPorAnunciante && datasJaCompradas.has(data)
+    if (proprioAnuncianteNaData) {
+      motivos.push('Este anunciante já possui uma ação nesta data.')
+    }
+
     if (livres === 0) motivos.push('Todos os espaços desta data já foram vendidos.')
 
-    /**
-     * A ORDEM. Prazo vem primeiro porque forma uma faixa contígua no começo
-     * do calendário, que o executivo lê de uma vez como "daqui não dá mais
-     * tempo" — furar essa faixa com uma célula de outra cor faz ele achar
-     * que as vizinhas são negociáveis. Os outros motivos continuam em
-     * `motivos`, visíveis no detalhe da célula: nada se perde.
-     */
-    const estado: EstadoDoDia = foraDoPrazo
-      ? 'fora_do_prazo'
-      : bloqueio || mesFechado
+    let estado: EstadoDoDia
+
+    if (usaRegrasPorAnunciante) {
+      // Regra validada com o negócio: concorrente real continua vermelho;
+      // compra do próprio anunciante ganha ✓ azul, inclusive em data passada;
+      // o teto mensal só bloqueia novas datas disponíveis daquele mês.
+      estado = bloqueio
         ? 'bloqueado'
         : concorrente
           ? 'concorrencia'
-          : livres === 0
-            ? 'esgotado'
-            : 'disponivel'
+          : proprioAnuncianteNaData
+            ? 'ja_comprado'
+            : foraDoPrazo
+              ? 'fora_do_prazo'
+              : mesFechado
+                ? 'limite_mensal'
+                : livres === 0
+                  ? 'esgotado'
+                  : 'disponivel'
+    } else {
+      // Ordem histórica preservada para os chamadores legados e regional.
+      estado = foraDoPrazo
+        ? 'fora_do_prazo'
+        : bloqueio || mesFechado
+          ? 'bloqueado'
+          : concorrente
+            ? 'concorrencia'
+            : livres === 0
+              ? 'esgotado'
+              : 'disponivel'
+    }
 
     return {
       data,
