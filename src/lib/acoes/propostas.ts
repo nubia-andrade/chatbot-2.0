@@ -19,6 +19,8 @@ export type EntradaGerarProposta = {
   clienteNome: string
   programaId: string
   programaNome: string
+  produto: string
+  objetivo: string
   modalidade: 'nacional' | 'regional'
   itens: ItemParaResumoFinanceiro[]
   incluirDigital: boolean
@@ -102,6 +104,11 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   if (!sessao) return resultadoFalha('Sessão expirada. Entre de novo.')
   if (entrada.itens.length === 0) return resultadoFalha('Selecione ao menos uma data para gerar a proposta.')
 
+  const produto = entrada.produto.trim()
+  const objetivo = entrada.objetivo.trim()
+  if (!produto) return resultadoFalha('Informe o Produto antes de gerar a proposta.')
+  if (!objetivo) return resultadoFalha('Informe o Objetivo antes de gerar a proposta.')
+
   const erroLimite = await validarLimiteMensal(entrada)
   if (erroLimite) return resultadoFalha(erroLimite)
 
@@ -148,6 +155,8 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       cliente_nome: entrada.clienteNome,
       programa_id: entrada.programaId,
       programa_nome: entrada.programaNome,
+      produto,
+      objetivo,
       modalidade: entrada.modalidade,
       inclui_digital: resumo.incluir_digital,
       inclui_redes_sociais: resumo.incluir_redes_sociais,
@@ -184,6 +193,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       marcaNome: entrada.marcaNome,
       clienteNome: entrada.clienteNome,
       programaNome: entrada.programaNome,
+      objetivo,
       modalidade: entrada.modalidade,
       resumo,
       slides,
@@ -256,6 +266,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
       html: `
         <p>Olá,</p>
         <p>Uma nova proposta foi gerada para <strong>${escaparHtml(entrada.marcaNome ?? entrada.clienteNome)}</strong> no programa <strong>${escaparHtml(entrada.programaNome)}</strong>.</p>
+        <p>Produto: <strong>${escaparHtml(produto)}</strong>.</p>
         <p>Total comercial: <strong>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.total_comercial)}</strong>.</p>
         <p>O PDF da proposta segue em anexo.</p>
       `,
