@@ -3,35 +3,115 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  adicionarSlideAoModelo,
+  adicionarSlidesAoModelo,
   moverSlideDoModelo,
   removerSlideDoModelo,
 } from '@/lib/acoes/modelo-proposta'
-import type { SlideDoModeloDeProposta } from '@/lib/dados/modelo-proposta'
+import {
+  slidesDaSecao,
+  type SecaoDoModeloDeProposta,
+  type SlideDoModeloDeProposta,
+} from '@/lib/dados/modelo-proposta'
 
 type Props = {
   programaId: string
+  programaNome: string
+  contemDigital: boolean
+  temRedesSociais: boolean
   slides: SlideDoModeloDeProposta[]
 }
 
-export function EditorDeModeloDeProposta({ programaId, slides }: Props) {
+type ConfiguracaoDaSecao = {
+  id: SecaoDoModeloDeProposta
+  titulo: string
+  descricao: string
+  unico?: boolean
+  condicional?: 'digital' | 'redes'
+  valorCalculado?: boolean
+}
+
+const SECOES: ConfiguracaoDaSecao[] = [
+  {
+    id: 'capa',
+    titulo: 'Capa',
+    descricao: 'Primeiro slide da proposta. Uma nova imagem substitui a atual.',
+    unico: true,
+  },
+  {
+    id: 'conteudo',
+    titulo: 'Conteúdo',
+    descricao: 'Apresentação do programa, formato, audiência e demais argumentos comerciais.',
+  },
+  {
+    id: 'digital',
+    titulo: 'Digital',
+    descricao: 'Só entra no PDF quando o executivo marcar “Incluir Digital” no calendário.',
+    condicional: 'digital',
+  },
+  {
+    id: 'redes_sociais',
+    titulo: 'Redes Sociais',
+    descricao: 'Só entra no PDF quando o executivo marcar “Incluir Redes sociais” no calendário.',
+    condicional: 'redes',
+  },
+  {
+    id: 'valor',
+    titulo: 'Valor',
+    descricao: 'Posição do resumo comercial calculado. A imagem é um fundo opcional; os valores são inseridos automaticamente.',
+    unico: true,
+    valorCalculado: true,
+  },
+  {
+    id: 'observacoes',
+    titulo: 'Observações',
+    descricao: 'Regras, ressalvas e informações que devem aparecer depois do resumo comercial.',
+  },
+  {
+    id: 'contracapa',
+    titulo: 'Contracapa',
+    descricao: 'Último slide da proposta. Uma nova imagem substitui a atual.',
+    unico: true,
+  },
+]
+
+export function EditorDeModeloDeProposta({
+  programaId,
+  programaNome,
+  contemDigital,
+  temRedesSociais,
+  slides,
+}: Props) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [secaoParaUpload, setSecaoParaUpload] = useState<ConfiguracaoDaSecao | null>(null)
+  const [testarDigital, setTestarDigital] = useState(false)
+  const [testarRedes, setTestarRedes] = useState(false)
 
-  async function adicionar(arquivo: File) {
+  function abrirSeletor(secao: ConfiguracaoDaSecao) {
+    setErro(null)
+    setSecaoParaUpload(secao)
+    requestAnimationFrame(() => input.current?.click())
+  }
+
+  async function adicionar(arquivos: File[]) {
+    if (!secaoParaUpload || arquivos.length === 0) return
     setOcupado(true)
     setErro(null)
+
     const formulario = new FormData()
-    formulario.append('arquivo', arquivo)
-    const resultado = await adicionarSlideAoModelo(programaId, formulario)
+    arquivos.forEach((arquivo) => formulario.append('arquivos', arquivo))
+    const resultado = await adicionarSlidesAoModelo(programaId, secaoParaUpload.id, formulario)
+
     setOcupado(false)
     if (input.current) input.current.value = ''
     if (resultado.erro) {
       setErro(resultado.erro)
       return
     }
+
+    setSecaoParaUpload(null)
     router.refresh()
   }
 
@@ -54,41 +134,64 @@ export function EditorDeModeloDeProposta({ programaId, slides }: Props) {
     else router.refresh()
   }
 
+  const urlTeste = `/configuracoes/programas/${programaId}/modelo/teste?digital=${testarDigital ? '1' : '0'}&redes=${testarRedes ? '1' : '0'}`
+
   return (
     <div className="flex flex-col gap-5">
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg"
+        multiple={!secaoParaUpload?.unico}
+        className="hidden"
+        onChange={(evento) => {
+          const arquivos = Array.from(evento.target.files ?? [])
+          if (arquivos.length > 0) void adicionar(arquivos)
+        }}
+      />
+
       <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <h2 className="text-[15px] font-bold text-[var(--texto)]">Modelo visual da proposta</h2>
-            <p className="mt-1 max-w-[680px] text-[12.5px] leading-[1.55] text-[var(--texto-3)]">
-              Adicione os slides institucionais do programa como imagens PNG ou JPG. Na proposta final, eles aparecem nesta ordem e são seguidos pelas páginas dinâmicas com cliente, datas e valores.
+            <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Modelo de propostas</p>
+            <h2 className="mt-1 text-[16px] font-bold text-[var(--texto)]">{programaNome}</h2>
+            <p className="mt-1 max-w-[720px] text-[12.5px] leading-[1.55] text-[var(--texto-3)]">
+              Monte o PDF pela ordem das seções abaixo. Conteúdo, Digital, Redes Sociais e Observações aceitam várias imagens de uma vez. A proposta final respeita esta mesma sequência.
             </p>
           </div>
-          <div>
-            <input
-              ref={input}
-              type="file"
-              accept="image/png,image/jpeg"
-              className="hidden"
-              onChange={(evento) => {
-                const arquivo = evento.target.files?.[0]
-                if (arquivo) void adicionar(arquivo)
-              }}
-            />
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={() => input.current?.click()}
-              className="h-[42px] rounded-[11px] px-5 text-[12.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}
+
+          <div className="flex min-w-[280px] flex-col gap-3 rounded-[12px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4">
+            <div>
+              <p className="text-[11.5px] font-bold text-[var(--texto)]">Prévia do PDF</p>
+              <p className="mt-0.5 text-[10.5px] leading-[1.4] text-[var(--texto-3)]">Não cria proposta, não envia e-mail e não entra no histórico.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <OpcaoDeTeste
+                rotulo="Digital"
+                marcado={testarDigital}
+                desabilitado={!contemDigital}
+                aoMudar={setTestarDigital}
+              />
+              <OpcaoDeTeste
+                rotulo="Redes sociais"
+                marcado={testarRedes}
+                desabilitado={!temRedesSociais}
+                aoMudar={setTestarRedes}
+              />
+            </div>
+            <a
+              href={urlTeste}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-[40px] items-center justify-center rounded-[10px] border border-[var(--borda-forte)] bg-white px-4 text-[12px] font-bold text-[var(--texto-2)] hover:border-[var(--roxo)] hover:text-[var(--roxo)]"
             >
-              {ocupado ? 'Processando…' : '+ Adicionar slide'}
-            </button>
+              Imprimir teste
+            </a>
           </div>
         </div>
 
         <div className="mt-4 rounded-[11px] bg-[var(--prazo-fundo)] px-4 py-3 text-[11.5px] leading-[1.5] text-[var(--texto-2)]">
-          Recomendação: exporte os slides em proporção 16:9. O PDF preserva a imagem inteira e centraliza automaticamente quando a proporção for diferente.
+          Use PNG ou JPG em 16:9. Arquivos de até 8 MB. Slides das seções condicionais só aparecem quando a entrega correspondente estiver incluída na proposta.
         </div>
 
         {erro && (
@@ -98,56 +201,185 @@ export function EditorDeModeloDeProposta({ programaId, slides }: Props) {
         )}
       </section>
 
-      {slides.length === 0 ? (
-        <section className="rounded-[var(--raio-card)] border border-dashed border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-6 py-10 text-center">
-          <p className="text-[14px] font-bold text-[var(--texto)]">Nenhum slide cadastrado</p>
-          <p className="mt-1 text-[12px] text-[var(--texto-3)]">
-            A proposta ainda pode ser gerada, usando apenas as páginas dinâmicas do sistema.
-          </p>
-        </section>
-      ) : (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {slides.map((slide, indice) => (
-            <article key={slide.id} className="overflow-hidden rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)]">
-              <div className="relative aspect-video bg-[var(--superficie-suave)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slide.imagem_url} alt={`Slide ${indice + 1}`} className="h-full w-full object-contain" />
-                <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-[10.5px] font-bold text-white">
-                  Slide {indice + 1}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3 border-t border-[var(--borda)] p-3">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={ocupado || indice === 0}
-                    onClick={() => void mover(slide.id, 'subir')}
-                    className="h-8 rounded-[9px] border border-[var(--borda-forte)] px-3 text-[11.5px] font-bold text-[var(--texto-2)] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    ← Antes
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ocupado || indice === slides.length - 1}
-                    onClick={() => void mover(slide.id, 'descer')}
-                    className="h-8 rounded-[9px] border border-[var(--borda-forte)] px-3 text-[11.5px] font-bold text-[var(--texto-2)] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    Depois →
-                  </button>
+      <div className="flex flex-col gap-4">
+        {SECOES.map((secao, indiceDaSecao) => {
+          const slidesDaVez = slidesDaSecao(slides, secao.id)
+          const condicionalIndisponivel =
+            (secao.condicional === 'digital' && !contemDigital) ||
+            (secao.condicional === 'redes' && !temRedesSociais)
+
+          return (
+            <section
+              key={secao.id}
+              className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--superficie-suave)] text-[11px] font-bold text-[var(--texto-3)]">
+                    {indiceDaSecao + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[13.5px] font-bold text-[var(--texto)]">{secao.titulo}</h3>
+                      {secao.condicional && (
+                        <span className="rounded-full bg-[#F5F3FF] px-2 py-0.5 text-[9.5px] font-bold text-[var(--roxo)]">
+                          Condicional
+                        </span>
+                      )}
+                      {secao.valorCalculado && (
+                        <span className="rounded-full bg-[var(--disponivel-fundo)] px-2 py-0.5 text-[9.5px] font-bold text-[var(--disponivel-texto)]">
+                          Calculado
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[11px] leading-[1.45] text-[var(--texto-3)]">{secao.descricao}</p>
+                    {condicionalIndisponivel && (
+                      <p className="mt-1 text-[10.5px] font-semibold text-[var(--texto-3)]">
+                        Habilite este complemento no Cadastro do programa para utilizá-lo.
+                      </p>
+                    )}
+                  </div>
                 </div>
+
                 <button
                   type="button"
-                  disabled={ocupado}
-                  onClick={() => void remover(slide.id)}
-                  className="h-8 px-2 text-[11.5px] font-bold text-[var(--concorrencia-texto)] disabled:opacity-40"
+                  disabled={ocupado || condicionalIndisponivel}
+                  onClick={() => abrirSeletor(secao)}
+                  className="h-9 rounded-[9px] border border-[var(--borda-forte)] px-3.5 text-[11.5px] font-bold text-[var(--roxo)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Remover
+                  {ocupado && secaoParaUpload?.id === secao.id
+                    ? 'Enviando…'
+                    : secao.unico && slidesDaVez.length > 0
+                      ? 'Substituir imagem'
+                      : secao.unico
+                        ? '+ Adicionar imagem'
+                        : '+ Adicionar imagens'}
                 </button>
               </div>
-            </article>
-          ))}
-        </section>
-      )}
+
+              <div className="mt-3 border-t border-[var(--borda)] pt-3">
+                {secao.valorCalculado && slidesDaVez.length === 0 ? (
+                  <div className="flex h-[86px] max-w-[155px] items-center justify-center rounded-[9px] border border-dashed border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-center">
+                    <p className="text-[10.5px] font-semibold leading-[1.35] text-[var(--texto-3)]">
+                      Layout padrão do resumo comercial
+                    </p>
+                  </div>
+                ) : slidesDaVez.length === 0 ? (
+                  <p className="py-2 text-[11px] text-[var(--texto-3)]">Nenhuma imagem nesta seção.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {slidesDaVez.map((slide, indice) => (
+                      <MiniaturaDeSlide
+                        key={slide.id}
+                        slide={slide}
+                        indice={indice}
+                        total={slidesDaVez.length}
+                        unico={Boolean(secao.unico)}
+                        ocupado={ocupado}
+                        mover={mover}
+                        remover={remover}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          )
+        })}
+      </div>
     </div>
+  )
+}
+
+function OpcaoDeTeste({
+  rotulo,
+  marcado,
+  desabilitado,
+  aoMudar,
+}: {
+  rotulo: string
+  marcado: boolean
+  desabilitado: boolean
+  aoMudar: (valor: boolean) => void
+}) {
+  return (
+    <label className={`flex items-center gap-1.5 text-[10.5px] font-semibold ${desabilitado ? 'opacity-40' : 'cursor-pointer'}`}>
+      <input
+        type="checkbox"
+        checked={marcado}
+        disabled={desabilitado}
+        onChange={(evento) => aoMudar(evento.target.checked)}
+        className="h-3.5 w-3.5 accent-[#7A2FF2]"
+      />
+      {rotulo}
+    </label>
+  )
+}
+
+function MiniaturaDeSlide({
+  slide,
+  indice,
+  total,
+  unico,
+  ocupado,
+  mover,
+  remover,
+}: {
+  slide: SlideDoModeloDeProposta
+  indice: number
+  total: number
+  unico: boolean
+  ocupado: boolean
+  mover: (slideId: string, direcao: 'subir' | 'descer') => Promise<void>
+  remover: (slideId: string) => Promise<void>
+}) {
+  return (
+    <article className="w-[155px] overflow-hidden rounded-[9px] border border-[var(--borda)] bg-[var(--superficie-suave)]">
+      <div className="relative aspect-video bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={slide.imagem_url} alt={`Slide ${indice + 1}`} className="h-full w-full object-contain" />
+        {!unico && (
+          <span className="absolute left-1.5 top-1.5 rounded-full bg-black/65 px-1.5 py-0.5 text-[8.5px] font-bold text-white">
+            {indice + 1}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-1 border-t border-[var(--borda)] px-1.5 py-1.5">
+        {!unico ? (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              title="Mover para antes"
+              aria-label="Mover para antes"
+              disabled={ocupado || indice === 0}
+              onClick={() => void mover(slide.id, 'subir')}
+              className="flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--borda)] text-[11px] font-bold text-[var(--texto-2)] disabled:opacity-25"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              title="Mover para depois"
+              aria-label="Mover para depois"
+              disabled={ocupado || indice === total - 1}
+              onClick={() => void mover(slide.id, 'descer')}
+              className="flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--borda)] text-[11px] font-bold text-[var(--texto-2)] disabled:opacity-25"
+            >
+              ↓
+            </button>
+          </div>
+        ) : <span />}
+        <button
+          type="button"
+          title="Remover imagem"
+          aria-label="Remover imagem"
+          disabled={ocupado}
+          onClick={() => void remover(slide.id)}
+          className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[14px] font-bold text-[var(--concorrencia-texto)] disabled:opacity-30"
+        >
+          ×
+        </button>
+      </div>
+    </article>
   )
 }
