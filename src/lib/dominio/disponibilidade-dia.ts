@@ -67,12 +67,12 @@ function limitarQuantidade(valor: number): number {
  * Responde a única pergunta que o calendário precisa fazer para cada data:
  * "esta marca pode receber uma proposta aqui, e por quê?".
  *
- * A ordem é deliberada. Fora da grade não existe inventário; bloqueio e prazo
- * vencem regras comerciais; restrição cadastrada e concorrência real tornam a
- * data inelegível para ESTE cliente. Depois disso distinguimos dois bloqueios
- * do próprio anunciante: já comprado nesta data e limite mensal atingido.
- * Esgotamento vem por último porque é condição do inventário. Data especial
- * acompanha o estado e só altera preço, nunca elegibilidade por si só.
+ * A ordem é deliberada. Fora da grade não existe inventário. Bloqueios e
+ * restrições cadastradas continuam prevalecendo, e concorrência real também.
+ * Quando o próprio anunciante já comprou a data, porém, mostramos esse fato
+ * antes do prazo mínimo: compras passadas precisam continuar azuis no mês para
+ * deixar visível quanto do limite mensal já foi consumido. Depois vêm prazo,
+ * limite mensal e esgotamento. Data especial só altera preço, nunca elegibilidade.
  */
 export function avaliarDisponibilidadeDoDia(
   entrada: EntradaDaDisponibilidade,
@@ -112,15 +112,6 @@ export function avaliarDisponibilidadeDoDia(
     }
   }
 
-  if (dentroDoPrazoMinimo(entrada.hoje, entrada.data, entrada.programa.prazo_minimo_dias)) {
-    return {
-      ...base,
-      estado: 'prazo',
-      selecionavel: false,
-      motivo: `Prazo mínimo de ${entrada.programa.prazo_minimo_dias} dias não atendido.`,
-    }
-  }
-
   const restricao = restricaoQueBloqueia(entrada.restricoes, entrada.cliente)
   if (restricao) {
     return {
@@ -147,6 +138,15 @@ export function avaliarDisponibilidadeDoDia(
       estado: 'ja_comprado',
       selecionavel: false,
       motivo: 'Este anunciante já possui uma ação nesta data.',
+    }
+  }
+
+  if (dentroDoPrazoMinimo(entrada.hoje, entrada.data, entrada.programa.prazo_minimo_dias)) {
+    return {
+      ...base,
+      estado: 'prazo',
+      selecionavel: false,
+      motivo: `Prazo mínimo de ${entrada.programa.prazo_minimo_dias} dias não atendido.`,
     }
   }
 
