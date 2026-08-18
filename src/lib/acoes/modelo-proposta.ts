@@ -4,14 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { podeEditarPrograma, type Perfil } from '../dominio/perfis'
+import type { SecaoDoModeloDeProposta } from '../dados/modelo-proposta'
 
 const BUCKET = 'programas'
 const TAMANHO_MAXIMO_BYTES = 8 * 1024 * 1024
+const SECOES_DE_SLIDE_UNICO = new Set<SecaoDoModeloDeProposta>(['capa', 'valor', 'contracapa'])
+const SECOES_VALIDAS = new Set<SecaoDoModeloDeProposta>([
+  'capa', 'conteudo', 'digital', 'redes_sociais', 'valor', 'observacoes', 'contracapa',
+])
 
-type SlideOrdenavel = { id: string; ordem: number }
-type SlideComImagem = { imagem_url: string }
-type SlideId = { id: string }
-type UltimaOrdem = { ordem: number }
+type SlideBasico = {
+  id: string
+  ordem: number
+  secao: SecaoDoModeloDeProposta
+  imagem_url?: string
+}
 
 function autorizado(
   perfis: Perfil[],
@@ -32,62 +39,132 @@ function caminhoPublicoDaUrl(url: string): string | null {
   return decodeURIComponent(url.slice(indice + marcador.length))
 }
 
-export async function adicionarSlideAoModelo(
+function secaoValida(valor: string): valor is SecaoDoModeloDeProposta {
+  return SECOES_VALIDAS.has(valor as SecaoDoModeloDeProposta)
+}
+
+function validarArquivos(arquivos: File[]): string | null {
+  if (arquivos.length === 0) return 'Escolha uma ou mais imagens para adicionar.'
+  for (const arquivo of arquivos) {
+    if (!['image/png', 'image/jpeg'].includes(arquivo.type)) {
+      return `O arquivo “${arquivo.name}” não é PNG ou JPG.`
+    }
+    if (arquivo.size > TAMANHO_MAXIMO_BYTES) {
+      return `O arquivo “${arquivo.name}” passa de 8 MB. Reduza a imagem e tente de novo.`
+    }
+  }
+  return null
+}
+
+export async function adicionarSlidesAoModelo(
   programaId: string,
+  secaoInformada: string,
   formulario: FormData,
-): Promise<{ erro: string | null }> {
+): Promise<{ erro: string | null; adicionados: number }> {
   const sessao = await obterSessao()
-  if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.' }
+  if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.', adicionados: 0 }
   if (!autorizado(sessao.perfis, sessao.programasVinculados, programaId)) {
-    return { erro: 'Você não tem permissão para alterar o modelo deste programa.' }
+    return { erro: 'Você não tem permissão para alterar o modelo deste programa.', adicionados: 0 }
+  }
+  if (!secaoValida(secaoInformada)) {
+    return { erro: 'Seção de proposta inválida.', adicionados: 0 }
   }
 
-  const arquivo = formulario.get('arquivo')
-  if (!(arquivo instanceof File) || arquivo.size === 0) {
-    return { erro: 'Escolha uma imagem para o slide.' }
-  }
-  if (!['image/png', 'image/jpeg'].includes(arquivo.type)) {
-    return { erro: 'Use uma imagem PNG ou JPG para o slide.' }
-  }
-  if (arquivo.size > TAMANHO_MAXIMO_BYTES) {
-    return { erro: 'A imagem passa de 8 MB. Reduza o arquivo e tente de novo.' }
+  const secao = secaoInformada
+  const arquivos = formulario
+    .getAll('arquivos')
+    .filter((item): item is File => item instanceof File && item.size > 0)
+
+  const erroArquivos = validarArquivos(arquivos)
+  if (erroArquivos) return { erro: erroArquivos, adicionados: 0 }
+
+  if (SECOES_DE_SLIDE_UNICO.has(secao) && arquivos.length > 1) {
+    return {
+      erro: 'Capa, Valor e Contracapa aceitam uma imagem por vez. Selecione apenas um arquivo.',
+      adicionados: 0,
+    }
   }
 
   const supabase = await criarClienteServidor()
-  const { data: ultimo } = await supabase
-    .from('programa_modelo_slides')
-    .select('ordem')
-    .eq('programa_id', programaId)
-    .order('ordem', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const uploads: Array<{ caminho: string; url: string }> = []
 
-  const ultimaOrdem = ultimo as UltimaOrdem | null
-  const ordem = (ultimaOrdem?.ordem ?? 0) + 1
-  const caminho = `modelos/${programaId}/${crypto.randomUUID()}.${extensaoDe(arquivo.name)}`
-  const { error: erroUpload } = await supabase.storage.from(BUCKET).upload(caminho, arquivo, {
-    contentType: arquivo.type,
-    upsert: false,
-  })
+  for (const arquivo of arquivos) {
+    const caminho = `modelos/${programaId}/${secao}/${crypto.randomUUID()}.${extensaoDe(arquivo.name)}`
+    const { error: erroUpload } = await supabase.storage.from(BUCKET).upload(caminho, arquivo, {
+      contentType: arquivo.type,
+      upsert: false,
+    })
 
-  if (erroUpload) {
-    return { erro: `Não foi possível enviar a imagem: ${erroUpload.message}` }
+    if (erroUpload) {
+      if (uploads.length > 0) await supabase.storage.from(BUCKET).remove(uploads.map((item) => item.caminho))
+      return { erro: `Não foi possível enviar “${arquivo.name}”: ${erroUpload.message}`, adicionados: 0 }
+    }
+
+    const { data: publico } = supabase.storage.from(BUCKET).getPublicUrl(caminho)
+    uploads.push({ caminho, url: publico.publicUrl })
   }
 
-  const { data: publico } = supabase.storage.from(BUCKET).getPublicUrl(caminho)
-  const { error: erroRegistro } = await supabase.from('programa_modelo_slides').insert({
-    programa_id: programaId,
-    imagem_url: publico.publicUrl,
-    ordem,
-  })
+  if (SECOES_DE_SLIDE_UNICO.has(secao)) {
+    const { data: existente } = await supabase
+      .from('programa_modelo_slides')
+      .select('id, imagem_url')
+      .eq('programa_id', programaId)
+      .eq('secao', secao)
+      .maybeSingle()
 
-  if (erroRegistro) {
-    await supabase.storage.from(BUCKET).remove([caminho])
-    return { erro: `Não foi possível adicionar o slide: ${erroRegistro.message}` }
+    if (existente?.id) {
+      const { error: erroAtualizar } = await supabase
+        .from('programa_modelo_slides')
+        .update({ imagem_url: uploads[0].url, ordem: 1, atualizado_em: new Date().toISOString() })
+        .eq('id', existente.id)
+        .eq('programa_id', programaId)
+
+      if (erroAtualizar) {
+        await supabase.storage.from(BUCKET).remove([uploads[0].caminho])
+        return { erro: `Não foi possível substituir o slide: ${erroAtualizar.message}`, adicionados: 0 }
+      }
+
+      const caminhoAntigo = existente.imagem_url ? caminhoPublicoDaUrl(existente.imagem_url) : null
+      if (caminhoAntigo) await supabase.storage.from(BUCKET).remove([caminhoAntigo])
+    } else {
+      const { error: erroRegistro } = await supabase.from('programa_modelo_slides').insert({
+        programa_id: programaId,
+        imagem_url: uploads[0].url,
+        secao,
+        ordem: 1,
+      })
+      if (erroRegistro) {
+        await supabase.storage.from(BUCKET).remove([uploads[0].caminho])
+        return { erro: `Não foi possível adicionar o slide: ${erroRegistro.message}`, adicionados: 0 }
+      }
+    }
+  } else {
+    const { data: ultimo } = await supabase
+      .from('programa_modelo_slides')
+      .select('ordem')
+      .eq('programa_id', programaId)
+      .eq('secao', secao)
+      .order('ordem', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const primeiraOrdem = (ultimo?.ordem ?? 0) + 1
+    const registros = uploads.map((upload, indice) => ({
+      programa_id: programaId,
+      imagem_url: upload.url,
+      secao,
+      ordem: primeiraOrdem + indice,
+    }))
+
+    const { error: erroRegistro } = await supabase.from('programa_modelo_slides').insert(registros)
+    if (erroRegistro) {
+      await supabase.storage.from(BUCKET).remove(uploads.map((item) => item.caminho))
+      return { erro: `Não foi possível adicionar os slides: ${erroRegistro.message}`, adicionados: 0 }
+    }
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/modelo`)
-  return { erro: null }
+  return { erro: null, adicionados: uploads.length }
 }
 
 export async function moverSlideDoModelo(
@@ -102,15 +179,27 @@ export async function moverSlideDoModelo(
   }
 
   const supabase = await criarClienteServidor()
+  const { data: atual, error: erroAtual } = await supabase
+    .from('programa_modelo_slides')
+    .select('id, ordem, secao')
+    .eq('id', slideId)
+    .eq('programa_id', programaId)
+    .maybeSingle()
+
+  if (erroAtual || !atual) return { erro: 'Slide não encontrado.' }
+  const secao = atual.secao as SecaoDoModeloDeProposta
+  if (SECOES_DE_SLIDE_UNICO.has(secao)) return { erro: null }
+
   const { data, error } = await supabase
     .from('programa_modelo_slides')
-    .select('id, ordem')
+    .select('id, ordem, secao')
     .eq('programa_id', programaId)
+    .eq('secao', secao)
     .order('ordem', { ascending: true })
     .order('criado_em', { ascending: true })
 
   if (error) return { erro: 'Não foi possível carregar a ordem dos slides.' }
-  const slides = (data ?? []) as SlideOrdenavel[]
+  const slides = (data ?? []) as SlideBasico[]
   const indice = slides.findIndex((slide) => slide.id === slideId)
   if (indice < 0) return { erro: 'Slide não encontrado.' }
 
@@ -146,7 +235,7 @@ export async function removerSlideDoModelo(
   const supabase = await criarClienteServidor()
   const { data: slide } = await supabase
     .from('programa_modelo_slides')
-    .select('imagem_url')
+    .select('imagem_url, secao')
     .eq('id', slideId)
     .eq('programa_id', programaId)
     .maybeSingle()
@@ -159,23 +248,26 @@ export async function removerSlideDoModelo(
 
   if (error) return { erro: 'Não foi possível remover o slide.' }
 
-  const slideComImagem = slide as SlideComImagem | null
-  const caminho = slideComImagem?.imagem_url ? caminhoPublicoDaUrl(slideComImagem.imagem_url) : null
+  const caminho = slide?.imagem_url ? caminhoPublicoDaUrl(slide.imagem_url) : null
   if (caminho) await supabase.storage.from(BUCKET).remove([caminho])
 
-  const { data: restantes } = await supabase
-    .from('programa_modelo_slides')
-    .select('id')
-    .eq('programa_id', programaId)
-    .order('ordem', { ascending: true })
-    .order('criado_em', { ascending: true })
-
-  const itensRestantes = (restantes ?? []) as SlideId[]
-  for (let i = 0; i < itensRestantes.length; i += 1) {
-    await supabase
+  const secao = slide?.secao as SecaoDoModeloDeProposta | undefined
+  if (secao && !SECOES_DE_SLIDE_UNICO.has(secao)) {
+    const { data: restantes } = await supabase
       .from('programa_modelo_slides')
-      .update({ ordem: i + 1, atualizado_em: new Date().toISOString() })
-      .eq('id', itensRestantes[i].id)
+      .select('id, ordem, secao')
+      .eq('programa_id', programaId)
+      .eq('secao', secao)
+      .order('ordem', { ascending: true })
+      .order('criado_em', { ascending: true })
+
+    const itensRestantes = (restantes ?? []) as SlideBasico[]
+    for (let i = 0; i < itensRestantes.length; i += 1) {
+      await supabase
+        .from('programa_modelo_slides')
+        .update({ ordem: i + 1, atualizado_em: new Date().toISOString() })
+        .eq('id', itensRestantes[i].id)
+    }
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/modelo`)
