@@ -41,14 +41,43 @@ function CampoDeMoeda({ rotulo, valor, aoMudar, ajuda }: { rotulo: string; valor
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[12px] font-semibold text-[var(--texto-2)]">{rotulo}</span>
-      <input
-        type="text"
-        value={valor}
-        placeholder="0,00"
-        onChange={(evento) => aoMudar(evento.target.value)}
-        onBlur={() => aoMudar(formatarMoeda(paraNumero(valor)))}
-        className="h-[40px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[13.5px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
-      />
+      <div className="relative">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13.5px] font-semibold text-[var(--texto-2)]">
+          R$
+        </span>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={valor}
+          placeholder="0,00"
+          onChange={(evento) => aoMudar(evento.target.value)}
+          onBlur={() => aoMudar(formatarMoeda(paraNumero(valor)))}
+          className="h-[40px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] pl-9 pr-3 text-[13.5px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+        />
+      </div>
+      {ajuda && <span className="text-[11.5px] text-[var(--texto-3)]">{ajuda}</span>}
+    </label>
+  )
+}
+
+function CampoPercentual({ rotulo, valor, aoMudar, ajuda }: { rotulo: string; valor: string; aoMudar: (valor: string) => void; ajuda?: string }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[12px] font-semibold text-[var(--texto-2)]">{rotulo}</span>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={valor}
+          placeholder="0,00"
+          onChange={(evento) => aoMudar(evento.target.value)}
+          onBlur={() => aoMudar(formatarMoeda(paraNumero(valor)))}
+          className="h-[40px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] pl-3 pr-9 text-[13.5px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[13.5px] font-semibold text-[var(--texto-2)]">
+          %
+        </span>
+      </div>
       {ajuda && <span className="text-[11.5px] text-[var(--texto-3)]">{ajuda}</span>}
     </label>
   )
@@ -90,7 +119,7 @@ export function BlocoDeCustos({
         <div className="grid gap-3 sm:grid-cols-2">
           <CampoDeMoeda rotulo="Custo de mídia TV" valor={rascunho.custo_midia_tv} aoMudar={(valor) => mudar('custo_midia_tv', valor)} />
           <CampoDeMoeda rotulo="Custo de produção TV" valor={rascunho.custo_producao_tv} aoMudar={(valor) => mudar('custo_producao_tv', valor)} />
-          <CampoDeMoeda rotulo="% Simulcast" valor={rascunho.percentual_simulcast} aoMudar={(valor) => mudar('percentual_simulcast', valor)} ajuda="Valor cobrado pela replicação da exibição no Globoplay." />
+          <CampoPercentual rotulo="Simulcast" valor={rascunho.percentual_simulcast} aoMudar={(valor) => mudar('percentual_simulcast', valor)} ajuda="Valor percentual cobrado pela replicação da exibição no Globoplay." />
           <CampoCalculado rotulo="Direitos e conexos (TV)" valor={direitosTv} explicacao="15% da mídia de TV, já somado o simulcast." />
         </div>
       </div>
