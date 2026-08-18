@@ -21,9 +21,9 @@ export type Programa = {
   custo_midia_digital: number | null
   custo_producao_digital: number | null
   /** Complemento opcional da proposta; por enquanto não possui direitos/conexos próprios. */
-  custo_midia_redes_sociais: number | null
+  custo_midia_redes_sociais?: number | null
   /** Campo mantido separado porque a área ainda vai validar se há produção para Redes Sociais. */
-  custo_producao_redes_sociais: number | null
+  custo_producao_redes_sociais?: number | null
   prazo_minimo_dias: number
   disponivel_para_proposta: boolean
   atualizado_em: string
@@ -53,60 +53,37 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     erros.push('Dia da semana inválido: use 0 (domingo) a 6 (sábado).')
   }
 
-  if ((programa.slots ?? 0) < 1) {
-    erros.push('O programa precisa ter pelo menos 1 slot por data.')
-  }
+  if ((programa.slots ?? 0) < 1) erros.push('O programa precisa ter pelo menos 1 slot por data.')
   if ((programa.acoes_minimas ?? 0) > (programa.acoes_maximas ?? 0)) {
     erros.push('A quantidade mínima de ações não pode ser maior que a máxima.')
   }
-  if ((programa.prazo_minimo_dias ?? 0) < 0) {
-    erros.push('O prazo mínimo não pode ser negativo.')
-  }
+  if ((programa.prazo_minimo_dias ?? 0) < 0) erros.push('O prazo mínimo não pode ser negativo.')
 
   if (programa.disponivel_para_proposta === true) {
-    if (programa.custo_midia_tv === null || programa.custo_midia_tv === undefined) {
-      erros.push('Informe o custo de mídia de TV para programas disponíveis para proposta.')
-    }
-    if (programa.custo_producao_tv === null || programa.custo_producao_tv === undefined) {
-      erros.push('Informe o custo de produção de TV para programas disponíveis para proposta.')
-    }
+    if (programa.custo_midia_tv == null) erros.push('Informe o custo de mídia de TV para programas disponíveis para proposta.')
+    if (programa.custo_producao_tv == null) erros.push('Informe o custo de produção de TV para programas disponíveis para proposta.')
   }
 
   if (programa.aceita_regional === true) {
     const dia = programa.dia_da_semana_regional
-    if (dia === null || dia === undefined) {
-      erros.push('Informe o dia da semana da ação regional.')
-    } else if (!Number.isInteger(dia) || dia < 0 || dia > 6) {
-      erros.push('Dia da semana regional inválido: use 0 (domingo) a 6 (sábado).')
-    }
+    if (dia == null) erros.push('Informe o dia da semana da ação regional.')
+    else if (!Number.isInteger(dia) || dia < 0 || dia > 6) erros.push('Dia da semana regional inválido: use 0 (domingo) a 6 (sábado).')
 
     const prazo = programa.prazo_minimo_regional_dias
-    if (prazo === null || prazo === undefined) {
-      erros.push('Informe o prazo mínimo regional.')
-    } else if (prazo < 0) {
-      erros.push('O prazo mínimo regional não pode ser negativo.')
-    }
+    if (prazo == null) erros.push('Informe o prazo mínimo regional.')
+    else if (prazo < 0) erros.push('O prazo mínimo regional não pode ser negativo.')
 
-    if ((programa.max_pracas_por_acao ?? 0) < 1) {
-      erros.push('O máximo de praças por ação regional precisa ser pelo menos 1.')
-    }
+    if ((programa.max_pracas_por_acao ?? 0) < 1) erros.push('O máximo de praças por ação regional precisa ser pelo menos 1.')
   }
 
-  if (
-    programa.bloqueio_mensal_regional !== null &&
-    programa.bloqueio_mensal_regional !== undefined &&
-    programa.bloqueio_mensal_regional < 0
-  ) {
+  if (programa.bloqueio_mensal_regional != null && programa.bloqueio_mensal_regional < 0) {
     erros.push('O bloqueio mensal regional não pode ser negativo.')
   }
 
   return erros
 }
 
-export function vaiAoArEm(
-  programa: Pick<Programa, 'dias_da_semana'>,
-  dataIso: string,
-): boolean {
+export function vaiAoArEm(programa: Pick<Programa, 'dias_da_semana'>, dataIso: string): boolean {
   const dia = new Date(`${dataIso}T00:00:00Z`).getUTCDay()
   return programa.dias_da_semana.includes(dia)
 }
