@@ -34,12 +34,9 @@ function rotuloDoMes(chave: string): string {
 }
 
 /**
- * Passo 6 — Resumo.
- *
- * É a conferência final da consulta antes da proposta. Não recalcula regra de
- * disponibilidade: apenas apresenta o estado já confirmado no passo Datas.
- * A proposta continua fora deste checkpoint e, por isso, o botão final fica
- * bloqueado até a etapa de preço/template ser conectada.
+ * Resumo final da consulta antes da proposta. A seleção já foi feita no
+ * próprio Calendário; esta tela concentra a conferência e, no próximo
+ * checkpoint, receberá o detalhamento financeiro completo da proposta.
  */
 export default function PassoResumo() {
   const pronto = useGuardaDoPasso('resumo')
@@ -72,13 +69,18 @@ export default function PassoResumo() {
           Resumo da consulta
         </h2>
         <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Confira o anunciante, o programa e as novas ações antes da configuração da proposta.
+          Confira anunciante, programa e datas. O detalhamento completo de valores será apresentado aqui antes da geração do PDF.
         </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="h-fit rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
           <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--texto-3)]">Consulta</p>
+
+          <div className="mt-4">
+            <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca</p>
+            <p className="mt-1 text-[14px] font-bold text-[var(--texto)]">{estado.marcaNome ?? '—'}</p>
+          </div>
 
           <div className="mt-4">
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante</p>
@@ -104,7 +106,7 @@ export default function PassoResumo() {
               <p className="mt-1 text-[24px] font-bold text-[var(--texto)]">{totalAcoes}</p>
             </div>
             <span className="rounded-full bg-[var(--disponivel-fundo)] px-3 py-1 text-[11px] font-bold text-[var(--disponivel)]">
-              Datas confirmadas
+              Datas selecionadas
             </span>
           </div>
         </aside>
@@ -149,11 +151,11 @@ export default function PassoResumo() {
       </div>
 
       <AcoesDoPasso
-        voltarPara="datas"
+        voltarPara="calendario"
         avancarPara="proposta"
         avancarRotulo="Gerar proposta"
         habilitado={false}
-        motivo="Preço e template da proposta entram no próximo checkpoint"
+        motivo="O detalhamento financeiro e o PDF entram no próximo checkpoint"
       />
     </div>
   )
