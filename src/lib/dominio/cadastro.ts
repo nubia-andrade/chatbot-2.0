@@ -15,44 +15,24 @@ export type Programa = {
   bloqueio_mensal: number
   acoes_minimas: number
   acoes_maximas: number
-  /** Custos nacionais de TV — Entrega 3. `direitos e conexos` de TV é calculado a partir destes dois, nunca digitado (`direitos-e-conexos.ts`). */
   custo_midia_tv: number | null
   custo_producao_tv: number | null
-  /** Só entra no cálculo de direitos de TV — não existe simulcast de digital. */
   percentual_simulcast: number | null
-  /** Custos nacionais de Digital — Entrega 3. Opcionais: a área ainda não confirmou quais praças vendem digital. */
   custo_midia_digital: number | null
   custo_producao_digital: number | null
+  /** Complemento opcional da proposta; por enquanto não possui direitos/conexos próprios. */
+  custo_midia_redes_sociais: number | null
+  /** Campo mantido separado porque a área ainda vai validar se há produção para Redes Sociais. */
+  custo_producao_redes_sociais: number | null
   prazo_minimo_dias: number
   disponivel_para_proposta: boolean
-  /** Alimenta o "Modificado em" do cartão da lista — Entrega 2. */
   atualizado_em: string
 
-  // Regional — Entrega 2. O bloco só se aplica quando `aceita_regional` é
-  // verdadeiro; os demais campos ficam `null`/vazios em quem não vende
-  // regional (Encontro e É de Casa hoje, por `docs/regras-acoes-regionais.md`).
   aceita_regional: boolean
-  /** 0 (domingo) a 6 (sábado) — o único dia da semana com slot regional. */
   dia_da_semana_regional: number | null
   prazo_minimo_regional_dias: number | null
-  /** Quantas praças uma mesma ação pode reunir. Padrão de banco: 3. */
   max_pracas_por_acao: number
-  /**
-   * Produção regional — Entrega "produção regional". Único por PROGRAMA, não
-   * por praça: um cliente que compra SP, RJ e BH paga a produção uma vez, não
-   * três (`src/lib/dominio/custo-da-acao-regional.ts`). Um só campo para a
-   * ação inteira — não separa TV de digital; se a área pedir produção digital
-   * própria depois, o campo se desdobra então.
-   */
   custo_producao_regional: number | null
-  /**
-   * Bloqueio mensal do REGIONAL — diferente de `bloqueio_mensal` (nacional).
-   * O documento da área diz "4 ações bloqueiam o mês" no regional; a coluna
-   * nacional já vem preenchida com outro número (12 no Encontro, 2 no É de
-   * Casa) e as duas grandezas não cabem numa coluna só. A regra em si (4
-   * ações fecham o mês) ainda não é aplicada em lugar nenhum — só o dado
-   * mora aqui, à espera do calendário regional.
-   */
   bloqueio_mensal_regional: number | null
 }
 
@@ -60,7 +40,6 @@ function vazio(valor: string | undefined | null): boolean {
   return valor === undefined || valor === null || valor.trim() === ''
 }
 
-// R7 — validações do cadastro.
 export function validarPrograma(programa: Partial<Programa>): string[] {
   const erros: string[] = []
 
@@ -84,8 +63,6 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     erros.push('O prazo mínimo não pode ser negativo.')
   }
 
-  // Só a TV é exigida: os campos digitais são opcionais até a área confirmar
-  // quais praças vendem digital (não é exigido aqui de propósito).
   if (programa.disponivel_para_proposta === true) {
     if (programa.custo_midia_tv === null || programa.custo_midia_tv === undefined) {
       erros.push('Informe o custo de mídia de TV para programas disponíveis para proposta.')
@@ -95,10 +72,6 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     }
   }
 
-  // R10/R11 — um programa que aceita regional precisa do dia da semana (o
-  // único em que o slot regional existe) e do prazo mínimo regional; sem os
-  // dois, `temSlotRegionalEm`/`validarCompra` (regional.ts) não têm o que
-  // avaliar.
   if (programa.aceita_regional === true) {
     const dia = programa.dia_da_semana_regional
     if (dia === null || dia === undefined) {
@@ -119,9 +92,6 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     }
   }
 
-  // Bloqueio mensal regional é opcional — nem todo programa vende regional,
-  // e mesmo quem vende pode não ter recebido o número ainda. Só valida
-  // quando informado: não pode ser negativo.
   if (
     programa.bloqueio_mensal_regional !== null &&
     programa.bloqueio_mensal_regional !== undefined &&
