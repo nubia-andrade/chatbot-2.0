@@ -22,6 +22,12 @@ const TEXTO = rgb(0.22, 0.19, 0.23)
 const CINZA = rgb(0.57, 0.55, 0.59)
 const LINHA = rgb(0.88, 0.87, 0.89)
 
+const X_ESQUERDA = 88
+const LARGURA_ESQUERDA = 310
+const X_FINANCEIRO = 515
+const X_VALOR = 842
+const LARGURA_FINANCEIRO = X_VALOR - X_FINANCEIRO
+
 const ARQUIVOS_GLOBOTIPO = {
   corporativaRegular: 'GlobotipoCorporativa-Regular.ttf',
   corporativaBold: 'GlobotipoCorporativa-Bold.ttf',
@@ -34,6 +40,12 @@ type FontesDaProposta = {
   tituloNegrito: PDFFont
   texto: PDFFont
   textoNegrito: PDFFont
+}
+
+type LinhaFinanceira = {
+  rotulo: string
+  valor: number
+  destaque?: boolean
 }
 
 function moeda(valor: number): string {
@@ -173,7 +185,10 @@ function escreverBloco(params: {
     const ultima = visiveis.length - 1
     const base = visiveis[ultima]
     let reduzida = base
-    while (reduzida.length > 0 && params.fonte.widthOfTextAtSize(`${reduzida}…`, params.tamanho) > params.largura) {
+    while (
+      reduzida.length > 0
+      && params.fonte.widthOfTextAtSize(`${reduzida}…`, params.tamanho) > params.largura
+    ) {
       reduzida = reduzida.slice(0, -1)
     }
     visiveis[ultima] = `${reduzida.trimEnd()}…`
@@ -196,7 +211,7 @@ function rotulo(pagina: PDFPage, fonte: PDFFont, texto: string, x: number, y: nu
   pagina.drawText(texto.toUpperCase(), {
     x,
     y,
-    size: 8.2,
+    size: 8.3,
     font: fonte,
     color: CINZA,
   })
@@ -213,18 +228,27 @@ function linhaDeValor(params: {
 }) {
   const fonteRotulo = params.destaque ? params.negrito : params.fonte
   const fonteValor = params.destaque ? params.negrito : params.fonte
-  const tamanho = params.destaque ? 12.2 : 10.2
+  const tamanho = params.destaque ? 12.6 : 10.2
   const valor = moeda(params.valor)
 
+  if (params.destaque) {
+    params.pagina.drawLine({
+      start: { x: X_FINANCEIRO, y: params.y + 17 },
+      end: { x: X_VALOR, y: params.y + 17 },
+      thickness: 1.1,
+      color: LINHA,
+    })
+  }
+
   params.pagina.drawText(params.rotulo, {
-    x: 515,
+    x: X_FINANCEIRO,
     y: params.y,
     size: tamanho,
     font: fonteRotulo,
     color: params.destaque ? TEXTO : CINZA,
   })
   params.pagina.drawText(valor, {
-    x: 834 - fonteValor.widthOfTextAtSize(valor, tamanho),
+    x: X_VALOR - fonteValor.widthOfTextAtSize(valor, tamanho),
     y: params.y,
     size: tamanho,
     font: fonteValor,
@@ -232,11 +256,47 @@ function linhaDeValor(params: {
   })
 
   params.pagina.drawLine({
-    start: { x: 515, y: params.y - 8 },
-    end: { x: 834, y: params.y - 8 },
-    thickness: 0.6,
+    start: { x: X_FINANCEIRO, y: params.y - 8 },
+    end: { x: X_VALOR, y: params.y - 8 },
+    thickness: params.destaque ? 0.9 : 0.55,
     color: LINHA,
   })
+}
+
+function linhasFinanceirasPrincipais(resumo: ResumoFinanceiroDaProposta): LinhaFinanceira[] {
+  return [
+    { rotulo: 'Mídia', valor: resumo.midia_tv },
+    resumo.incluir_digital && resumo.midia_digital > 0
+      ? { rotulo: 'Digital', valor: resumo.midia_digital }
+      : null,
+    resumo.incluir_redes_sociais && resumo.redes_sociais > 0
+      ? { rotulo: 'Redes Sociais', valor: resumo.redes_sociais }
+      : null,
+    resumo.simulcast > 0
+      ? { rotulo: 'Globoplay Simulcast', valor: resumo.simulcast }
+      : null,
+    { rotulo: 'Total', valor: resumo.total_comercial, destaque: true },
+  ].filter((linha): linha is LinhaFinanceira => Boolean(linha))
+}
+
+function linhasFinanceirasSecundarias(resumo: ResumoFinanceiroDaProposta): LinhaFinanceira[] {
+  return [
+    resumo.direitos_tv > 0
+      ? { rotulo: 'Direitos e Conexos', valor: resumo.direitos_tv }
+      : null,
+    resumo.incluir_digital && resumo.direitos_digital > 0
+      ? { rotulo: 'Direitos e Conexos Digital', valor: resumo.direitos_digital }
+      : null,
+    resumo.producao_tv > 0
+      ? { rotulo: 'Custo de Produção', valor: resumo.producao_tv }
+      : null,
+    resumo.incluir_digital && resumo.producao_digital > 0
+      ? { rotulo: 'Custo de Produção Digital', valor: resumo.producao_digital }
+      : null,
+    resumo.incluir_redes_sociais && resumo.producao_redes_sociais > 0
+      ? { rotulo: 'Produção Redes Sociais', valor: resumo.producao_redes_sociais }
+      : null,
+  ].filter((linha): linha is LinhaFinanceira => Boolean(linha))
 }
 
 function condicoesEspeciais(resumo: ResumoFinanceiroDaProposta): string[] {
@@ -249,6 +309,86 @@ function condicoesEspeciais(resumo: ResumoFinanceiroDaProposta): string[] {
     mapa.set(chave, texto)
   }
   return [...mapa.values()]
+}
+
+function renderizarBlocoFinanceiro(params: {
+  pagina: PDFPage
+  fontes: FontesDaProposta
+  resumo: ResumoFinanceiroDaProposta
+}): number {
+  const principais = linhasFinanceirasPrincipais(params.resumo)
+  const secundarias = linhasFinanceirasSecundarias(params.resumo)
+  const quantidadeDeLinhas = principais.length + secundarias.length
+  const passoPrincipal = quantidadeDeLinhas >= 9 ? 27 : 29
+  const passoSecundario = quantidadeDeLinhas >= 9 ? 22 : 24
+
+  let y = 370
+  for (const linha of principais) {
+    linhaDeValor({
+      pagina: params.pagina,
+      fonte: params.fontes.texto,
+      negrito: params.fontes.textoNegrito,
+      rotulo: linha.rotulo,
+      valor: linha.valor,
+      y,
+      destaque: linha.destaque,
+    })
+    y -= linha.destaque ? passoPrincipal + 7 : passoPrincipal
+  }
+
+  if (secundarias.length > 0) y -= 5
+
+  for (const linha of secundarias) {
+    linhaDeValor({
+      pagina: params.pagina,
+      fonte: params.fontes.texto,
+      negrito: params.fontes.textoNegrito,
+      rotulo: linha.rotulo,
+      valor: linha.valor,
+      y,
+    })
+    y -= passoSecundario
+  }
+
+  return y
+}
+
+function renderizarCondicaoEspecial(params: {
+  pagina: PDFPage
+  fontes: FontesDaProposta
+  condicoes: string[]
+  yDepoisDosCustos: number
+}) {
+  if (params.condicoes.length === 0) return
+
+  const ySeparador = Math.max(76, params.yDepoisDosCustos - 2)
+  params.pagina.drawLine({
+    start: { x: X_FINANCEIRO, y: ySeparador },
+    end: { x: X_VALOR, y: ySeparador },
+    thickness: 0.8,
+    color: LINHA,
+  })
+
+  params.pagina.drawText('CONDIÇÃO ESPECIAL', {
+    x: X_FINANCEIRO,
+    y: ySeparador - 18,
+    size: 7.8,
+    font: params.fontes.textoNegrito,
+    color: ROSA,
+  })
+
+  escreverBloco({
+    pagina: params.pagina,
+    texto: params.condicoes.join(' · '),
+    fonte: params.fontes.texto,
+    tamanho: 8.3,
+    x: X_FINANCEIRO,
+    y: ySeparador - 34,
+    largura: LARGURA_FINANCEIRO,
+    entrelinhas: 11,
+    maxLinhas: 3,
+    cor: TEXTO,
+  })
 }
 
 async function adicionarPropostaComercial(params: {
@@ -276,116 +416,72 @@ async function adicionarPropostaComercial(params: {
     incluirRedesSociais: params.resumo.incluir_redes_sociais,
   })
 
-  // Coluna esquerda: contexto comercial. Produto é snapshot para histórico,
-  // mas não é impresso por decisão da área.
-  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', 90, 360)
+  // Coluna esquerda: começa mais alto e trabalha como um bloco editorial único.
+  // Produto continua salvo no snapshot da proposta, mas não é impresso.
+  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', X_ESQUERDA, 414)
   escreverBloco({
     pagina,
     texto: cliente,
     fonte: params.fontes.tituloNegrito,
-    tamanho: 14.5,
-    x: 90,
-    y: 340,
-    largura: 285,
+    tamanho: 19,
+    x: X_ESQUERDA,
+    y: 386,
+    largura: LARGURA_ESQUERDA,
+    entrelinhas: 22,
     maxLinhas: 2,
     cor: ROSA,
   })
 
-  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', 90, 300)
+  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', X_ESQUERDA, 335)
   const depoisConteudo = escreverBloco({
     pagina,
     texto: textoAcao,
     fonte: params.fontes.texto,
-    tamanho: 11.2,
-    x: 90,
-    y: 278,
-    largura: 292,
-    entrelinhas: 15.8,
-    maxLinhas: 6,
+    tamanho: 11.5,
+    x: X_ESQUERDA,
+    y: 312,
+    largura: LARGURA_ESQUERDA,
+    entrelinhas: 16,
+    maxLinhas: 5,
     cor: ROSA,
   })
 
-  const yObjetivo = Math.min(190, depoisConteudo - 18)
-  rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', 90, yObjetivo)
+  const yObjetivo = Math.min(226, depoisConteudo - 17)
+  rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', X_ESQUERDA, yObjetivo)
   escreverBloco({
     pagina,
     texto: params.objetivo,
     fonte: params.fontes.texto,
-    tamanho: 10.6,
-    x: 90,
-    y: yObjetivo - 20,
-    largura: 292,
-    entrelinhas: 14.8,
+    tamanho: 11,
+    x: X_ESQUERDA,
+    y: yObjetivo - 22,
+    largura: LARGURA_ESQUERDA,
+    entrelinhas: 15.5,
     maxLinhas: 7,
     cor: ROSA,
   })
 
-  // Coluna direita: investimento consolidado. Sem tabela por data.
+  // Coluna direita: hierarquia editorial, sem aparência de tabela de planilha.
   pagina.drawText('PROPOSTA COMERCIAL', {
-    x: 515,
-    y: 382,
-    size: 17.5,
+    x: X_FINANCEIRO,
+    y: 410,
+    size: 18.5,
     font: params.fontes.tituloNegrito,
     color: ROSA,
   })
 
-  let y = 342
-  const passo = 30
-  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Mídia', valor: params.resumo.midia_tv, y })
-  y -= passo
+  const yDepoisDosCustos = renderizarBlocoFinanceiro({
+    pagina,
+    fontes: params.fontes,
+    resumo: params.resumo,
+  })
 
-  if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Digital', valor: params.resumo.midia_digital, y })
-    y -= passo
-  }
-  if (params.resumo.incluir_redes_sociais) {
-    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Redes Sociais', valor: params.resumo.redes_sociais, y })
-    y -= passo
-  }
-
-  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Globoplay Simulcast', valor: params.resumo.simulcast, y })
-  y -= passo
-  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Total', valor: params.resumo.total_comercial, y, destaque: true })
-  y -= 38
-
-  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Direitos e Conexos', valor: params.resumo.direitos_tv, y })
-  y -= 26
-  if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Direitos e Conexos Digital', valor: params.resumo.direitos_digital, y })
-    y -= 26
-  }
-  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Custo de Produção', valor: params.resumo.producao_tv, y })
-  y -= 26
-  if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Custo de Produção Digital', valor: params.resumo.producao_digital, y })
-    y -= 26
-  }
-  if (params.resumo.incluir_redes_sociais && params.resumo.producao_redes_sociais > 0) {
-    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Produção Redes Sociais', valor: params.resumo.producao_redes_sociais, y })
-  }
-
-  const condicoes = condicoesEspeciais(params.resumo)
-  if (condicoes.length > 0) {
-    pagina.drawText('CONDIÇÃO ESPECIAL', {
-      x: 515,
-      y: 76,
-      size: 7.5,
-      font: params.fontes.textoNegrito,
-      color: ROSA,
-    })
-    escreverBloco({
-      pagina,
-      texto: condicoes.join(' · '),
-      fonte: params.fontes.texto,
-      tamanho: 8.2,
-      x: 515,
-      y: 62,
-      largura: 320,
-      entrelinhas: 11,
-      maxLinhas: 2,
-      cor: TEXTO,
-    })
-  }
+  renderizarCondicaoEspecial({
+    pagina,
+    fontes: params.fontes,
+    condicoes: condicoesEspeciais(params.resumo),
+    yDepoisDosCustos,
+  })
 }
 
 async function adicionarSlides(
