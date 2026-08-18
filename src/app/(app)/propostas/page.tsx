@@ -45,6 +45,11 @@ export default async function PaginaPropostas() {
                   <span className="rounded-full bg-[var(--superficie-suave)] px-2.5 py-1 text-[10.5px] font-bold text-[var(--texto-2)]">{ROTULO_STATUS[proposta.status] ?? proposta.status}</span>
                 </div>
                 <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">{proposta.cliente_nome} · {proposta.modalidade === 'regional' ? 'Regional' : 'Nacional'} · {dataHora(proposta.criado_em)}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="rounded-full border border-[var(--borda)] bg-[var(--superficie-suave)] px-2 py-1 text-[10px] font-semibold text-[var(--texto-2)]">TV</span>
+                  {proposta.inclui_digital && <span className="rounded-full border border-[#DDD6FE] bg-[#F5F3FF] px-2 py-1 text-[10px] font-semibold text-[var(--roxo)]">Digital</span>}
+                  {proposta.inclui_redes_sociais && <span className="rounded-full border border-[#D8E8FF] bg-[#F1F6FF] px-2 py-1 text-[10px] font-semibold text-[#315EA8]">Redes sociais</span>}
+                </div>
                 {proposta.erro && <p className="mt-2 text-[11px] text-[var(--concorrencia-texto)]">{proposta.erro}</p>}
               </div>
 
