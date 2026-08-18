@@ -45,9 +45,13 @@ describe('deveImportar', () => {
     expect(deveImportar(bruto({ data_de_exibicao: '15/08/2026' }), HOJE)).toBe(true)
   })
 
-  // R3: o passado não interessa
-  it('recusa exibição passada', () => {
-    expect(deveImportar(bruto({ data_de_exibicao: '14/08/2026' }), HOJE)).toBe(false)
+  it('mantém uma exibição passada do mesmo mês para o limite mensal', () => {
+    expect(deveImportar(bruto({ data_de_exibicao: '01/08/2026' }), HOJE)).toBe(true)
+    expect(deveImportar(bruto({ data_de_exibicao: '14/08/2026' }), HOJE)).toBe(true)
+  })
+
+  it('recusa exibição de mês anterior', () => {
+    expect(deveImportar(bruto({ data_de_exibicao: '31/07/2026' }), HOJE)).toBe(false)
   })
 
   // R4: sentinela de ação sem data definida
