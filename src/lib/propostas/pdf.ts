@@ -9,7 +9,7 @@ import type { ResumoFinanceiroDaProposta } from '../dominio/resumo-financeiro'
 import {
   slidesDaSecao,
   type SlideDoModeloDeProposta,
-} from '../dados/modelo-proposta'
+} from '../dominio/modelo-proposta'
 
 const LARGURA = 960
 const ALTURA = 540
