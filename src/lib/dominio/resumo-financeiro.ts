@@ -47,6 +47,10 @@ function multiplicar(valor: number, quantidade: number): number {
   return arredondar(valor * quantidade)
 }
 
+function comAcrescimo(valor: number, percentual: number): number {
+  return percentual > 0 ? aplicarAcrescimo(valor, percentual) : valor
+}
+
 function linhaNacional(
   programa: Programa,
   item: ItemParaResumoFinanceiro,
@@ -55,12 +59,10 @@ function linhaNacional(
   const periodo = periodoEspecialEm(periodos, item.data)
   const percentual = periodo?.percentual_acrescimo ?? 0
 
-  // Regra vigente do domínio: o acréscimo de período especial incide sobre
-  // a mídia antes de direitos/conexos. Digital permanece no valor cadastrado
-  // enquanto a regra comercial específica para Digital não for alterada.
-  const midiaTvBase = programa.custo_midia_tv ?? 0
-  const midiaTvUnit = percentual > 0 ? aplicarAcrescimo(midiaTvBase, percentual) : midiaTvBase
-  const midiaDigitalUnit = programa.custo_midia_digital ?? 0
+  // Datas especiais aumentam a MÍDIA antes do cálculo de simulcast e
+  // direitos/conexos. Produção não recebe o acréscimo.
+  const midiaTvUnit = comAcrescimo(programa.custo_midia_tv ?? 0, percentual)
+  const midiaDigitalUnit = comAcrescimo(programa.custo_midia_digital ?? 0, percentual)
   const simulcastUnit = arredondar(midiaTvUnit * ((programa.percentual_simulcast ?? 0) / 100))
   const producaoUnit = arredondar((programa.custo_producao_tv ?? 0) + (programa.custo_producao_digital ?? 0))
   const direitosTvUnit = calcularDireitosTv(midiaTvUnit, programa.percentual_simulcast) ?? 0
@@ -111,10 +113,8 @@ function linhaRegional(
   let direitosDigitalUnit = 0
 
   for (const preco of precosSelecionados) {
-    const tv = percentual > 0
-      ? aplicarAcrescimo(preco.custo_midia_tv, percentual)
-      : preco.custo_midia_tv
-    const digital = preco.custo_midia_digital ?? 0
+    const tv = comAcrescimo(preco.custo_midia_tv, percentual)
+    const digital = comAcrescimo(preco.custo_midia_digital ?? 0, percentual)
     const simulcast = arredondar(tv * ((preco.percentual_simulcast ?? 0) / 100))
 
     midiaTvUnit += tv
@@ -127,6 +127,7 @@ function linhaRegional(
   const midiaTv = multiplicar(arredondar(midiaTvUnit), item.quantidade)
   const midiaDigital = multiplicar(arredondar(midiaDigitalUnit), item.quantidade)
   const simulcast = multiplicar(arredondar(simulcastUnit), item.quantidade)
+  // Produção regional é cobrada uma vez por ação, independentemente de 1, 2 ou 3 praças.
   const producao = multiplicar(programa.custo_producao_regional ?? 0, item.quantidade)
   const direitosTv = multiplicar(arredondar(direitosTvUnit), item.quantidade)
   const direitosDigital = multiplicar(arredondar(direitosDigitalUnit), item.quantidade)
