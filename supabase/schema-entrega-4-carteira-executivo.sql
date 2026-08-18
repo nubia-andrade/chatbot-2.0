@@ -39,6 +39,11 @@ as $$
     select
       trim(coalesce(termo_busca, '')) as termo,
       lower(trim(coalesce(auth.jwt() ->> 'email', ''))) as email_logado,
+      normalizar_nome_take(coalesce((
+        select u.nome
+        from usuario u
+        where u.usuario_id = auth.uid()
+      ), '')) as nome_logado,
       e_proprietario() or tem_perfil('consultor_programa') as pode_ver_toda_carteira
   ),
   clientes_visiveis as (
@@ -47,6 +52,10 @@ as $$
     cross join contexto ctx
     where ctx.pode_ver_toda_carteira
        or lower(trim(coalesce(c.email, ''))) = ctx.email_logado
+       or (
+         ctx.nome_logado <> ''
+         and normalizar_nome_take(coalesce(c.executivo, '')) = ctx.nome_logado
+       )
   ),
   resultados as (
     -- Cliente/anunciante da carteira. Garante que clientes ainda sem marca
@@ -114,7 +123,8 @@ grant execute on function buscar_marcas(text, integer) to authenticated;
 
 -- Conferência para um executivo logado:
 --   select * from buscar_marcas('', 20);
--- Deve listar a própria carteira.
+-- Deve listar a própria carteira. O vínculo é feito primeiro por e-mail e,
+-- como fallback, pelo nome do executivo salvo em `usuario` x `clientes.executivo`.
 --
 -- Busca por cliente:
 --   select * from buscar_marcas('ADEMICON', 20);
