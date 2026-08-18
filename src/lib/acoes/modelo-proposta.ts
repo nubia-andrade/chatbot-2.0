@@ -8,6 +8,11 @@ import { podeEditarPrograma, type Perfil } from '../dominio/perfis'
 const BUCKET = 'programas'
 const TAMANHO_MAXIMO_BYTES = 8 * 1024 * 1024
 
+type SlideOrdenavel = { id: string; ordem: number }
+type SlideComImagem = { imagem_url: string }
+type SlideId = { id: string }
+type UltimaOrdem = { ordem: number }
+
 function autorizado(
   perfis: Perfil[],
   programasVinculados: string[],
@@ -57,7 +62,8 @@ export async function adicionarSlideAoModelo(
     .limit(1)
     .maybeSingle()
 
-  const ordem = (ultimo?.ordem ?? 0) + 1
+  const ultimaOrdem = ultimo as UltimaOrdem | null
+  const ordem = (ultimaOrdem?.ordem ?? 0) + 1
   const caminho = `modelos/${programaId}/${crypto.randomUUID()}.${extensaoDe(arquivo.name)}`
   const { error: erroUpload } = await supabase.storage.from(BUCKET).upload(caminho, arquivo, {
     contentType: arquivo.type,
@@ -104,7 +110,7 @@ export async function moverSlideDoModelo(
     .order('criado_em', { ascending: true })
 
   if (error) return { erro: 'Não foi possível carregar a ordem dos slides.' }
-  const slides = data ?? []
+  const slides = (data ?? []) as SlideOrdenavel[]
   const indice = slides.findIndex((slide) => slide.id === slideId)
   if (indice < 0) return { erro: 'Slide não encontrado.' }
 
@@ -153,7 +159,8 @@ export async function removerSlideDoModelo(
 
   if (error) return { erro: 'Não foi possível remover o slide.' }
 
-  const caminho = slide?.imagem_url ? caminhoPublicoDaUrl(slide.imagem_url) : null
+  const slideComImagem = slide as SlideComImagem | null
+  const caminho = slideComImagem?.imagem_url ? caminhoPublicoDaUrl(slideComImagem.imagem_url) : null
   if (caminho) await supabase.storage.from(BUCKET).remove([caminho])
 
   const { data: restantes } = await supabase
@@ -163,7 +170,7 @@ export async function removerSlideDoModelo(
     .order('ordem', { ascending: true })
     .order('criado_em', { ascending: true })
 
-  const itensRestantes = restantes ?? []
+  const itensRestantes = (restantes ?? []) as SlideId[]
   for (let i = 0; i < itensRestantes.length; i += 1) {
     await supabase
       .from('programa_modelo_slides')
