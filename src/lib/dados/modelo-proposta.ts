@@ -23,7 +23,7 @@ export type SlideDoModeloDeProposta = {
 }
 
 const ORDEM_DAS_SECOES = new Map<SecaoDoModeloDeProposta, number>(
-  SECOES_DO_MODELO.map((secao, indice) => [secao, indice]),
+  SECOES_DO_MODELO.map((secao, indice) => [secao, indice] as const),
 )
 
 export function ordenarSlidesDoModelo(
