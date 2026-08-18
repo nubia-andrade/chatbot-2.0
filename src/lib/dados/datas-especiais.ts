@@ -11,6 +11,12 @@ export type PeriodoEspecial = {
   dias_da_semana: number[] | null
 }
 
+function faltaColunaDiasDaSemana(mensagem: string): boolean {
+  const normalizada = mensagem.toLowerCase()
+  return normalizada.includes('dias_da_semana')
+    && (normalizada.includes('does not exist') || normalizada.includes('could not find'))
+}
+
 /**
  * Quantos períodos especiais um programa tem — alimenta o contador da aba
  * "Datas especiais" em `AbasDoPrograma` ("Datas especiais · 2").
@@ -46,7 +52,16 @@ export async function listarDatasEspeciais(programaId: string): Promise<PeriodoE
     .order('data_inicio', { ascending: false })
 
   if (error) {
-    console.error('Falha ao listar datas especiais:', error.message)
+    // Em ambiente local, console.error abre o overlay vermelho do Next.js.
+    // Para este caso de schema conhecido, a própria tela já orienta qual
+    // migration executar; warn preserva o diagnóstico sem bloquear a UX.
+    if (faltaColunaDiasDaSemana(error.message)) {
+      console.warn(
+        'Banco desatualizado: execute supabase/schema-correcao-proposta-datas-especiais.sql.',
+      )
+    } else {
+      console.error('Falha ao listar datas especiais:', error.message)
+    }
     return []
   }
 
