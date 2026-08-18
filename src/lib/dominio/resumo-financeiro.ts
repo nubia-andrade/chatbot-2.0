@@ -192,8 +192,21 @@ export function calcularResumoFinanceiro(params: {
   incluirDigital?: boolean
   incluirRedesSociais?: boolean
 }): ResumoFinanceiroDaProposta {
-  const incluirDigital = Boolean(params.incluirDigital && params.programa.contem_digital)
-  const incluirRedesSociais = Boolean(params.incluirRedesSociais && params.programa.redes_sociais)
+  // Não basta o marcador estar ativo: sem valor comercial cadastrado, o
+  // complemento fica indisponível para evitar uma proposta de R$ 0,00 por
+  // configuração incompleta.
+  const incluirDigital = Boolean(
+    params.incluirDigital &&
+    params.programa.contem_digital &&
+    params.programa.custo_midia_digital !== null &&
+    params.programa.custo_midia_digital !== undefined,
+  )
+  const incluirRedesSociais = Boolean(
+    params.incluirRedesSociais &&
+    params.programa.redes_sociais &&
+    params.programa.custo_midia_redes_sociais !== null &&
+    params.programa.custo_midia_redes_sociais !== undefined,
+  )
 
   const linhas = params.itens.map((item) =>
     params.modalidade === 'regional'
