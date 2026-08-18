@@ -139,7 +139,7 @@ begin
   -- aliases novos, só casa automaticamente quando existe exatamente UM nome
   -- normalizado igual na carteira.
   if v_cliente_id is null and v_status <> 'confirmado' then
-    select min(id), count(*)::integer
+    select (array_agg(id order by id::text))[1], count(*)::integer
       into v_candidato, v_total_candidatos
     from clientes
     where nome_normalizado_take = v_anunciante_norm;
@@ -241,7 +241,7 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- 5. RLS.
+-- 5. RLS e privilégios.
 -- ---------------------------------------------------------------------------
 alter table marcas enable row level security;
 alter table anunciantes_take enable row level security;
@@ -267,6 +267,11 @@ create policy "atualizacao administrador" on anunciantes_take
   using (e_administrador())
   with check (e_administrador());
 
+-- Funções internas do trigger não ficam expostas como RPC gravável para uma
+-- sessão comum. Só a função de busca é pública para usuários autenticados.
+revoke execute on function registrar_marca_take(text, text) from public;
+revoke execute on function aprender_marca_ao_importar_acao() from public;
+revoke execute on function buscar_marcas(text, integer) from public;
 grant execute on function buscar_marcas(text, integer) to authenticated;
 
 -- Conferência útil depois de aplicar:
