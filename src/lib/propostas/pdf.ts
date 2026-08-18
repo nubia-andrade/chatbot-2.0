@@ -405,7 +405,12 @@ async function adicionarPropostaComercial(params: {
   resumo: ResumoFinanceiroDaProposta
 }) {
   const pagina = await novaPaginaDeValor(params.pdf, params.fundo)
-  const cliente = params.marcaNome ?? params.clienteNome
+  const anunciante = params.clienteNome.trim()
+  const marca = params.marcaNome?.trim() || null
+  const exibirMarca = Boolean(
+    marca
+    && marca.localeCompare(anunciante, 'pt-BR', { sensitivity: 'base' }) !== 0,
+  )
   const textoAcao = descreverAcaoDaProposta({
     programaNome: params.programaNome,
     modalidade: params.modalidade,
@@ -418,37 +423,57 @@ async function adicionarPropostaComercial(params: {
     incluirRedesSociais: params.resumo.incluir_redes_sociais,
   })
 
-  // Coluna esquerda: bloco editorial mais alto, com marca dominante e labels legíveis.
+  // Coluna esquerda: anunciante oficial + marca comercial, quando forem distintos.
   // Produto continua salvo no snapshot da proposta, mas não é impresso.
-  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', X_ESQUERDA, 432)
+  rotulo(pagina, params.fontes.textoNegrito, 'Anunciante', X_ESQUERDA, 438)
   escreverBloco({
     pagina,
-    texto: cliente,
-    fonte: params.fontes.tituloNegrito,
-    tamanho: 21,
+    texto: anunciante,
+    fonte: exibirMarca ? params.fontes.textoNegrito : params.fontes.tituloNegrito,
+    tamanho: exibirMarca ? 13.8 : 21,
     x: X_ESQUERDA,
-    y: 404,
+    y: 416,
     largura: LARGURA_ESQUERDA,
-    entrelinhas: 24,
+    entrelinhas: exibirMarca ? 17 : 24,
     maxLinhas: 2,
     cor: ROSA,
   })
 
-  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', X_ESQUERDA, 353)
+  let yConteudo = 348
+
+  if (exibirMarca && marca) {
+    rotulo(pagina, params.fontes.textoNegrito, 'Marca', X_ESQUERDA, 382)
+    escreverBloco({
+      pagina,
+      texto: marca,
+      fonte: params.fontes.tituloNegrito,
+      tamanho: 21,
+      x: X_ESQUERDA,
+      y: 358,
+      largura: LARGURA_ESQUERDA,
+      entrelinhas: 24,
+      maxLinhas: 2,
+      cor: ROSA,
+    })
+    yConteudo = 306
+  }
+
+  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', X_ESQUERDA, yConteudo)
   const depoisConteudo = escreverBloco({
     pagina,
     texto: textoAcao,
     fonte: params.fontes.texto,
     tamanho: 12,
     x: X_ESQUERDA,
-    y: 330,
+    y: yConteudo - 23,
     largura: LARGURA_ESQUERDA,
     entrelinhas: 16.8,
     maxLinhas: 5,
     cor: ROSA,
   })
 
-  const yObjetivo = Math.min(244, depoisConteudo - 18)
+  const limiteObjetivo = exibirMarca ? 194 : 244
+  const yObjetivo = Math.min(limiteObjetivo, depoisConteudo - 18)
   rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', X_ESQUERDA, yObjetivo)
   escreverBloco({
     pagina,
