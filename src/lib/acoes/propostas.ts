@@ -56,6 +56,30 @@ function resultadoFalha(erro: string, extras: Partial<ResultadoGerarProposta> = 
   }
 }
 
+function erroDeSchemaDaProposta(mensagem: string | undefined): string | null {
+  if (!mensagem) return null
+  const normalizada = mensagem.toLowerCase()
+  const colunasIncrementais = [
+    'produto',
+    'objetivo',
+    'inclui_digital',
+    'inclui_redes_sociais',
+    'valor_redes_sociais',
+    'valor_producao_tv',
+    'valor_producao_digital',
+    'valor_producao_redes_sociais',
+  ]
+
+  const mencionaColunaIncremental = colunasIncrementais.some((coluna) => normalizada.includes(coluna))
+  const pareceErroDeSchema = normalizada.includes('does not exist')
+    || normalizada.includes('could not find')
+    || normalizada.includes('schema cache')
+
+  if (!mencionaColunaIncremental || !pareceErroDeSchema) return null
+
+  return 'O banco ainda não possui todos os campos da proposta. Execute no Supabase o arquivo supabase/schema-correcao-proposta-datas-especiais.sql e tente novamente.'
+}
+
 function mesesDaEntrada(itens: ItemParaResumoFinanceiro[]): { ano: number; mes: number; quantidade: number }[] {
   const mapa = new Map<string, Set<string>>()
   for (const item of itens) {
@@ -179,6 +203,12 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
     .single()
 
   if (erroProposta || !proposta?.id) {
+    const orientacaoSchema = erroDeSchemaDaProposta(erroProposta?.message)
+    if (orientacaoSchema) {
+      console.warn('Banco desatualizado ao criar proposta:', erroProposta?.message)
+      return resultadoFalha(orientacaoSchema, { consultaId: consulta.id })
+    }
+
     console.error('Falha ao criar proposta:', erroProposta?.message)
     return resultadoFalha('Não foi possível criar a proposta.', { consultaId: consulta.id })
   }
