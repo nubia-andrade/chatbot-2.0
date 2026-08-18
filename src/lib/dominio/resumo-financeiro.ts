@@ -1,4 +1,4 @@
-import { aplicarAcrescimo, type PeriodoEspecial } from './datas-especiais'
+import { aplicarAcrescimo, periodoEspecialEm, type PeriodoEspecial } from './datas-especiais'
 import { calcularDireitosDigital, calcularDireitosTv } from './direitos-e-conexos'
 import type { Programa } from './cadastro'
 import type { PrecoDePraca } from '../dados/regional'
@@ -43,10 +43,6 @@ function arredondar(valor: number): number {
   return Math.round((valor + Number.EPSILON) * 100) / 100
 }
 
-function periodoDaData(periodos: PeriodoEspecial[], data: string): PeriodoEspecial | null {
-  return periodos.find((periodo) => data >= periodo.data_inicio && data <= periodo.data_fim) ?? null
-}
-
 function multiplicar(valor: number, quantidade: number): number {
   return arredondar(valor * quantidade)
 }
@@ -56,11 +52,12 @@ function linhaNacional(
   item: ItemParaResumoFinanceiro,
   periodos: PeriodoEspecial[],
 ): LinhaFinanceiraDaProposta {
-  const periodo = periodoDaData(periodos, item.data)
+  const periodo = periodoEspecialEm(periodos, item.data)
   const percentual = periodo?.percentual_acrescimo ?? 0
 
-  // Regra vigente: o acréscimo de período especial incide na mídia de TV.
-  // Digital permanece com o preço cadastrado até definição comercial diversa.
+  // Regra vigente do domínio: o acréscimo de período especial incide sobre
+  // a mídia antes de direitos/conexos. Digital permanece no valor cadastrado
+  // enquanto a regra comercial específica para Digital não for alterada.
   const midiaTvBase = programa.custo_midia_tv ?? 0
   const midiaTvUnit = percentual > 0 ? aplicarAcrescimo(midiaTvBase, percentual) : midiaTvBase
   const midiaDigitalUnit = programa.custo_midia_digital ?? 0
@@ -102,7 +99,7 @@ function linhaRegional(
   periodos: PeriodoEspecial[],
   precos: PrecoDePraca[],
 ): LinhaFinanceiraDaProposta {
-  const periodo = periodoDaData(periodos, item.data)
+  const periodo = periodoEspecialEm(periodos, item.data)
   const percentual = periodo?.percentual_acrescimo ?? 0
   const selecionados = new Set(item.pracas)
   const precosSelecionados = precos.filter((preco) => selecionados.has(preco.praca_codigo))
@@ -130,7 +127,6 @@ function linhaRegional(
   const midiaTv = multiplicar(arredondar(midiaTvUnit), item.quantidade)
   const midiaDigital = multiplicar(arredondar(midiaDigitalUnit), item.quantidade)
   const simulcast = multiplicar(arredondar(simulcastUnit), item.quantidade)
-  // Produção regional é uma cobrança única por ação, independentemente de 1, 2 ou 3 praças.
   const producao = multiplicar(programa.custo_producao_regional ?? 0, item.quantidade)
   const direitosTv = multiplicar(arredondar(direitosTvUnit), item.quantidade)
   const direitosDigital = multiplicar(arredondar(direitosDigitalUnit), item.quantidade)
