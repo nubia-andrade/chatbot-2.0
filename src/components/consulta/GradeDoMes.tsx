@@ -35,7 +35,7 @@ export function GradeDoMes({ dias, ano, mes, selecionadas, aoAlternar }: Props) 
         {NOMES_CURTOS_DOS_DIAS.map((nome) => (
           <div
             key={nome}
-            className="text-center text-[10.5px] font-bold uppercase tracking-wide text-[var(--texto-3)] sm:text-[11px]"
+            className="text-center text-[10.5px] font-bold uppercase tracking-wide text-[var(--texto-2)] sm:text-[11px]"
           >
             {nome}
           </div>

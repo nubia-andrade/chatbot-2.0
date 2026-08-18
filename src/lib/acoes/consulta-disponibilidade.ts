@@ -7,7 +7,7 @@ import { listarDatasBloqueadas } from '../dados/datas-bloqueadas'
 import { listarDatasEspeciais } from '../dados/datas-especiais'
 import { listarRestricoes } from '../dados/restricoes'
 import { lerPaginado } from '../dados/paginacao'
-import { avaliarDisponibilidadeDoDia, type DisponibilidadeDoDia } from '../dominio/disponibilidade'
+import { avaliarDisponibilidadeDoDia, type DisponibilidadeDoDia } from '../dominio/disponibilidade-dia'
 import { montarMapa, ocupaSlot } from '../dominio/formatos'
 import { encontrarProgramaId, montarIndice } from '../dominio/programas'
 import { normalizarNome } from '../dominio/texto'
@@ -295,3 +295,4 @@ export async function consultarDisponibilidadeMensal(
     dias,
   }
 }
+
