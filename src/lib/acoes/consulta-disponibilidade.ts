@@ -23,6 +23,8 @@ export type ResultadoDaDisponibilidadeMensal = {
   } | null
   ano: number
   mes: number
+  limiteMensal: number
+  acoesDoAnuncianteNoMes: number
   dias: DisponibilidadeDoDia[]
 }
 
@@ -39,6 +41,7 @@ type AcaoDoTake = {
   data_de_exibicao: string
   formato: string
   anunciante: string
+  marca: string
 }
 
 type AcaoRegionalDoMes = {
@@ -53,6 +56,23 @@ type ClienteClassificado = {
   nome: string
   setor: string | null
   industria: string | null
+}
+
+type AliasDoTake = {
+  id: string
+  nome_normalizado: string
+  cliente_id: string | null
+}
+
+type MarcaDoTake = {
+  id: string
+  nome_normalizado: string
+}
+
+type RelacaoMarcaAnunciante = {
+  anunciante_take_id: string
+  marca_id: string
+  cliente_id_override: string | null
 }
 
 function dataDoBrasil(): string {
@@ -90,6 +110,8 @@ export async function consultarDisponibilidadeMensal(
     programa: null,
     ano: parametros.ano,
     mes: parametros.mes,
+    limiteMensal: 0,
+    acoesDoAnuncianteNoMes: 0,
     dias: [],
   }
 
@@ -124,7 +146,7 @@ export async function consultarDisponibilidadeMensal(
       lerPaginado<AcaoDoTake>((de, ate) =>
         supabase
           .from('acoes_vendidas')
-          .select('numero_da_entrega, programa, data_de_exibicao, formato, anunciante')
+          .select('numero_da_entrega, programa, data_de_exibicao, formato, anunciante, marca')
           .gte('data_de_exibicao', intervalo.inicio)
           .lte('data_de_exibicao', intervalo.fim)
           .range(de, ate),
@@ -181,8 +203,7 @@ export async function consultarDisponibilidadeMensal(
 
       // Uma ação regional possui uma linha por praça. Para o inventário
       // nacional ela consome UM slot, não 2/3 slots quando a mesma ação compra
-      // várias praças. Sem número da entrega, cliente+data é a melhor chave da
-      // ação e também cobre compras complementares de praça feitas depois.
+      // várias praças.
       const chaveRegional = chaveEntrega
         ? `entrega|${chaveEntrega}`
         : `cliente|${acao.data_de_exibicao}|${acao.cliente_id ?? normalizarNome(acao.cliente_nome)}`
@@ -195,31 +216,92 @@ export async function consultarDisponibilidadeMensal(
     }
   }
 
-  // Enriquece os anunciantes das vendas com setor/indústria da carteira. Os
-  // aliases foram aprendidos pelo schema-marcas-take.sql; sem vínculo seguro,
-  // a venda continua ocupando slot, mas não gera concorrência sem classificação.
+  // A origem pode trazer uma marca associada a um anunciante que foi corrigido
+  // manualmente na governança (ex.: PAGBANK sob PORTO SEGURO). Por isso a venda
+  // precisa ser resolvida pelo PAR anunciante + marca, respeitando o override da
+  // relação antes do cliente padrão do alias.
   const nomesNormalizados = [
     ...new Set(acoesQueOcupam.map((acao) => normalizarNome(acao.anunciante)).filter(Boolean)),
   ]
-  const aliases = nomesNormalizados.length
-    ? await supabase
-        .from('anunciantes_take')
-        .select('nome_normalizado, cliente_id')
-        .in('nome_normalizado', nomesNormalizados)
-    : { data: [], error: null }
+  const marcasNormalizadas = [
+    ...new Set(acoesQueOcupam.map((acao) => normalizarNome(acao.marca)).filter(Boolean)),
+  ]
 
-  if (aliases.error) {
+  const [aliases, marcas] = await Promise.all([
+    nomesNormalizados.length
+      ? supabase
+          .from('anunciantes_take')
+          .select('id, nome_normalizado, cliente_id')
+          .in('nome_normalizado', nomesNormalizados)
+      : Promise.resolve({ data: [], error: null }),
+    marcasNormalizadas.length
+      ? supabase
+          .from('marcas')
+          .select('id, nome_normalizado')
+          .in('nome_normalizado', marcasNormalizadas)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (aliases.error || marcas.error) {
     return { ...vazio, erro: 'Não foi possível relacionar as vendas aos anunciantes da carteira.' }
   }
 
-  const aliasParaCliente = new Map<string, string>()
-  for (const alias of aliases.data ?? []) {
-    if (alias.cliente_id) aliasParaCliente.set(alias.nome_normalizado, alias.cliente_id)
+  const aliasPorNome = new Map<string, AliasDoTake>(
+    ((aliases.data ?? []) as AliasDoTake[]).map((alias) => [alias.nome_normalizado, alias]),
+  )
+  const marcaPorNome = new Map<string, MarcaDoTake>(
+    ((marcas.data ?? []) as MarcaDoTake[]).map((marca) => [marca.nome_normalizado, marca]),
+  )
+  const aliasIds = [...new Set([...aliasPorNome.values()].map((alias) => alias.id))]
+  const marcaIds = [...new Set([...marcaPorNome.values()].map((marca) => marca.id))]
+
+  const relacoes = aliasIds.length > 0 && marcaIds.length > 0
+    ? await supabase
+        .from('anunciante_take_marcas')
+        .select('anunciante_take_id, marca_id, cliente_id_override')
+        .in('anunciante_take_id', aliasIds)
+        .in('marca_id', marcaIds)
+    : { data: [], error: null }
+
+  if (relacoes.error) {
+    return { ...vazio, erro: 'Não foi possível aplicar as correções de marca e anunciante.' }
   }
 
-  const idsDeClientesVendidos = new Set<string>(
-    [...aliasParaCliente.values(), ...acoesRegionais.map((acao) => acao.cliente_id).filter(Boolean)] as string[],
-  )
+  const overridePorPar = new Map<string, string>()
+  for (const relacao of (relacoes.data ?? []) as RelacaoMarcaAnunciante[]) {
+    if (relacao.cliente_id_override) {
+      overridePorPar.set(
+        `${relacao.anunciante_take_id}|${relacao.marca_id}`,
+        relacao.cliente_id_override,
+      )
+    }
+  }
+
+  function clienteEfetivoDaAcao(acao: AcaoDoTake): string | null {
+    const alias = aliasPorNome.get(normalizarNome(acao.anunciante))
+    if (!alias) return null
+
+    const marca = marcaPorNome.get(normalizarNome(acao.marca))
+    const override = marca
+      ? overridePorPar.get(`${alias.id}|${marca.id}`)
+      : undefined
+
+    return override ?? alias.cliente_id ?? null
+  }
+
+  const acoesResolvidas = acoesQueOcupam.map((acao) => ({
+    acao,
+    clienteId: clienteEfetivoDaAcao(acao),
+  }))
+
+  const idsDeClientesVendidos = new Set<string>()
+  for (const item of acoesResolvidas) {
+    if (item.clienteId) idsDeClientesVendidos.add(item.clienteId)
+  }
+  for (const acao of acoesRegionais) {
+    if (acao.cliente_id) idsDeClientesVendidos.add(acao.cliente_id)
+  }
+
   const leituraClientesVendidos = idsDeClientesVendidos.size
     ? await supabase
         .from('clientes')
@@ -236,6 +318,8 @@ export async function consultarDisponibilidadeMensal(
   )
   const vendasPorData = new Map<string, { anunciante: string; setor: string | null; industria: string | null }[]>()
   const vendasJaIncluidas = new Set<string>()
+  const datasDoProprioAnunciante = new Set<string>()
+  const entregasDoProprioAnunciante = new Set<string>()
 
   function incluirVenda(data: string, clienteVenda: ClienteClassificado) {
     const chave = `${data}|${clienteVenda.id}`
@@ -250,16 +334,22 @@ export async function consultarDisponibilidadeMensal(
     vendasPorData.set(data, vendas)
   }
 
-  for (const acao of acoesQueOcupam) {
-    const clienteId = aliasParaCliente.get(normalizarNome(acao.anunciante))
-    if (!clienteId) continue
-    const classificado = clientesPorId.get(clienteId)
-    if (classificado) incluirVenda(acao.data_de_exibicao, classificado)
+  for (const item of acoesResolvidas) {
+    if (!item.clienteId) continue
+    const classificado = clientesPorId.get(item.clienteId)
+    if (classificado) incluirVenda(item.acao.data_de_exibicao, classificado)
+
+    if (item.clienteId === cliente.id) {
+      datasDoProprioAnunciante.add(item.acao.data_de_exibicao)
+      entregasDoProprioAnunciante.add(item.acao.numero_da_entrega)
+    }
   }
+
   for (const acao of acoesRegionais) {
     if (!acao.cliente_id) continue
     const classificado = clientesPorId.get(acao.cliente_id)
     if (classificado) incluirVenda(acao.data_de_exibicao, classificado)
+    if (acao.cliente_id === cliente.id) datasDoProprioAnunciante.add(acao.data_de_exibicao)
   }
 
   const clienteDaConsulta = {
@@ -268,6 +358,8 @@ export async function consultarDisponibilidadeMensal(
     industria: cliente.industria,
   }
   const hoje = dataDoBrasil()
+  const limiteMensal = Math.max(0, Math.floor(programa.bloqueio_mensal ?? 0))
+  const acoesDoAnuncianteNoMes = entregasDoProprioAnunciante.size
   const dias = intervalo.datas.map((data) =>
     avaliarDisponibilidadeDoDia({
       data,
@@ -276,6 +368,9 @@ export async function consultarDisponibilidadeMensal(
       cliente: clienteDaConsulta,
       ocupacao: ocupacaoPorData.get(data) ?? 0,
       vendasNaData: vendasPorData.get(data) ?? [],
+      proprioAnuncianteNaData: datasDoProprioAnunciante.has(data),
+      acoesDoAnuncianteNoMes,
+      limiteMensalDoAnunciante: limiteMensal,
       bloqueios,
       restricoes,
       periodosEspeciais,
@@ -292,7 +387,8 @@ export async function consultarDisponibilidadeMensal(
     },
     ano: parametros.ano,
     mes: parametros.mes,
+    limiteMensal,
+    acoesDoAnuncianteNoMes,
     dias,
   }
 }
-
