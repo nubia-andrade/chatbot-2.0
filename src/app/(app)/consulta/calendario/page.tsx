@@ -31,21 +31,6 @@ type Resultado =
   | { chave: string; tipo: 'ok'; dados: ResultadoDeDisponibilidade }
   | { chave: string; tipo: 'erro'; mensagem: string }
 
-/**
- * Passo 4 — Calendário (tela 1e do handoff, a tela central). Task 12.
- *
- * Client Component: precisa do provider do wizard (mês/ano navegável,
- * seleção de datas) — mas quem vai ao banco é
- * `carregarDisponibilidadeDoCalendario`, uma Server Action
- * (`@/lib/acoes/disponibilidade.ts`) que só repassa para
- * `carregarDisponibilidade` (Task 8). Esta tela não recalcula regra
- * nenhuma: todo `dia.estado`, `dia.motivos` e `dia.pracas` chega resolvido.
- *
- * Recarrega a cada troca de cliente, programa, modalidade, ano ou mês — o
- * mesmo padrão de corrida (`idDaConsulta`) do passo 2 e 3 evita que uma
- * resposta atrasada de um mês antigo sobrescreva a tela depois que o
- * executivo já navegou para outro.
- */
 export default function PassoCalendario() {
   const pronto = useGuardaDoPasso('calendario')
   const { estado, atualizar } = useConsulta()
@@ -80,27 +65,23 @@ export default function PassoCalendario() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programaId, clienteId, modalidade, ano, mes, tentativa])
 
-  if (!pronto) {
-    return <CarregandoDoPasso />
-  }
-
-  // A guarda só libera este passo com cliente e programa escolhidos
-  // (`primeiroPassoPendente`); os tipos continuam nulos por segurança do
-  // TypeScript, não por um estado real de tela.
-  if (!estado.cliente || !programaId) {
-    return <CarregandoDoPasso />
-  }
+  if (!pronto) return <CarregandoDoPasso />
+  if (!estado.cliente || !programaId) return <CarregandoDoPasso />
   const cliente = estado.cliente
 
   const carregando = resultado === null || resultado.chave !== chaveAtual
   const comErro = !carregando && resultado?.tipo === 'erro'
-  const dias = !carregando && resultado?.tipo === 'ok' ? resultado.dados.dias : []
-  // Mês inteiro sem exibição: nenhum dia do mês tem inventário deste
-  // programa — não é o mesmo que "esgotado" (que TEM inventário, só que
-  // vendido), por isso ganha aviso próprio em vez de uma grade toda apagada
-  // e muda.
+  const dados = !carregando && resultado?.tipo === 'ok' ? resultado.dados : null
+  const dias = dados?.dias ?? []
   const mesTodoSemExibicao =
     !carregando && !comErro && dias.length > 0 && dias.every((dia) => dia.estado === 'sem_exibicao')
+
+  const limiteMensal = modalidade === 'nacional' ? (dados?.limiteMensal ?? 0) : 0
+  const acoesCompradasNoMes = modalidade === 'nacional' ? (dados?.acoesDoAnuncianteNoMes ?? 0) : 0
+  const selecionadasNoMes = estado.itens.filter(
+    (item) => item.data.startsWith(`${ano}-${String(mes).padStart(2, '0')}-`),
+  ).length
+  const totalComSelecao = acoesCompradasNoMes + selecionadasNoMes
 
   function irParaMes(delta: number) {
     let novoMes = estado.mes + delta
@@ -125,17 +106,35 @@ export default function PassoCalendario() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2
-          className="text-[19px] font-bold text-[var(--texto)]"
-          style={{ fontFamily: 'var(--fonte-titulo)' }}
-        >
-          Disponibilidade elegível
-        </h2>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Disponibilidade elegível para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong>.
-          Só datas em verde (Disponível) podem ser selecionadas.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2
+            className="text-[19px] font-bold text-[var(--texto)]"
+            style={{ fontFamily: 'var(--fonte-titulo)' }}
+          >
+            Disponibilidade elegível
+          </h2>
+          <p className="mt-1 text-[13px] text-[var(--texto-3)]">
+            Disponibilidade elegível para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong>.
+            Só datas em verde (Disponível) podem ser selecionadas.
+          </p>
+        </div>
+
+        {!carregando && !comErro && modalidade === 'nacional' && limiteMensal > 0 && (
+          <div className="min-w-[220px] rounded-[12px] border border-[var(--borda)] bg-[var(--superficie)] px-4 py-3 text-right">
+            <p className="text-[10.5px] font-bold uppercase tracking-[.04em] text-[var(--texto-3)]">
+              Ações já compradas neste mês
+            </p>
+            <p className="mt-1 text-[17px] font-bold text-[var(--texto)]">
+              {acoesCompradasNoMes}/{limiteMensal}
+            </p>
+            {selecionadasNoMes > 0 && (
+              <p className="mt-1 text-[11px] text-[var(--texto-3)]">
+                Com esta seleção: <strong className="text-[var(--roxo)]">{totalComSelecao}/{limiteMensal}</strong>
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 rounded-[var(--raio-card)] border border-[var(--borda)] p-4 sm:p-5" style={{ background: 'var(--superficie)' }}>
@@ -212,7 +211,6 @@ export default function PassoCalendario() {
   )
 }
 
-/** Esqueleto da grade — Step 4 (carregando), nunca um spinner solto. */
 function EsqueletoDaGrade() {
   return (
     <div role="status" aria-live="polite" className="flex flex-col gap-2">
