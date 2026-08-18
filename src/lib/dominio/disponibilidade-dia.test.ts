@@ -103,6 +103,19 @@ describe('avaliarDisponibilidadeDoDia', () => {
     })
   })
 
+  it('mantém em azul uma compra passada mesmo que o prazo já tenha encerrado', () => {
+    const resultado = avaliarDisponibilidadeDoDia(
+      entrada({
+        data: '2026-08-15',
+        hoje: '2026-08-18',
+        programa: { dias_da_semana: [6], slots: 4, prazo_minimo_dias: 10 },
+        proprioAnuncianteNaData: true,
+        vendasNaData: [{ anunciante: 'Nestlé Brasil', setor: 'Alimentos', industria: 'Café' }],
+      }),
+    )
+    expect(resultado.estado).toBe('ja_comprado')
+  })
+
   it('concorrência real tem prioridade mesmo quando o próprio anunciante já está na data', () => {
     const resultado = avaliarDisponibilidadeDoDia(
       entrada({
