@@ -76,7 +76,27 @@ export async function criarPeriodoEspecial(
   })
 
   if (error) {
-    return { erros: ['Não foi possível gravar o período. Tente novamente.'] }
+    console.error('Falha ao gravar período especial:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+
+    const mensagem = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase()
+    if (mensagem.includes('dias_da_semana')) {
+      return {
+        erros: [
+          'A estrutura do banco ainda não possui o campo de dias da semana. Execute o arquivo supabase/schema-datas-especiais-dias.sql no SQL Editor do Supabase e tente novamente.',
+        ],
+      }
+    }
+
+    if (error.code === '42501' || mensagem.includes('row-level security')) {
+      return { erros: ['O banco não permitiu gravar este período. Confira seu perfil e vínculo com o programa.'] }
+    }
+
+    return { erros: [`Não foi possível gravar o período. Detalhe técnico: ${error.message}`] }
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/datas-especiais`)
