@@ -40,6 +40,8 @@ export function InicioDaConsulta({ programas }: Props) {
       programaNome: programa.nome,
       modalidade: 'nacional',
       itens: [],
+      incluirDigital: false,
+      incluirRedesSociais: false,
       datasConfirmadas: false,
     })
 
