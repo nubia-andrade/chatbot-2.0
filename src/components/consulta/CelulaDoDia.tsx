@@ -13,21 +13,12 @@ function numeroDoDia(dataIso: string): number {
   return Number(dataIso.slice(8, 10))
 }
 
-/**
- * Uma célula do calendário — Task 12. **Não decide nada**: `dia.estado`,
- * `dia.motivos` e `dia.pracas` já chegam resolvidos de `carregarDisponibilidade`
- * (Task 8), esta função só os desenha.
- *
- * `sem_exibicao` não é um estado, é ausência de inventário (o programa não
- * vai ao ar naquele dia) — por isso vira um `<div>` sem dot, sem "N
- * livres"/"usados de total" e não interativo, em vez de um `<button>`
- * "desabilitado" que ainda pareceria um estado possível de resolver.
- *
- * Nas demais, só `disponivel` é de fato clicável; as outras continuam
- * `<button>` (para o motivo ficar acessível por teclado e leitor de tela,
- * via `title` e o texto oculto no fim), mas com `aria-disabled="true"`,
- * `cursor: not-allowed` e o clique sem efeito algum.
- */
+function rotuloPrincipal(dia: DiaDeDisponibilidade): string {
+  if (dia.estado === 'ja_comprado') return '✓ Já comprado'
+  if (dia.estado === 'limite_mensal') return 'Limite mensal'
+  return `${dia.livres} livre${dia.livres === 1 ? '' : 's'}`
+}
+
 export function CelulaDoDia({ dia, selecionada, aoClicar }: Props) {
   const numero = numeroDoDia(dia.data)
 
@@ -54,16 +45,8 @@ export function CelulaDoDia({ dia, selecionada, aoClicar }: Props) {
   const clicavel = dia.estado === 'disponivel'
   const regional = dia.pracas.length > 0
   const usados = dia.total - dia.livres
-
-  // `title` traz TODOS os motivos, um por linha — o detalhe nunca esconde o
-  // segundo motivo atrás do primeiro (uma data pode estar fora do prazo E
-  // bloqueada ao mesmo tempo).
   const title = dia.motivos.length > 0 ? dia.motivos.join('\n') : undefined
 
-  // No regional, a pergunta não é "este dia está livre?", é "o que está
-  // livre, para qual praça" — o `title` de cada quadradinho não é lido por
-  // todo leitor de tela, então o mesmo detalhe entra no texto oculto da
-  // célula inteira.
   const resumoDasPracas = dia.pracas
     .map((praca) =>
       praca.disponivel
@@ -106,18 +89,21 @@ export function CelulaDoDia({ dia, selecionada, aoClicar }: Props) {
               +{dia.motivos.length}
             </span>
           )}
-          <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: cores.dot }} />
+          {dia.estado === 'ja_comprado' ? (
+            <span aria-hidden className="text-[13px] font-bold" style={{ color: '#2563EB' }}>✓</span>
+          ) : (
+            <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: cores.dot }} />
+          )}
         </span>
       </div>
 
       <p className="mt-0.5 text-[10px] font-bold leading-tight sm:text-[12px]" style={{ color: corTexto }}>
-        {dia.livres} livre{dia.livres === 1 ? '' : 's'}
+        {rotuloPrincipal(dia)}
       </p>
       <p className="text-[9px] leading-tight sm:text-[10.5px]" style={{ color: 'var(--texto-2)' }}>
-        {usados}/{dia.total}
+        {usados}/{dia.total} ocupados
       </p>
 
-      {/* Regional: as 5 praças em miniatura — a pergunta regional não é "este dia está livre?", é "o que está livre, para qual praça". */}
       {regional && (
         <div className="mt-1 grid grid-cols-5 gap-[2px]">
           {dia.pracas.map((praca) => (
@@ -137,12 +123,6 @@ export function CelulaDoDia({ dia, selecionada, aoClicar }: Props) {
         </div>
       )}
 
-      {/*
-        Feriado é ILUSTRAÇÃO, nunca regra — por isso nunca entra em `motivos`
-        nem muda `cores`/`clicavel`. Mesmo lugar em qualquer estado (aqui,
-        sempre a última linha da célula) para quem lê "Natal" numa célula
-        verde entender que o programa vende naquele dia.
-      */}
       {dia.feriado && (
         <p
           className="mt-auto truncate pt-1 text-[9px] sm:text-[10px]"
@@ -163,7 +143,6 @@ export function CelulaDoDia({ dia, selecionada, aoClicar }: Props) {
         </span>
       )}
 
-      {/* Cor nunca é o único indicador: o rótulo do estado, todos os motivos, as praças (no regional) e o feriado ficam disponíveis a leitor de tela mesmo sem o `title` (que não é lido por todo leitor de tela em todo navegador). */}
       <span className="sr-only">
         {cores.rotulo}
         {dia.motivos.length > 0 ? `. ${dia.motivos.join('. ')}` : ''}
