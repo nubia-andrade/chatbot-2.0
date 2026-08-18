@@ -10,6 +10,11 @@ type Props = {
   avancarRotulo: string
   habilitado: boolean
   /**
+   * Ação síncrona executada antes da navegação. Útil para passos que precisam
+   * marcar uma confirmação no provider antes de liberar a próxima rota.
+   */
+  aoAvancar?: () => void
+  /**
    * Por que o botão de avançar está desabilitado — aparece ao lado dele.
    * Botão desabilitado sem explicação é o pior estado possível, então só
    * faz sentido omitir quando `habilitado` é `true`.
@@ -25,7 +30,14 @@ type Props = {
  * quando `habilitado` é falso, porque um link desabilitado continua
  * navegável por teclado em vários navegadores — um botão nativo não.
  */
-export function AcoesDoPasso({ voltarPara, avancarPara, avancarRotulo, habilitado, motivo }: Props) {
+export function AcoesDoPasso({
+  voltarPara,
+  avancarPara,
+  avancarRotulo,
+  habilitado,
+  aoAvancar,
+  motivo,
+}: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--borda)] pt-6">
       {voltarPara ? (
@@ -47,6 +59,7 @@ export function AcoesDoPasso({ voltarPara, avancarPara, avancarRotulo, habilitad
         {habilitado ? (
           <Link
             href={`/consulta/${avancarPara}`}
+            onClick={aoAvancar}
             className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--roxo)]"
             style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}
           >
