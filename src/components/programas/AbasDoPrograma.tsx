@@ -18,23 +18,6 @@ type Props = {
   contagemRegional: number
 }
 
-/**
- * As abas da área do programa — Task 10.
- *
- * Componente cliente porque a aba ativa depende do caminho atual
- * (`usePathname`), que só um Client Component enxerga atualizado a cada
- * navegação — o layout que envolve as abas não re-renderiza sozinho
- * (`node_modules/next/dist/docs/.../layout.md`, seção "Pathname").
- *
- * A aba Regional só aparece quando o programa aceita regional
- * (`programa.aceita_regional`); a aba Modelo de propostas aparece sempre,
- * mas desabilitada — a spec decidiu mostrar em vez de esconder, para que o
- * consultor saiba que a funcionalidade existe e chega na próxima entrega.
- *
- * Esconder uma aba é conveniência de interface, não proteção: quem digitar
- * a URL de uma aba sem o vínculo certo esbarra na guarda do layout
- * (`notFound()`), não nesta lista.
- */
 export function AbasDoPrograma({
   programaId,
   aceitaRegional,
@@ -45,14 +28,6 @@ export function AbasDoPrograma({
 }: Props) {
   const pathname = usePathname()
   const base = `/configuracoes/programas/${programaId}`
-
-  // Ordem pedida pela área: Regional vem logo depois do Cadastro, porque é a
-  // continuação natural da configuração do programa — quem acabou de definir
-  // dias e slots segue para praças e preços. Datas bloqueadas, Datas
-  // especiais e Restrições são ajustes posteriores, feitos ao longo do
-  // tempo. Datas especiais vem logo depois de Datas bloqueadas por pedido
-  // da área — são conceitos vizinhos (bloqueio impede a venda, data
-  // especial muda o preço) e ficam lado a lado para não se confundirem.
   const abas: Aba[] = [{ rotulo: 'Cadastro', href: base }]
 
   if (aceitaRegional) {
@@ -61,19 +36,13 @@ export function AbasDoPrograma({
 
   abas.push(
     { rotulo: 'Datas bloqueadas', href: `${base}/datas`, contagem: contagemDatas },
-    {
-      rotulo: 'Datas especiais',
-      href: `${base}/datas-especiais`,
-      contagem: contagemDatasEspeciais,
-    },
+    { rotulo: 'Datas especiais', href: `${base}/datas-especiais`, contagem: contagemDatasEspeciais },
     { rotulo: 'Restrições', href: `${base}/restricoes`, contagem: contagemRestricoes },
+    { rotulo: 'Modelo de propostas', href: `${base}/modelo` },
   )
 
   return (
-    <nav
-      aria-label="Abas do programa"
-      className="flex flex-wrap gap-1 border-b border-[var(--borda)]"
-    >
+    <nav aria-label="Abas do programa" className="flex flex-wrap gap-1 border-b border-[var(--borda)]">
       {abas.map((aba) => {
         const ativa = pathname === aba.href
         return (
@@ -96,20 +65,6 @@ export function AbasDoPrograma({
           </Link>
         )
       })}
-
-      <span
-        aria-disabled="true"
-        title="Disponível na próxima entrega"
-        className="flex cursor-not-allowed items-center gap-2 px-4 py-3 text-[13.5px] font-bold text-[var(--placeholder)]"
-      >
-        Modelo de propostas
-        <span
-          className="rounded-full px-2 py-[2px] text-[10.5px] font-bold"
-          style={{ background: 'var(--superficie-suave)', color: 'var(--texto-3)' }}
-        >
-          Disponível na próxima entrega
-        </span>
-      </span>
     </nav>
   )
 }
