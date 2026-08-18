@@ -6,6 +6,8 @@ export type PropostaDaLista = {
   cliente_nome: string
   programa_nome: string
   modalidade: 'nacional' | 'regional'
+  inclui_digital: boolean
+  inclui_redes_sociais: boolean
   valor_total_comercial: number
   valor_total_geral: number
   status: 'gerando' | 'gerada' | 'enviando' | 'enviada' | 'falha'
@@ -21,7 +23,7 @@ export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
   const supabase = await criarClienteServidor()
   const { data, error } = await supabase
     .from('propostas')
-    .select('id, marca_nome, cliente_nome, programa_nome, modalidade, valor_total_comercial, valor_total_geral, status, erro, criado_em, enviado_em, pdf_path')
+    .select('id, marca_nome, cliente_nome, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_total_geral, status, erro, criado_em, enviado_em, pdf_path')
     .order('criado_em', { ascending: false })
     .limit(100)
 
