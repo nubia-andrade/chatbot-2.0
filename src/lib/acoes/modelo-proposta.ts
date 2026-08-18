@@ -3,13 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
-import { podeEditarPrograma } from '../dominio/perfis'
+import { podeEditarPrograma, type Perfil } from '../dominio/perfis'
 
 const BUCKET = 'programas'
 const TAMANHO_MAXIMO_BYTES = 8 * 1024 * 1024
 
 function autorizado(
-  perfis: string[],
+  perfis: Perfil[],
   programasVinculados: string[],
   programaId: string,
 ): boolean {
@@ -111,7 +111,6 @@ export async function moverSlideDoModelo(
   const destino = direcao === 'subir' ? indice - 1 : indice + 1
   if (destino < 0 || destino >= slides.length) return { erro: null }
 
-  // Renumera a sequência inteira para evitar colisões e manter uma ordem simples.
   const novaOrdem = [...slides]
   ;[novaOrdem[indice], novaOrdem[destino]] = [novaOrdem[destino], novaOrdem[indice]]
 
@@ -157,7 +156,6 @@ export async function removerSlideDoModelo(
   const caminho = slide?.imagem_url ? caminhoPublicoDaUrl(slide.imagem_url) : null
   if (caminho) await supabase.storage.from(BUCKET).remove([caminho])
 
-  // Normaliza as posições restantes.
   const { data: restantes } = await supabase
     .from('programa_modelo_slides')
     .select('id')
@@ -165,11 +163,12 @@ export async function removerSlideDoModelo(
     .order('ordem', { ascending: true })
     .order('criado_em', { ascending: true })
 
-  for (let i = 0; i < (restantes ?? []).length; i += 1) {
+  const itensRestantes = restantes ?? []
+  for (let i = 0; i < itensRestantes.length; i += 1) {
     await supabase
       .from('programa_modelo_slides')
       .update({ ordem: i + 1, atualizado_em: new Date().toISOString() })
-      .eq('id', restantes![i].id)
+      .eq('id', itensRestantes[i].id)
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/modelo`)
