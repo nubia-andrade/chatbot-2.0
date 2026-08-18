@@ -9,6 +9,7 @@ import {
   type PDFPage,
 } from 'pdf-lib'
 import type { ResumoFinanceiroDaProposta } from '../dominio/resumo-financeiro'
+import { PRACAS } from '../dominio/regional'
 import { descreverAcaoDaProposta } from '../dominio/texto-proposta'
 import {
   slidesDaSecao,
@@ -257,9 +258,46 @@ function linhaDeValor(params: {
   })
 }
 
-function linhasFinanceirasPrincipais(resumo: ResumoFinanceiroDaProposta): LinhaFinanceira[] {
+function rotuloVisualDaPraca(codigo: string): string {
+  return codigo === 'PE1' ? 'PE' : codigo
+}
+
+function linhasDeMidiaRegional(resumo: ResumoFinanceiroDaProposta): LinhaFinanceira[] {
+  const totais = new Map<string, number>()
+
+  for (const linha of resumo.linhas) {
+    for (const detalhe of linha.detalhe_pracas) {
+      totais.set(
+        detalhe.praca_codigo,
+        (totais.get(detalhe.praca_codigo) ?? 0) + detalhe.midia_tv,
+      )
+    }
+  }
+
+  return PRACAS
+    .filter((praca) => (totais.get(praca) ?? 0) > 0)
+    .map((praca) => ({
+      rotulo: `Mídia ${rotuloVisualDaPraca(praca)}`,
+      valor: totais.get(praca) ?? 0,
+    }))
+}
+
+function linhasFinanceirasPrincipais(
+  resumo: ResumoFinanceiroDaProposta,
+  modalidade: 'nacional' | 'regional',
+): LinhaFinanceira[] {
+  const linhasDeMidia = modalidade === 'regional'
+    ? linhasDeMidiaRegional(resumo)
+    : [{ rotulo: 'Mídia', valor: resumo.midia_tv }]
+
+  // Fallback defensivo para snapshots antigos que ainda não tenham
+  // `detalhe_pracas`, sem perder o valor total de mídia no PDF.
+  const midia = linhasDeMidia.length > 0
+    ? linhasDeMidia
+    : [{ rotulo: 'Mídia', valor: resumo.midia_tv }]
+
   return [
-    { rotulo: 'Mídia', valor: resumo.midia_tv },
+    ...midia,
     resumo.incluir_digital && resumo.midia_digital > 0
       ? { rotulo: 'Digital', valor: resumo.midia_digital }
       : null,
@@ -309,12 +347,14 @@ function renderizarBlocoFinanceiro(params: {
   pagina: PDFPage
   fontes: FontesDaProposta
   resumo: ResumoFinanceiroDaProposta
+  modalidade: 'nacional' | 'regional'
 }): number {
-  const principais = linhasFinanceirasPrincipais(params.resumo)
+  const principais = linhasFinanceirasPrincipais(params.resumo, params.modalidade)
   const secundarias = linhasFinanceirasSecundarias(params.resumo)
   const quantidadeDeLinhas = principais.length + secundarias.length
-  const passoPrincipal = quantidadeDeLinhas >= 9 ? 27 : 29
-  const passoSecundario = quantidadeDeLinhas >= 9 ? 22 : 24
+  const layoutDenso = quantidadeDeLinhas >= 12
+  const passoPrincipal = layoutDenso ? 21 : quantidadeDeLinhas >= 9 ? 25 : 29
+  const passoSecundario = layoutDenso ? 18 : quantidadeDeLinhas >= 9 ? 21 : 24
   const indiceTotal = principais.findIndex((linha) => linha.destaque)
 
   let y = 370
@@ -332,15 +372,15 @@ function renderizarBlocoFinanceiro(params: {
     })
 
     if (linha.destaque) {
-      y -= passoPrincipal + 16
+      y -= passoPrincipal + (layoutDenso ? 11 : 16)
     } else if (separadorApos) {
-      y -= passoPrincipal + 7
+      y -= passoPrincipal + (layoutDenso ? 4 : 7)
     } else {
       y -= passoPrincipal
     }
   }
 
-  if (secundarias.length > 0) y -= 8
+  if (secundarias.length > 0) y -= layoutDenso ? 4 : 8
 
   for (const linha of secundarias) {
     linhaDeValor({
@@ -503,6 +543,7 @@ async function adicionarPropostaComercial(params: {
     pagina,
     fontes: params.fontes,
     resumo: params.resumo,
+    modalidade: params.modalidade,
   })
 
   renderizarCondicaoEspecial({
