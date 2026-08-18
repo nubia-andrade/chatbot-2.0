@@ -180,7 +180,7 @@ export function CelulaDoDia({
         <span className="sr-only">
           {cores.rotulo}
           {dia.motivos.length > 0 ? `. ${dia.motivos.join('. ')}` : ''}
-          `. Praças: ${resumoDasPracas}.`
+          {`. Praças: ${resumoDasPracas}.`}
           {pracasSelecionadas.length > 0 ? ` Selecionadas: ${pracasSelecionadas.join(', ')}.` : ''}
           {dia.feriado ? `. ${dia.feriado}.` : ''}
         </span>
