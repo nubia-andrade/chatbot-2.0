@@ -1,19 +1,6 @@
 import Link from 'next/link'
 import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
 
-/**
- * Índice de Configurações.
- *
- * Existe porque a barra lateral leva a `/configuracoes` e as duas telas desta
- * entrega vivem abaixo dela: sem este índice, Programas e Importação só
- * seriam alcançáveis digitando a URL na barra de endereço.
- *
- * De propósito, repete a checagem de `podeAdministrar` que já decide se
- * "Configurações" aparece na barra lateral (`BarraLateral.tsx`): esconder o
- * link é conveniência de interface, quem protege de verdade os dados é o RLS
- * do banco (`supabase/schema.sql`).
- */
-
 type Secao = { href: string; titulo: string; descricao: string }
 
 const SECOES: Secao[] = [
@@ -34,6 +21,12 @@ const SECOES: Secao[] = [
     titulo: 'Clientes regionais',
     descricao:
       'Quem pode comprar ação regional — elegibilidade do cliente, válida para todos os programas que aceitam regional.',
+  },
+  {
+    href: '/configuracoes/marcas',
+    titulo: 'Marcas e anunciantes',
+    descricao:
+      'Relacionamentos aprendidos do Globo Take e pendências entre o nome do anunciante na API e o cliente oficial da carteira.',
   },
 ]
 
@@ -70,8 +63,7 @@ export default async function PaginaConfiguracoes() {
           Configurações
         </h1>
         <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          O que alimenta o cálculo de disponibilidade: o cadastro dos programas e o snapshot das
-          vendas já fechadas.
+          Cadastros e fontes que alimentam as regras comerciais, a disponibilidade e as propostas.
         </p>
       </header>
 
