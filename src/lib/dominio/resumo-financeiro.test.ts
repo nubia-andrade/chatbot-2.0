@@ -35,12 +35,14 @@ const programa = {
   bloqueio_mensal_regional: 0,
 } satisfies Programa
 
+const item = [{ data: '2026-09-08', quantidade: 1, pracas: [] }]
+
 describe('calcularResumoFinanceiro', () => {
   it('não cobra complementos quando o executivo não os seleciona', () => {
     const resumo = calcularResumoFinanceiro({
       programa,
       modalidade: 'nacional',
-      itens: [{ data: '2026-09-08', quantidade: 1, pracas: [] }],
+      itens: item,
       periodosEspeciais: [],
       incluirDigital: false,
       incluirRedesSociais: false,
@@ -60,7 +62,7 @@ describe('calcularResumoFinanceiro', () => {
     const resumo = calcularResumoFinanceiro({
       programa,
       modalidade: 'nacional',
-      itens: [{ data: '2026-09-08', quantidade: 1, pracas: [] }],
+      itens: item,
       periodosEspeciais: [],
       incluirDigital: true,
       incluirRedesSociais: true,
@@ -85,7 +87,7 @@ describe('calcularResumoFinanceiro', () => {
     const resumo = calcularResumoFinanceiro({
       programa,
       modalidade: 'nacional',
-      itens: [{ data: '2026-09-08', quantidade: 1, pracas: [] }],
+      itens: item,
       periodosEspeciais: [{
         nome: 'Especial',
         data_inicio: '2026-09-01',
@@ -111,7 +113,27 @@ describe('calcularResumoFinanceiro', () => {
     const resumo = calcularResumoFinanceiro({
       programa: { ...programa, contem_digital: false, redes_sociais: false },
       modalidade: 'nacional',
-      itens: [{ data: '2026-09-08', quantidade: 1, pracas: [] }],
+      itens: item,
+      periodosEspeciais: [],
+      incluirDigital: true,
+      incluirRedesSociais: true,
+    })
+
+    expect(resumo.incluir_digital).toBe(false)
+    expect(resumo.incluir_redes_sociais).toBe(false)
+    expect(resumo.midia_digital).toBe(0)
+    expect(resumo.redes_sociais).toBe(0)
+  })
+
+  it('não inclui complemento habilitado sem valor comercial cadastrado', () => {
+    const resumo = calcularResumoFinanceiro({
+      programa: {
+        ...programa,
+        custo_midia_digital: null,
+        custo_midia_redes_sociais: null,
+      },
+      modalidade: 'nacional',
+      itens: item,
       periodosEspeciais: [],
       incluirDigital: true,
       incluirRedesSociais: true,
