@@ -33,15 +33,21 @@ export function converterData(entrada: string | null | undefined): string | null
   return `${ano}-${mes}-${dia}`
 }
 
+function primeiroDiaDoMes(dataIso: string): string {
+  return `${dataIso.slice(0, 7)}-01`
+}
+
 /**
- * R3 — só o futuro interessa; R4 — a sentinela fica de fora, por decisão da
- * área, sem aviso na interface.
+ * R3 — disponibilidade e limite mensal precisam enxergar todas as compras do
+ * mês corrente, inclusive as que já aconteceram. Por isso o snapshot mantém
+ * o mês atual inteiro + datas futuras. Meses anteriores ficam de fora.
+ * R4 — a sentinela continua excluída, sem aviso na interface.
  */
 export function deveImportar(bruto: RegistroBruto, hoje: string): boolean {
   const data = converterData(texto(bruto.data_de_exibicao))
   if (data === null) return false
   if (data === DATA_SEM_DEFINICAO) return false
-  return data >= hoje
+  return data >= primeiroDiaDoMes(hoje)
 }
 
 /**
