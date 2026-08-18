@@ -1,5 +1,7 @@
+import { notFound } from 'next/navigation'
 import { EditorDeModeloDeProposta } from '@/components/programas/EditorDeModeloDeProposta'
 import { listarSlidesDoModelo } from '@/lib/dados/modelo-proposta'
+import { obterPrograma } from '@/lib/dados/programas'
 
 export default async function PaginaDeModeloDeProposta({
   params,
@@ -7,7 +9,20 @@ export default async function PaginaDeModeloDeProposta({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const slides = await listarSlidesDoModelo(id)
+  const [programa, slides] = await Promise.all([
+    obterPrograma(id),
+    listarSlidesDoModelo(id),
+  ])
 
-  return <EditorDeModeloDeProposta programaId={id} slides={slides} />
+  if (!programa) notFound()
+
+  return (
+    <EditorDeModeloDeProposta
+      programaId={id}
+      programaNome={programa.nome}
+      contemDigital={programa.contem_digital}
+      temRedesSociais={programa.redes_sociais}
+      slides={slides}
+    />
+  )
 }
