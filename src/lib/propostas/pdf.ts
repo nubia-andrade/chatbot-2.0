@@ -55,7 +55,9 @@ function moeda(valor: number): string {
 async function carregarFontesDaProposta(pdf: PDFDocument): Promise<FontesDaProposta> {
   try {
     pdf.registerFontkit(fontkit)
-    const pasta = path.join(process.cwd(), 'public', 'fonts')
+    // Fontes corporativas usadas exclusivamente no servidor para composição
+    // do PDF. Mantidas fora de /public para não serem expostas como assets HTTP.
+    const pasta = path.join(process.cwd(), 'assets', 'fonts')
     const [corporativaRegular, corporativaBold, textosRegular, textosBold] = await Promise.all([
       readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.corporativaRegular)),
       readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.corporativaBold)),
