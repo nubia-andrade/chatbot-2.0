@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import fontkit from '@pdf-lib/fontkit'
 import {
   PDFDocument,
   StandardFonts,
@@ -19,8 +22,56 @@ const TEXTO = rgb(0.22, 0.19, 0.23)
 const CINZA = rgb(0.57, 0.55, 0.59)
 const LINHA = rgb(0.88, 0.87, 0.89)
 
+const ARQUIVOS_GLOBOTIPO = {
+  corporativaRegular: 'GlobotipoCorporativa-Regular.ttf',
+  corporativaBold: 'GlobotipoCorporativa-Bold.ttf',
+  textosRegular: 'GlobotipoCorporativaTextos-Regular.ttf',
+  textosBold: 'GlobotipoCorporativaTextos-Bold.ttf',
+} as const
+
+type FontesDaProposta = {
+  titulo: PDFFont
+  tituloNegrito: PDFFont
+  texto: PDFFont
+  textoNegrito: PDFFont
+}
+
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
+}
+
+async function carregarFontesDaProposta(pdf: PDFDocument): Promise<FontesDaProposta> {
+  try {
+    pdf.registerFontkit(fontkit)
+    const pasta = path.join(process.cwd(), 'public', 'fonts')
+    const [corporativaRegular, corporativaBold, textosRegular, textosBold] = await Promise.all([
+      readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.corporativaRegular)),
+      readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.corporativaBold)),
+      readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.textosRegular)),
+      readFile(path.join(pasta, ARQUIVOS_GLOBOTIPO.textosBold)),
+    ])
+
+    const [titulo, tituloNegrito, texto, textoNegrito] = await Promise.all([
+      pdf.embedFont(corporativaRegular, { subset: true }),
+      pdf.embedFont(corporativaBold, { subset: true }),
+      pdf.embedFont(textosRegular, { subset: true }),
+      pdf.embedFont(textosBold, { subset: true }),
+    ])
+
+    return { titulo, tituloNegrito, texto, textoNegrito }
+  } catch (erro) {
+    console.error('Falha ao carregar Globotipo Corporativa; usando fonte de contingência.', erro)
+    const [regular, negrito] = await Promise.all([
+      pdf.embedFont(StandardFonts.Helvetica),
+      pdf.embedFont(StandardFonts.HelveticaBold),
+    ])
+    return {
+      titulo: regular,
+      tituloNegrito: negrito,
+      texto: regular,
+      textoNegrito: negrito,
+    }
+  }
 }
 
 async function carregarImagemDoSlide(pdf: PDFDocument, slide: SlideDoModeloDeProposta) {
@@ -76,10 +127,14 @@ async function novaPaginaDeValor(
 }
 
 function quebrarLinhas(texto: string, fonte: PDFFont, tamanho: number, larguraMaxima: number): string[] {
-  const paragrafos = texto.replace(/\s+/g, ' ').trim().split('\n')
+  const paragrafos = texto.split(/\r?\n/).map((paragrafo) => paragrafo.replace(/\s+/g, ' ').trim())
   const linhas: string[] = []
 
   for (const paragrafo of paragrafos) {
+    if (!paragrafo) {
+      linhas.push('')
+      continue
+    }
     const palavras = paragrafo.split(' ').filter(Boolean)
     let atual = ''
     for (const palavra of palavras) {
@@ -141,7 +196,7 @@ function rotulo(pagina: PDFPage, fonte: PDFFont, texto: string, x: number, y: nu
   pagina.drawText(texto.toUpperCase(), {
     x,
     y,
-    size: 8.5,
+    size: 8.2,
     font: fonte,
     color: CINZA,
   })
@@ -158,7 +213,7 @@ function linhaDeValor(params: {
 }) {
   const fonteRotulo = params.destaque ? params.negrito : params.fonte
   const fonteValor = params.destaque ? params.negrito : params.fonte
-  const tamanho = params.destaque ? 12 : 10.5
+  const tamanho = params.destaque ? 12.2 : 10.2
   const valor = moeda(params.valor)
 
   params.pagina.drawText(params.rotulo, {
@@ -198,8 +253,7 @@ function condicoesEspeciais(resumo: ResumoFinanceiroDaProposta): string[] {
 
 async function adicionarPropostaComercial(params: {
   pdf: PDFDocument
-  fonte: PDFFont
-  negrito: PDFFont
+  fontes: FontesDaProposta
   fundo?: SlideDoModeloDeProposta
   marcaNome: string | null
   clienteNome: string
@@ -222,14 +276,14 @@ async function adicionarPropostaComercial(params: {
     incluirRedesSociais: params.resumo.incluir_redes_sociais,
   })
 
-  // Coluna esquerda — contexto comercial. Produto é snapshot para histórico,
+  // Coluna esquerda: contexto comercial. Produto é snapshot para histórico,
   // mas não é impresso por decisão da área.
-  rotulo(pagina, params.fonte, 'Cliente', 90, 360)
+  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', 90, 360)
   escreverBloco({
     pagina,
     texto: cliente,
-    fonte: params.negrito,
-    tamanho: 14,
+    fonte: params.fontes.tituloNegrito,
+    tamanho: 14.5,
     x: 90,
     y: 340,
     largura: 285,
@@ -237,78 +291,77 @@ async function adicionarPropostaComercial(params: {
     cor: ROSA,
   })
 
-  rotulo(pagina, params.fonte, 'Conteúdo', 90, 300)
+  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', 90, 300)
   const depoisConteudo = escreverBloco({
     pagina,
     texto: textoAcao,
-    fonte: params.fonte,
-    tamanho: 11.5,
+    fonte: params.fontes.texto,
+    tamanho: 11.2,
     x: 90,
     y: 278,
     largura: 292,
-    entrelinhas: 16,
+    entrelinhas: 15.8,
     maxLinhas: 6,
     cor: ROSA,
   })
 
   const yObjetivo = Math.min(190, depoisConteudo - 18)
-  rotulo(pagina, params.fonte, 'Objetivo', 90, yObjetivo)
+  rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', 90, yObjetivo)
   escreverBloco({
     pagina,
     texto: params.objetivo,
-    fonte: params.fonte,
-    tamanho: 10.8,
+    fonte: params.fontes.texto,
+    tamanho: 10.6,
     x: 90,
     y: yObjetivo - 20,
     largura: 292,
-    entrelinhas: 15,
+    entrelinhas: 14.8,
     maxLinhas: 7,
     cor: ROSA,
   })
 
-  // Coluna direita — investimento consolidado. Sem tabela por data.
+  // Coluna direita: investimento consolidado. Sem tabela por data.
   pagina.drawText('PROPOSTA COMERCIAL', {
     x: 515,
     y: 382,
-    size: 17,
-    font: params.negrito,
+    size: 17.5,
+    font: params.fontes.tituloNegrito,
     color: ROSA,
   })
 
   let y = 342
   const passo = 30
-  linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Mídia', valor: params.resumo.midia_tv, y })
+  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Mídia', valor: params.resumo.midia_tv, y })
   y -= passo
 
   if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Digital', valor: params.resumo.midia_digital, y })
+    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Digital', valor: params.resumo.midia_digital, y })
     y -= passo
   }
   if (params.resumo.incluir_redes_sociais) {
-    linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Redes Sociais', valor: params.resumo.redes_sociais, y })
+    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Redes Sociais', valor: params.resumo.redes_sociais, y })
     y -= passo
   }
 
-  linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Globoplay Simulcast', valor: params.resumo.simulcast, y })
+  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Globoplay Simulcast', valor: params.resumo.simulcast, y })
   y -= passo
-  linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Total', valor: params.resumo.total_comercial, y, destaque: true })
+  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Total', valor: params.resumo.total_comercial, y, destaque: true })
   y -= 38
 
-  linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Direitos e Conexos', valor: params.resumo.direitos_tv, y })
+  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Direitos e Conexos', valor: params.resumo.direitos_tv, y })
   y -= 26
   if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Direitos e Conexos Digital', valor: params.resumo.direitos_digital, y })
+    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Direitos e Conexos Digital', valor: params.resumo.direitos_digital, y })
     y -= 26
   }
-  linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Custo de Produção', valor: params.resumo.producao_tv, y })
+  linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Custo de Produção', valor: params.resumo.producao_tv, y })
   y -= 26
   if (params.resumo.incluir_digital) {
-    linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Custo de Produção Digital', valor: params.resumo.producao_digital, y })
+    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Custo de Produção Digital', valor: params.resumo.producao_digital, y })
     y -= 26
   }
   if (params.resumo.incluir_redes_sociais && params.resumo.producao_redes_sociais > 0) {
-    linhaDeValor({ pagina, fonte: params.fonte, negrito: params.negrito, rotulo: 'Produção Redes Sociais', valor: params.resumo.producao_redes_sociais, y })
-    y -= 26
+    linhaDeValor({ pagina, fonte: params.fontes.texto, negrito: params.fontes.textoNegrito, rotulo: 'Produção Redes Sociais', valor: params.resumo.producao_redes_sociais, y })
   }
 
   const condicoes = condicoesEspeciais(params.resumo)
@@ -317,13 +370,13 @@ async function adicionarPropostaComercial(params: {
       x: 515,
       y: 76,
       size: 7.5,
-      font: params.negrito,
+      font: params.fontes.textoNegrito,
       color: ROSA,
     })
     escreverBloco({
       pagina,
       texto: condicoes.join(' · '),
-      fonte: params.fonte,
+      fonte: params.fontes.texto,
       tamanho: 8.2,
       x: 515,
       y: 62,
@@ -354,10 +407,7 @@ export async function gerarPdfDaProposta(params: {
   modoTeste?: boolean
 }): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  // A Globotipo Corporativa será incorporada quando o arquivo licenciado for
-  // disponibilizado. Até lá, o PDF usa Helvetica sem fingir ser a fonte corporativa.
-  const fonte = await pdf.embedFont(StandardFonts.Helvetica)
-  const negrito = await pdf.embedFont(StandardFonts.HelveticaBold)
+  const fontes = await carregarFontesDaProposta(pdf)
   const slides = params.slides ?? []
 
   await adicionarSlides(pdf, slidesDaSecao(slides, 'capa'))
@@ -373,8 +423,7 @@ export async function gerarPdfDaProposta(params: {
 
   await adicionarPropostaComercial({
     pdf,
-    fonte,
-    negrito,
+    fontes,
     fundo: slidesDaSecao(slides, 'valor')[0],
     marcaNome: params.marcaNome,
     clienteNome: params.clienteNome,
@@ -393,7 +442,7 @@ export async function gerarPdfDaProposta(params: {
         x: LARGURA - 122,
         y: 12,
         size: 7.5,
-        font: negrito,
+        font: fontes.textoNegrito,
         color: ROSA,
         opacity: 0.78,
       })
