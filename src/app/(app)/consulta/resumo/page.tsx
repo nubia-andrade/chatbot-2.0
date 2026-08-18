@@ -7,6 +7,7 @@ import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 import { carregarResumoFinanceiro } from '@/lib/acoes/resumo-financeiro'
 import { gerarProposta, type ResultadoGerarProposta } from '@/lib/acoes/propostas'
 import type { ResumoFinanceiroDaProposta } from '@/lib/dominio/resumo-financeiro'
+import { descreverAcaoDaProposta } from '@/lib/dominio/texto-proposta'
 
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
@@ -26,6 +27,16 @@ export default function PassoResumo() {
   const [resultado, setResultado] = useState<ResultadoGerarProposta | null>(null)
 
   const chaveItens = useMemo(() => JSON.stringify(estado.itens), [estado.itens])
+  const textoDaAcao = useMemo(() => {
+    if (!estado.programaNome || estado.itens.length === 0) return ''
+    return descreverAcaoDaProposta({
+      programaNome: estado.programaNome,
+      modalidade: estado.modalidade,
+      itens: estado.itens,
+      incluirDigital: estado.incluirDigital,
+      incluirRedesSociais: estado.incluirRedesSociais,
+    })
+  }, [estado.programaNome, estado.modalidade, estado.itens, estado.incluirDigital, estado.incluirRedesSociais])
 
   useEffect(() => {
     if (!estado.programaId || estado.itens.length === 0) return
@@ -65,6 +76,8 @@ export default function PassoResumo() {
         clienteNome: estado.cliente.nome,
         programaId: estado.programaId,
         programaNome: estado.programaNome ?? 'Programa',
+        produto: estado.produto,
+        objetivo: estado.objetivo,
         modalidade: estado.modalidade,
         itens: estado.itens,
         incluirDigital: estado.incluirDigital,
@@ -80,7 +93,7 @@ export default function PassoResumo() {
     <div className="flex flex-col gap-6">
       <header>
         <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Resumo da proposta</h2>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">Confira as datas, os complementos escolhidos e todos os valores antes de gerar o PDF e notificar o time do programa.</p>
+        <p className="mt-1 text-[13px] text-[var(--texto-3)]">Confira o contexto, as datas, o texto da ação e todos os valores antes de gerar o PDF e notificar o time do programa.</p>
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -89,6 +102,8 @@ export default function PassoResumo() {
           <Campo rotulo="Anunciante" valor={estado.cliente.nome} />
           <Campo rotulo="Setor / indústria" valor={`${estado.cliente.setor ?? '—'} · ${estado.cliente.industria ?? '—'}`} />
           <Campo rotulo="Programa" valor={estado.programaNome ?? '—'} />
+          <Campo rotulo="Produto" valor={estado.produto} />
+          <Campo rotulo="Objetivo" valor={estado.objetivo} />
           <Campo rotulo="Modalidade" valor={estado.modalidade === 'regional' ? 'Regional' : 'Nacional'} />
           <Campo rotulo="Novas ações" valor={String(estado.itens.length)} />
           <Campo rotulo="Digital" valor={estado.incluirDigital ? 'Incluído em todas as datas' : 'Não incluído'} />
@@ -96,6 +111,17 @@ export default function PassoResumo() {
         </aside>
 
         <div className="flex flex-col gap-4">
+          {textoDaAcao && (
+            <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
+              <p className="text-[10.5px] font-bold uppercase tracking-[.06em] text-[var(--roxo)]">Texto da ação no PDF</p>
+              <p className="mt-2 text-[13.5px] leading-[1.65] text-[var(--texto)]">{textoDaAcao}</p>
+              <div className="mt-4 border-t border-[var(--borda)] pt-3">
+                <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Objetivo</p>
+                <p className="mt-1 text-[12.5px] leading-[1.55] text-[var(--texto-2)]">{estado.objetivo}</p>
+              </div>
+            </section>
+          )}
+
           {!resumo && !erroResumo && <div className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-8 text-center text-[13px] text-[var(--texto-3)]">Calculando valores…</div>}
           {erroResumo && <div role="alert" className="rounded-[var(--raio-card)] border border-[var(--concorrencia)] bg-[var(--concorrencia-fundo)] p-4 text-[13px] text-[var(--concorrencia-texto)]">{erroResumo}</div>}
 
@@ -157,7 +183,7 @@ export default function PassoResumo() {
   )
 }
 
-function Campo({ rotulo, valor }: { rotulo: string; valor: string }) { return <div className="border-b border-[var(--borda)] py-3 first:pt-0 last:border-0 last:pb-0"><p className="text-[10px] font-bold uppercase tracking-[.05em] text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[13px] font-semibold text-[var(--texto)]">{valor}</p></div> }
+function Campo({ rotulo, valor }: { rotulo: string; valor: string }) { return <div className="border-b border-[var(--borda)] py-3 first:pt-0 last:border-0 last:pb-0"><p className="text-[10px] font-bold uppercase tracking-[.05em] text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 whitespace-pre-wrap text-[13px] font-semibold leading-[1.45] text-[var(--texto)]">{valor}</p></div> }
 function Valor({ rotulo, valor }: { rotulo: string; valor: number }) { return <p><span className="text-[var(--texto-3)]">{rotulo}: </span><strong className="text-[var(--texto)]">{moeda(valor)}</strong></p> }
 function CartaoValor({ rotulo, valor, subtitulo }: { rotulo: string; valor: number; subtitulo?: string }) { return <div className="rounded-[11px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-3"><p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{moeda(valor)}</p>{subtitulo && <p className="mt-1 text-[10px] text-[var(--texto-3)]">{subtitulo}</p>}</div> }
 
