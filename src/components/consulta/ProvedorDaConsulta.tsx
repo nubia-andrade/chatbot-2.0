@@ -150,7 +150,10 @@ export function useGuardaDoPasso(slug: string): boolean {
 
     if (indexEstePasso > indexPendente) {
       setRedirecionando(true)
-      router.replace(`/consulta/${pendente}`)
+      const destino = pendente === 'cliente' || pendente === 'programa'
+        ? '/consulta'
+        : `/consulta/${pendente}`
+      router.replace(destino)
     }
   }, [estado, hidratado, router, slug])
 
