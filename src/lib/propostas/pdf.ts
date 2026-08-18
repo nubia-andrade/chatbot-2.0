@@ -211,7 +211,7 @@ function rotulo(pagina: PDFPage, fonte: PDFFont, texto: string, x: number, y: nu
   pagina.drawText(texto.toUpperCase(), {
     x,
     y,
-    size: 8.3,
+    size: 9.4,
     font: fonte,
     color: CINZA,
   })
@@ -225,20 +225,12 @@ function linhaDeValor(params: {
   valor: number
   y: number
   destaque?: boolean
+  separadorApos?: boolean
 }) {
   const fonteRotulo = params.destaque ? params.negrito : params.fonte
   const fonteValor = params.destaque ? params.negrito : params.fonte
   const tamanho = params.destaque ? 12.6 : 10.2
   const valor = moeda(params.valor)
-
-  if (params.destaque) {
-    params.pagina.drawLine({
-      start: { x: X_FINANCEIRO, y: params.y + 17 },
-      end: { x: X_VALOR, y: params.y + 17 },
-      thickness: 1.1,
-      color: LINHA,
-    })
-  }
 
   params.pagina.drawText(params.rotulo, {
     x: X_FINANCEIRO,
@@ -258,7 +250,7 @@ function linhaDeValor(params: {
   params.pagina.drawLine({
     start: { x: X_FINANCEIRO, y: params.y - 8 },
     end: { x: X_VALOR, y: params.y - 8 },
-    thickness: params.destaque ? 0.9 : 0.55,
+    thickness: params.separadorApos ? 1.35 : params.destaque ? 0.9 : 0.55,
     color: LINHA,
   })
 }
@@ -321,9 +313,11 @@ function renderizarBlocoFinanceiro(params: {
   const quantidadeDeLinhas = principais.length + secundarias.length
   const passoPrincipal = quantidadeDeLinhas >= 9 ? 27 : 29
   const passoSecundario = quantidadeDeLinhas >= 9 ? 22 : 24
+  const indiceTotal = principais.findIndex((linha) => linha.destaque)
 
   let y = 370
-  for (const linha of principais) {
+  for (const [indice, linha] of principais.entries()) {
+    const separadorApos = indice === indiceTotal - 1
     linhaDeValor({
       pagina: params.pagina,
       fonte: params.fontes.texto,
@@ -332,11 +326,19 @@ function renderizarBlocoFinanceiro(params: {
       valor: linha.valor,
       y,
       destaque: linha.destaque,
+      separadorApos,
     })
-    y -= linha.destaque ? passoPrincipal + 7 : passoPrincipal
+
+    if (linha.destaque) {
+      y -= passoPrincipal + 16
+    } else if (separadorApos) {
+      y -= passoPrincipal + 7
+    } else {
+      y -= passoPrincipal
+    }
   }
 
-  if (secundarias.length > 0) y -= 5
+  if (secundarias.length > 0) y -= 8
 
   for (const linha of secundarias) {
     linhaDeValor({
@@ -416,47 +418,47 @@ async function adicionarPropostaComercial(params: {
     incluirRedesSociais: params.resumo.incluir_redes_sociais,
   })
 
-  // Coluna esquerda: começa mais alto e trabalha como um bloco editorial único.
+  // Coluna esquerda: bloco editorial mais alto, com marca dominante e labels legíveis.
   // Produto continua salvo no snapshot da proposta, mas não é impresso.
-  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', X_ESQUERDA, 414)
+  rotulo(pagina, params.fontes.textoNegrito, 'Cliente', X_ESQUERDA, 432)
   escreverBloco({
     pagina,
     texto: cliente,
     fonte: params.fontes.tituloNegrito,
-    tamanho: 19,
+    tamanho: 21,
     x: X_ESQUERDA,
-    y: 386,
+    y: 404,
     largura: LARGURA_ESQUERDA,
-    entrelinhas: 22,
+    entrelinhas: 24,
     maxLinhas: 2,
     cor: ROSA,
   })
 
-  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', X_ESQUERDA, 335)
+  rotulo(pagina, params.fontes.textoNegrito, 'Conteúdo', X_ESQUERDA, 353)
   const depoisConteudo = escreverBloco({
     pagina,
     texto: textoAcao,
     fonte: params.fontes.texto,
-    tamanho: 11.5,
+    tamanho: 12,
     x: X_ESQUERDA,
-    y: 312,
+    y: 330,
     largura: LARGURA_ESQUERDA,
-    entrelinhas: 16,
+    entrelinhas: 16.8,
     maxLinhas: 5,
     cor: ROSA,
   })
 
-  const yObjetivo = Math.min(226, depoisConteudo - 17)
+  const yObjetivo = Math.min(244, depoisConteudo - 18)
   rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', X_ESQUERDA, yObjetivo)
   escreverBloco({
     pagina,
     texto: params.objetivo,
     fonte: params.fontes.texto,
-    tamanho: 11,
+    tamanho: 11.5,
     x: X_ESQUERDA,
-    y: yObjetivo - 22,
+    y: yObjetivo - 23,
     largura: LARGURA_ESQUERDA,
-    entrelinhas: 15.5,
+    entrelinhas: 16.2,
     maxLinhas: 7,
     cor: ROSA,
   })
