@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { CampoDeBuscaDeMarca } from '@/components/consulta/CampoDeBuscaDeMarca'
-import { CalendarioDeDisponibilidade } from '@/components/consulta/CalendarioDeDisponibilidade'
+import { useConsulta } from '@/components/consulta/ProvedorDaConsulta'
 import type { MarcaDaCarteira } from '@/lib/dados/busca-marcas'
 
 type ProgramaDaConsulta = {
@@ -15,19 +16,34 @@ type ProgramaDaConsulta = {
 type Props = { programas: ProgramaDaConsulta[] }
 
 export function InicioDaConsulta({ programas }: Props) {
+  const router = useRouter()
+  const { atualizar } = useConsulta()
   const [marca, setMarca] = useState<MarcaDaCarteira | null>(null)
   const [programaId, setProgramaId] = useState('')
-  const [noCalendario, setNoCalendario] = useState(false)
   const programa = programas.find((item) => item.id === programaId) ?? null
 
-  if (noCalendario && marca && programa) {
-    return (
-      <CalendarioDeDisponibilidade
-        marca={marca}
-        programa={programa}
-        aoVoltar={() => setNoCalendario(false)}
-      />
-    )
+  function continuar() {
+    if (!marca || !programa) return
+
+    atualizar({
+      marcaId: marca.marca_id,
+      marcaNome: marca.marca_nome,
+      cliente: {
+        id: marca.cliente_id,
+        nome: marca.cliente_nome,
+        cnpj: marca.cnpj,
+        setor: marca.setor,
+        industria: marca.industria,
+        apto_regional: marca.apto_regional,
+      },
+      programaId: programa.id,
+      programaNome: programa.nome,
+      modalidade: 'nacional',
+      itens: [],
+      datasConfirmadas: false,
+    })
+
+    router.push('/consulta/calendario')
   }
 
   return (
@@ -37,7 +53,7 @@ export function InicioDaConsulta({ programas }: Props) {
           <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--roxo)]">Nova consulta</p>
           <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Marca e programa</h1>
         </div>
-        <span className="text-[12px] font-semibold text-[var(--texto-3)]">Etapa 1 de 7</span>
+        <span className="text-[12px] font-semibold text-[var(--texto-3)]">Início da consulta</span>
       </header>
 
       <div className="grid min-h-[560px] lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -48,7 +64,6 @@ export function InicioDaConsulta({ programas }: Props) {
               aoEscolher={(novaMarca) => {
                 setMarca(novaMarca)
                 setProgramaId('')
-                setNoCalendario(false)
               }}
             />
 
@@ -92,10 +107,7 @@ export function InicioDaConsulta({ programas }: Props) {
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">2. Escolha o programa</h2>
             <select
               value={programaId}
-              onChange={(evento) => {
-                setProgramaId(evento.target.value)
-                setNoCalendario(false)
-              }}
+              onChange={(evento) => setProgramaId(evento.target.value)}
               className="h-[44px] w-full max-w-[520px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
             >
               <option value="">Selecione um programa</option>
@@ -115,16 +127,14 @@ export function InicioDaConsulta({ programas }: Props) {
           <div>
             <h2 className="text-[14px] font-bold text-[var(--texto)]">Resumo da consulta</h2>
             <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--texto-3)]">
-              A marca identifica o anunciante da carteira. Setor e indústria desse anunciante alimentarão as regras de concorrência do calendário.
+              A marca identifica o anunciante oficial da carteira. Setor e indústria desse anunciante alimentam as regras de concorrência do calendário.
             </p>
           </div>
 
           <div className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-white p-4">
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Marca</p>
             <p className="mt-1 text-[13px] font-semibold">{marca?.marca_nome ?? 'Ainda não selecionada'}</p>
-            {marca && (
-              <p className="mt-1 text-[11px] text-[var(--texto-3)]">{marca.cliente_nome}</p>
-            )}
+            {marca && <p className="mt-1 text-[11px] text-[var(--texto-3)]">{marca.cliente_nome}</p>}
             <div className="my-3 border-t border-[var(--borda)]" />
             <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Programa</p>
             <p className="mt-1 text-[13px] font-semibold">{programa?.nome ?? 'Ainda não selecionado'}</p>
@@ -132,12 +142,12 @@ export function InicioDaConsulta({ programas }: Props) {
 
           <div className="mt-auto">
             <div className="mb-3 rounded-[var(--raio-card)] bg-[var(--prazo-fundo)] px-4 py-3 text-[11.5px] leading-[1.5] text-[var(--texto-2)]">
-              O calendário considera vendas nacionais, ações regionais, concorrência, restrições, prazo, bloqueios e datas especiais.
+              O calendário considera vendas nacionais, ações regionais, concorrência, compras anteriores do anunciante, limite mensal, prazo, bloqueios e datas especiais.
             </div>
             <button
               type="button"
               disabled={!marca || !programa}
-              onClick={() => setNoCalendario(true)}
+              onClick={continuar}
               className="h-[48px] w-full rounded-[12px] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
               style={{ background: 'var(--marca)' }}
             >
