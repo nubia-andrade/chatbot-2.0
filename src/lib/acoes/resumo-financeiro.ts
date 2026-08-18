@@ -9,6 +9,8 @@ export async function carregarResumoFinanceiro(params: {
   programaId: string
   modalidade: 'nacional' | 'regional'
   itens: ItemParaResumoFinanceiro[]
+  incluirDigital: boolean
+  incluirRedesSociais: boolean
 }): Promise<{ resumo: ResumoFinanceiroDaProposta | null; erro: string | null }> {
   const programa = await obterPrograma(params.programaId)
   if (!programa) return { resumo: null, erro: 'Programa não encontrado.' }
@@ -25,6 +27,8 @@ export async function carregarResumoFinanceiro(params: {
       itens: params.itens,
       periodosEspeciais,
       precosRegionais,
+      incluirDigital: params.incluirDigital,
+      incluirRedesSociais: params.incluirRedesSociais,
     }),
     erro: null,
   }
