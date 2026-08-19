@@ -7,6 +7,7 @@ import { podeAdministrarProgramas } from '../dominio/perfis'
 
 const CAMINHO = '/configuracoes/marcas'
 const ARQUIVO_SCHEMA = 'supabase/schema-entrega-4-fechamento-propostas.sql'
+const ARQUIVO_GOVERNANCA = 'supabase/schema-entrega-5-governanca-marcas-executivo.sql'
 
 function revalidar() {
   revalidatePath(CAMINHO)
@@ -15,6 +16,9 @@ function revalidar() {
 
 function mensagemDeSchema(mensagem: string | undefined): string | null {
   const texto = mensagem?.toLowerCase() ?? ''
+  if (texto.includes('marcar_marca_manual_revisada') || texto.includes('revisao_status')) {
+    return `O banco ainda não possui a governança de marcas cadastradas na consulta. Execute ${ARQUIVO_GOVERNANCA} no Supabase e tente novamente.`
+  }
   if (texto.includes('vincular_marca_manual') || texto.includes('marca_cliente_manual')) {
     return `O banco ainda não possui o cadastro manual de marcas. Execute ${ARQUIVO_SCHEMA} no Supabase e tente novamente.`
   }
@@ -44,6 +48,31 @@ export async function vincularMarcaManual(
     if (schema) return { erro: schema }
     console.error('Falha ao vincular marca manual:', error.message)
     return { erro: error.message || 'Não foi possível vincular a marca.' }
+  }
+
+  revalidar()
+  return { erro: null }
+}
+
+export async function marcarMarcaManualRevisada(
+  marcaId: string,
+  clienteId: string,
+): Promise<{ erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.' }
+  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: 'Você não tem permissão para revisar marcas.' }
+
+  const supabase = await criarClienteServidor()
+  const { error } = await supabase.rpc('marcar_marca_manual_revisada', {
+    p_marca_id: marcaId,
+    p_cliente_id: clienteId,
+  })
+
+  if (error) {
+    const schema = mensagemDeSchema(error.message)
+    if (schema) return { erro: schema }
+    console.error('Falha ao revisar marca manual:', error.message)
+    return { erro: 'Não foi possível marcar a marca como revisada.' }
   }
 
   revalidar()
