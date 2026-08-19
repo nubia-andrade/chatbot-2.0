@@ -39,6 +39,7 @@ export function AbasDoPrograma({
     { rotulo: 'Datas especiais', href: `${base}/datas-especiais`, contagem: contagemDatasEspeciais },
     { rotulo: 'Restrições', href: `${base}/restricoes`, contagem: contagemRestricoes },
     { rotulo: 'Modelo de propostas', href: `${base}/modelo` },
+    { rotulo: 'E-mail', href: `${base}/email` },
   )
 
   return (
