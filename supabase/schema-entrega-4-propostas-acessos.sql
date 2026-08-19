@@ -179,22 +179,22 @@ begin
 
   return query
   select
-    au.id,
-    coalesce(au.email, ''),
-    coalesce(u.nome, au.email, ''),
-    u.cargo,
+    au.id::uuid,
+    coalesce(au.email, '')::text,
+    coalesce(u.nome, au.email, '')::text,
+    u.cargo::text,
     coalesce(
-      (select array_agg(pu.perfil order by pu.perfil)
+      (select array_agg(pu.perfil::text order by pu.perfil)
        from public.perfil_usuario pu
        where pu.usuario_id = au.id),
       '{}'::text[]
-    ),
+    )::text[],
     coalesce(
-      (select array_agg(cp.programa_id order by cp.programa_id)
+      (select array_agg(cp.programa_id::uuid order by cp.programa_id)
        from public.consultor_programa cp
        where cp.usuario_id = au.id),
       '{}'::uuid[]
-    )
+    )::uuid[]
   from auth.users au
   left join public.usuario u on u.usuario_id = au.id
   order by coalesce(u.nome, au.email, '');
