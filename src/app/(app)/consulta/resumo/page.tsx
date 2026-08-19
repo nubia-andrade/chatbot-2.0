@@ -20,7 +20,7 @@ function formatarData(dataIso: string): string {
 
 export default function PassoResumo() {
   const pronto = useGuardaDoPasso('resumo')
-  const { estado } = useConsulta()
+  const { estado, finalizar, limpar } = useConsulta()
   const [resumo, setResumo] = useState<ResumoFinanceiroDaProposta | null>(null)
   const [erroResumo, setErroResumo] = useState<string | null>(null)
   const [gerando, setGerando] = useState(false)
@@ -69,7 +69,7 @@ export default function PassoResumo() {
   if (!pronto || !estado.cliente || !estado.programaId) return <CarregandoDoPasso />
 
   async function aoGerar() {
-    if (!resumo || !estado.cliente || !estado.programaId) return
+    if (!resumo || !estado.cliente || !estado.programaId || estado.finalizada) return
     setGerando(true)
     setResultado(null)
     try {
@@ -88,7 +88,8 @@ export default function PassoResumo() {
         incluirRedesSociais: estado.incluirRedesSociais,
       })
       setResultado(retorno)
-      if (retorno.pdfGerado) {
+      if (retorno.pdfGerado && retorno.propostaId) {
+        finalizar(retorno.propostaId)
         window.setTimeout(() => document.getElementById('resultado-proposta')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
       }
     } finally {
@@ -100,7 +101,11 @@ export default function PassoResumo() {
     <div className="flex flex-col gap-6">
       <header>
         <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Resumo da proposta</h2>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">Confira o contexto, as datas, o texto da ação e todos os valores antes de gerar o PDF e notificar o time do programa.</p>
+        <p className="mt-1 text-[13px] text-[var(--texto-3)]">
+          {estado.finalizada
+            ? 'Consulta finalizada. O documento gerado preserva exatamente os dados abaixo.'
+            : 'Confira o contexto, as datas, o texto da ação e todos os valores antes de gerar o PDF e notificar o time do programa.'}
+        </p>
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -200,13 +205,40 @@ export default function PassoResumo() {
             </>
           )}
 
+          {estado.finalizada && !resultado && (
+            <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--disponivel-fundo)] p-5">
+              <h3 className="text-[15px] font-bold text-[var(--texto)]">✓ Consulta finalizada</h3>
+              <p className="mt-1 text-[12px] text-[var(--texto-2)]">Esta consulta já gerou uma proposta e não pode mais ser alterada. O documento permanece disponível em Propostas.</p>
+              <Link href="/propostas" className="mt-3 inline-flex rounded-[9px] bg-white px-4 py-2 text-[11.5px] font-bold text-[var(--roxo)]">Ver proposta →</Link>
+            </section>
+          )}
+
           {resultado && <ResultadoDaGeracao resultado={resultado} />}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--borda)] pt-6">
-        <Link href="/consulta/calendario" className="rounded-[11px] border border-[var(--borda-forte)] px-5 py-[11px] text-[13.5px] font-bold text-[var(--texto-2)]">← Voltar ao calendário</Link>
-        <button type="button" disabled={!resumo || gerando || Boolean(resultado?.propostaId)} onClick={aoGerar} className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}>{gerando ? 'Gerando proposta…' : resultado?.propostaId ? 'Proposta gerada ✓' : 'Gerar proposta →'}</button>
+        {estado.finalizada ? (
+          <div>
+            <p className="text-[12.5px] font-bold text-[var(--disponivel-texto)]">✓ Consulta encerrada</p>
+            <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">Para alterar cliente, programa, datas ou valores, inicie uma nova consulta.</p>
+          </div>
+        ) : (
+          <Link href="/consulta/calendario" className="rounded-[11px] border border-[var(--borda-forte)] px-5 py-[11px] text-[13.5px] font-bold text-[var(--texto-2)]">← Voltar ao calendário</Link>
+        )}
+
+        {estado.finalizada ? (
+          <Link
+            href="/consulta"
+            onClick={limpar}
+            className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white"
+            style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}
+          >
+            + Nova consulta
+          </Link>
+        ) : (
+          <button type="button" disabled={!resumo || gerando} onClick={aoGerar} className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}>{gerando ? 'Gerando proposta…' : 'Gerar proposta →'}</button>
+        )}
       </div>
     </div>
   )
