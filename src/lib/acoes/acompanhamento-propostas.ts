@@ -7,6 +7,7 @@ import { temPerfil } from '../dominio/perfis'
 import type { StatusNegociacao } from '../dados/propostas'
 import type { Cliente } from '../dados/busca-clientes'
 import type { ItemDaConsulta } from '../dominio/consulta'
+import { gerarProposta, type EntradaGerarProposta, type ResultadoGerarProposta } from './propostas'
 
 const SCHEMA_ACOMPANHAMENTO = 'supabase/schema-entrega-5-acompanhamento-performance.sql'
 
@@ -151,4 +152,70 @@ export async function prepararNovaVersao(
       propostaAnteriorId: proposta.id,
     },
   }
+}
+
+/**
+ * Emissão canônica da tela de Resumo. Para uma proposta comum, apenas delega
+ * ao gerador existente. Para uma nova versão, valida a origem antes de emitir
+ * e só substitui a versão anterior depois que o novo PDF foi gerado.
+ */
+export async function gerarPropostaAcompanhada(
+  entrada: EntradaGerarProposta & { propostaAnteriorId?: string | null },
+): Promise<ResultadoGerarProposta> {
+  const propostaAnteriorId = entrada.propostaAnteriorId ?? null
+  const { propostaAnteriorId: _ignorar, ...entradaBase } = entrada
+
+  if (!propostaAnteriorId) return gerarProposta(entradaBase)
+
+  const preparacao = await prepararNovaVersao(propostaAnteriorId)
+  if (!preparacao.dados) {
+    return {
+      propostaId: null,
+      consultaId: null,
+      pdfGerado: false,
+      pdfUrl: null,
+      emailAtivo: false,
+      emailEnviado: false,
+      emailConfigurado: false,
+      destinatarios: [],
+      erro: preparacao.erro ?? 'Não foi possível preparar a nova versão.',
+      emailErro: null,
+    }
+  }
+
+  if (preparacao.dados.cliente.id !== entrada.clienteId || preparacao.dados.programaId !== entrada.programaId) {
+    return {
+      propostaId: null,
+      consultaId: null,
+      pdfGerado: false,
+      pdfUrl: null,
+      emailAtivo: false,
+      emailEnviado: false,
+      emailConfigurado: false,
+      destinatarios: [],
+      erro: 'Uma nova versão deve manter o mesmo anunciante e programa. Para outro anunciante ou programa, inicie uma nova consulta.',
+      emailErro: null,
+    }
+  }
+
+  const resultado = await gerarProposta(entradaBase)
+  if (!resultado.pdfGerado || !resultado.propostaId) return resultado
+
+  const supabase = await criarClienteServidor()
+  const { error } = await supabase.rpc('vincular_nova_versao', {
+    p_proposta_anterior_id: propostaAnteriorId,
+    p_nova_proposta_id: resultado.propostaId,
+  })
+
+  if (error) {
+    const texto = error.message.toLowerCase()
+    const mensagem = texto.includes('vincular_nova_versao') || texto.includes('could not find')
+      ? `O PDF foi gerado, mas o banco ainda não possui o versionamento. Execute ${SCHEMA_ACOMPANHAMENTO}.`
+      : `O PDF foi gerado, mas não foi possível vinculá-lo como nova versão: ${error.message}`
+    return { ...resultado, erro: mensagem }
+  }
+
+  revalidatePath('/propostas')
+  revalidatePath('/inicio')
+  return resultado
 }
