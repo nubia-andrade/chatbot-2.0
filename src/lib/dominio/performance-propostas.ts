@@ -1,4 +1,4 @@
-import type { StatusNegociacao } from '../dados/propostas'
+import type { StatusNegociacao, StatusAprovacaoDaProposta } from '../dados/propostas'
 
 export type LinhaParaPerformance = {
   id: string
@@ -13,13 +13,11 @@ export type LinhaParaPerformance = {
   grupo_versao_id: string
   versao: number
   status: string
+  aprovacao_status?: StatusAprovacaoDaProposta
   criado_em?: string
 }
 
-export type LinhaExecutivoPerformance = LinhaParaPerformance & {
-  usuario_id: string
-  executivo_nome?: string | null
-}
+export type LinhaExecutivoPerformance = LinhaParaPerformance & { usuario_id: string; executivo_nome?: string | null }
 
 export type MetricasPerformance = {
   propostas: number
@@ -38,26 +36,12 @@ export type MetricasPerformance = {
   regionais: number
 }
 
-export type PontoEvolucaoMensal = {
-  mes: string
-  rotulo: string
-  ofertado: number
-  vendido: number
-  propostas: number
-  fechadas: number
-}
+export type PontoEvolucaoMensal = { mes: string; rotulo: string; ofertado: number; vendido: number; propostas: number; fechadas: number }
+export type ItemRankingExecutivo = { usuarioId: string; nome: string; metricas: MetricasPerformance }
 
-export type ItemRankingExecutivo = {
-  usuarioId: string
-  nome: string
-  metricas: MetricasPerformance
-}
+function arredondar(valor: number): number { return Math.round((valor + Number.EPSILON) * 100) / 100 }
 
-function arredondar(valor: number): number {
-  return Math.round((valor + Number.EPSILON) * 100) / 100
-}
-
-/** Mantém apenas a versão mais alta de cada família e documentos válidos. */
+/** Mantém somente a versão vigente e documentos comercialmente válidos. */
 export function selecionarVersoesAtuais<T extends LinhaParaPerformance>(linhas: T[]): T[] {
   const porGrupo = new Map<string, T>()
   for (const linha of linhas) {
@@ -65,15 +49,18 @@ export function selecionarVersoesAtuais<T extends LinhaParaPerformance>(linhas: 
     if (!atual || linha.versao > atual.versao) porGrupo.set(linha.grupo_versao_id, linha)
   }
 
-  return [...porGrupo.values()].filter(
-    (linha) => linha.negociacao_status !== 'substituida' && linha.status !== 'falha' && linha.status !== 'gerando',
-  )
+  return [...porGrupo.values()].filter((linha) => {
+    const aprovacaoValida = !linha.aprovacao_status
+      || linha.aprovacao_status === 'nao_requerida'
+      || linha.aprovacao_status === 'aprovada'
+    return linha.negociacao_status !== 'substituida'
+      && linha.status !== 'falha'
+      && linha.status !== 'gerando'
+      && aprovacaoValida
+  })
 }
 
-/**
- * Conversão = Fechadas / (Fechadas + Perdidas).
- * Em negociação não entra no denominador porque ainda não houve decisão.
- */
+/** Conversão = Fechadas / (Fechadas + Perdidas). */
 export function calcularMetricasPerformance<T extends LinhaParaPerformance>(linhas: T[]): MetricasPerformance {
   const propostas = linhas.length
   const valorProposto = arredondar(linhas.reduce((total, linha) => total + Number(linha.valor_total_comercial || 0), 0))
@@ -100,98 +87,45 @@ export function calcularMetricasPerformance<T extends LinhaParaPerformance>(linh
   }
 }
 
-/**
- * Ranking comercial do período informado.
- * Ordena primeiro pelo valor vendido e, em empate, pelo valor ofertado.
- */
 export function calcularRankingExecutivos<T extends LinhaExecutivoPerformance>(linhas: T[]): ItemRankingExecutivo[] {
   const porExecutivo = new Map<string, T[]>()
-
-  for (const linha of linhas) {
-    const grupo = porExecutivo.get(linha.usuario_id) ?? []
-    grupo.push(linha)
-    porExecutivo.set(linha.usuario_id, grupo)
-  }
-
-  return [...porExecutivo.entries()]
-    .map(([usuarioId, propostas]) => ({
-      usuarioId,
-      nome: propostas.find((linha) => linha.executivo_nome?.trim())?.executivo_nome?.trim() || 'Executivo',
-      metricas: calcularMetricasPerformance(propostas),
-    }))
-    .sort((a, b) => {
-      const vendido = b.metricas.valorFechado - a.metricas.valorFechado
-      if (vendido !== 0) return vendido
-      const ofertado = b.metricas.valorProposto - a.metricas.valorProposto
-      if (ofertado !== 0) return ofertado
-      return a.nome.localeCompare(b.nome, 'pt-BR')
-    })
+  for (const linha of linhas) { const grupo = porExecutivo.get(linha.usuario_id) ?? []; grupo.push(linha); porExecutivo.set(linha.usuario_id, grupo) }
+  return [...porExecutivo.entries()].map(([usuarioId, propostas]) => ({ usuarioId, nome: propostas.find((linha) => linha.executivo_nome?.trim())?.executivo_nome?.trim() || 'Executivo', metricas: calcularMetricasPerformance(propostas) })).sort((a, b) => {
+    const vendido = b.metricas.valorFechado - a.metricas.valorFechado
+    if (vendido !== 0) return vendido
+    const ofertado = b.metricas.valorProposto - a.metricas.valorProposto
+    if (ofertado !== 0) return ofertado
+    return a.nome.localeCompare(b.nome, 'pt-BR')
+  })
 }
 
 const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
+function chaveMes(data: Date): string { return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}` }
+function rotuloMes(chave: string): string { const [ano, mes] = chave.split('-').map(Number); return `${MESES_PT[mes - 1]}/${String(ano).slice(-2)}` }
 
-function chaveMes(data: Date): string {
-  return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}`
-}
-
-function rotuloMes(chave: string): string {
-  const [ano, mes] = chave.split('-').map(Number)
-  return `${MESES_PT[mes - 1]}/${String(ano).slice(-2)}`
-}
-
-/**
- * Evolução por mês de CRIAÇÃO da proposta vigente.
- *
- * Ofertado = Total Comercial da versão vigente criada naquele mês.
- * Vendido = Valor Final Negociado das propostas Fechadas, atribuído ao mês em
- * que a proposta foi criada (não ao mês do fechamento), conforme a leitura
- * comercial da Home.
- */
-export function calcularEvolucaoMensal<T extends LinhaParaPerformance>(
-  linhas: T[],
-  referencia: Date = new Date(),
-  quantidadeMeses = 12,
-): PontoEvolucaoMensal[] {
+export function calcularEvolucaoMensal<T extends LinhaParaPerformance>(linhas: T[], referencia: Date = new Date(), quantidadeMeses = 12): PontoEvolucaoMensal[] {
   const quantidade = Math.max(1, Math.trunc(quantidadeMeses))
   const referenciaUtc = new Date(Date.UTC(referencia.getUTCFullYear(), referencia.getUTCMonth(), 1))
   const meses: PontoEvolucaoMensal[] = []
   const porMes = new Map<string, PontoEvolucaoMensal>()
 
   for (let deslocamento = quantidade - 1; deslocamento >= 0; deslocamento -= 1) {
-    const data = new Date(Date.UTC(
-      referenciaUtc.getUTCFullYear(),
-      referenciaUtc.getUTCMonth() - deslocamento,
-      1,
-    ))
+    const data = new Date(Date.UTC(referenciaUtc.getUTCFullYear(), referenciaUtc.getUTCMonth() - deslocamento, 1))
     const mes = chaveMes(data)
-    const ponto: PontoEvolucaoMensal = {
-      mes,
-      rotulo: rotuloMes(mes),
-      ofertado: 0,
-      vendido: 0,
-      propostas: 0,
-      fechadas: 0,
-    }
-    meses.push(ponto)
-    porMes.set(mes, ponto)
+    const ponto: PontoEvolucaoMensal = { mes, rotulo: rotuloMes(mes), ofertado: 0, vendido: 0, propostas: 0, fechadas: 0 }
+    meses.push(ponto); porMes.set(mes, ponto)
   }
 
   for (const linha of linhas) {
     if (!linha.criado_em) continue
-    const mes = linha.criado_em.slice(0, 7)
-    const ponto = porMes.get(mes)
+    const ponto = porMes.get(linha.criado_em.slice(0, 7))
     if (!ponto) continue
-
     ponto.ofertado = arredondar(ponto.ofertado + Number(linha.valor_total_comercial || 0))
     ponto.propostas += 1
-
     if (linha.negociacao_status === 'fechada') {
-      ponto.vendido = arredondar(
-        ponto.vendido + Number(linha.valor_final_negociado ?? linha.valor_total_comercial ?? 0),
-      )
+      ponto.vendido = arredondar(ponto.vendido + Number(linha.valor_final_negociado ?? linha.valor_total_comercial ?? 0))
       ponto.fechadas += 1
     }
   }
-
   return meses
 }
