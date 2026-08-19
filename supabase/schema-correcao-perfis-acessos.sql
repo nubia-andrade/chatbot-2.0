@@ -53,5 +53,9 @@ $$;
 revoke all on function listar_usuarios_acessos() from public;
 grant execute on function listar_usuarios_acessos() to authenticated;
 
--- Conferência após executar:
--- select * from listar_usuarios_acessos();
+-- IMPORTANTE:
+-- Não valide esta função com `select * from listar_usuarios_acessos();` no
+-- SQL Editor do Supabase. O editor não executa com a sessão autenticada do
+-- Chatbot 2.0, então `auth.uid()` fica vazio e a proteção `e_proprietario()`
+-- retorna falso. A conferência correta é abrir Configurações > Perfis e acessos
+-- no aplicativo enquanto estiver autenticado com um usuário proprietário.
