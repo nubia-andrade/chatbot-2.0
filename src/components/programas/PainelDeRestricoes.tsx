@@ -13,6 +13,7 @@ type Restricao = {
   anunciante: string | null
   setor: string | null
   industria: string | null
+  segmentacao_se: string | null
   motivo: string
 }
 
@@ -21,50 +22,55 @@ type Props = {
   restricoesIniciais: Restricao[]
   setores: string[]
   industrias: string[]
+  segmentacoesSe: string[]
 }
 
-type Modo = 'anunciante' | 'setorIndustria' | 'categoria'
-type EixoDaCategoria = 'setor' | 'industria'
+type Modo = 'anunciante' | 'setorIndustria' | 'segmentacaoSe'
+
+type DadosDoAlvo = {
+  anunciante: string | null
+  setor: string | null
+  industria: string | null
+  segmentacao_se: string | null
+}
 
 const ATRASO_DO_CALCULO_MS = 400
 
-function descreverTipo(restricao: { anunciante: string | null; setor: string | null; industria: string | null }): string {
+function descreverTipo(restricao: Restricao): string {
   if (restricao.anunciante) return 'Anunciante'
   if (restricao.setor && restricao.industria) return 'Setor e indústria'
-  return 'Segmentação SE'
+  if (restricao.segmentacao_se) return 'Segmentação SE'
+  return 'Restrição legada'
 }
 
-function descreverAlvo(restricao: { anunciante: string | null; setor: string | null; industria: string | null }): string {
+function descreverAlvo(restricao: Restricao): string {
   if (restricao.anunciante) return restricao.anunciante
   if (restricao.setor && restricao.industria) return `${restricao.setor} · ${restricao.industria}`
+  if (restricao.segmentacao_se) return restricao.segmentacao_se
   return restricao.setor ?? restricao.industria ?? '—'
 }
 
-/**
- * Três modos de cadastro convergem para as mesmas colunas de
- * `restricoes_anunciante`:
- * 1. anunciante específico;
- * 2. setor + indústria;
- * 3. Segmentação SE, usando somente um eixo da classificação.
- */
-export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, industrias }: Props) {
+export function PainelDeRestricoes({
+  programaId,
+  restricoesIniciais,
+  setores,
+  industrias,
+  segmentacoesSe,
+}: Props) {
   const [restricoes, setRestricoes] = useState<Restricao[]>(restricoesIniciais)
-
   const [modo, setModo] = useState<Modo>('anunciante')
   const [clienteEscolhido, setClienteEscolhido] = useState<Cliente | null>(null)
   const [setorEscolhido, setSetorEscolhido] = useState('')
   const [industriaEscolhida, setIndustriaEscolhida] = useState('')
-  const [categoria, setCategoria] = useState<{ eixo: EixoDaCategoria; valor: string } | null>(null)
+  const [segmentacaoSeEscolhida, setSegmentacaoSeEscolhida] = useState('')
   const [motivo, setMotivo] = useState('')
 
   const [alcance, setAlcance] = useState<number | null>(null)
   const [totalDaCarteira, setTotalDaCarteira] = useState(0)
   const [calculandoAlcance, setCalculandoAlcance] = useState(false)
-
   const [gravando, setGravando] = useState(false)
   const [erros, setErros] = useState<string[]>([])
   const [sucesso, setSucesso] = useState<string | null>(null)
-
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null)
   const [excluindo, setExcluindo] = useState<string | null>(null)
   const [avisoDaLista, setAvisoDaLista] = useState<{ tipo: 'erro' | 'sucesso'; texto: string } | null>(null)
@@ -72,15 +78,26 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
   const idDaConsultaAtual = useRef(0)
   const campoDeMotivo = useRef<HTMLTextAreaElement>(null)
 
-  const dadosDoAlvo: { anunciante: string | null; setor: string | null; industria: string | null } =
+  const dadosDoAlvo: DadosDoAlvo =
     modo === 'anunciante'
-      ? { anunciante: clienteEscolhido?.nome ?? null, setor: clienteEscolhido?.setor ?? null, industria: clienteEscolhido?.industria ?? null }
+      ? {
+          anunciante: clienteEscolhido?.nome ?? null,
+          setor: null,
+          industria: null,
+          segmentacao_se: null,
+        }
       : modo === 'setorIndustria'
-        ? { anunciante: null, setor: setorEscolhido || null, industria: industriaEscolhida || null }
+        ? {
+            anunciante: null,
+            setor: setorEscolhido || null,
+            industria: industriaEscolhida || null,
+            segmentacao_se: null,
+          }
         : {
             anunciante: null,
-            setor: categoria?.eixo === 'setor' ? categoria.valor : null,
-            industria: categoria?.eixo === 'industria' ? categoria.valor : null,
+            setor: null,
+            industria: null,
+            segmentacao_se: segmentacaoSeEscolhida || null,
           }
 
   const alvoValido =
@@ -88,10 +105,14 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
       ? Boolean(clienteEscolhido)
       : modo === 'setorIndustria'
         ? Boolean(setorEscolhido && industriaEscolhida)
-        : Boolean(categoria)
+        : Boolean(segmentacaoSeEscolhida)
 
   const temAlteracaoNaoSalva =
-    Boolean(clienteEscolhido) || setorEscolhido !== '' || industriaEscolhida !== '' || Boolean(categoria) || motivo.trim() !== ''
+    Boolean(clienteEscolhido) ||
+    setorEscolhido !== '' ||
+    industriaEscolhida !== '' ||
+    segmentacaoSeEscolhida !== '' ||
+    motivo.trim() !== ''
 
   useEffect(() => {
     if (!alvoValido) return
@@ -110,14 +131,20 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
 
     return () => clearTimeout(temporizador)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alvoValido, dadosDoAlvo.anunciante, dadosDoAlvo.setor, dadosDoAlvo.industria])
+  }, [
+    alvoValido,
+    dadosDoAlvo.anunciante,
+    dadosDoAlvo.setor,
+    dadosDoAlvo.industria,
+    dadosDoAlvo.segmentacao_se,
+  ])
 
   function trocarModo(novoModo: Modo) {
     setModo(novoModo)
     setClienteEscolhido(null)
     setSetorEscolhido('')
     setIndustriaEscolhida('')
-    setCategoria(null)
+    setSegmentacaoSeEscolhida('')
     setAlcance(null)
     setErros([])
     setSucesso(null)
@@ -139,7 +166,6 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
 
     if (resultado.erros.length > 0) {
       setErros(resultado.erros)
-      campoDeMotivo.current?.focus()
       return
     }
 
@@ -147,17 +173,15 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
       { id: resultado.id!, ...dadosDoAlvo, motivo: motivoLimpo },
       ...atual,
     ])
-    setSucesso('Restrição salva.')
-    trocarModo(modo)
     setMotivo('')
+    trocarModo(modo)
+    setSucesso('Restrição salva.')
   }
 
   async function excluir(id: string) {
     setExcluindo(id)
     setAvisoDaLista(null)
-
     const resultado = await excluirRestricao(programaId, id)
-
     setExcluindo(null)
     setConfirmandoExclusao(null)
 
@@ -190,7 +214,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
         {restricoes.length === 0 ? (
           <EstadoVazio
             titulo="Nenhuma restrição cadastrada"
-            explicacao="Cadastre restrições por anunciante, por setor e indústria ou por Segmentação SE para impedir propostas que o programa não aceita."
+            explicacao="Cadastre restrições por anunciante, por setor e indústria ou pela Segmentação SE da Carteira."
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -220,7 +244,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                       type="button"
                       onClick={() => setConfirmandoExclusao(null)}
                       disabled={excluindo === restricao.id}
-                      className="cursor-pointer rounded-[10px] border border-[var(--borda-forte)] px-3 py-1.5 text-[12px] font-semibold text-[var(--texto-2)] hover:bg-[var(--superficie-suave)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="cursor-pointer rounded-[10px] border border-[var(--borda-forte)] px-3 py-1.5 text-[12px] font-semibold text-[var(--texto-2)] hover:bg-[var(--superficie-suave)] disabled:opacity-40"
                     >
                       Cancelar
                     </button>
@@ -228,7 +252,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                       type="button"
                       onClick={() => excluir(restricao.id)}
                       disabled={excluindo === restricao.id}
-                      className="cursor-pointer rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-[var(--superficie)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-[10px] px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-60"
                       style={{ background: 'var(--concorrencia)' }}
                     >
                       {excluindo === restricao.id ? 'Excluindo…' : 'Confirmar exclusão'}
@@ -242,7 +266,6 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                       setSucesso(null)
                       setErros([])
                     }}
-                    aria-label={`Excluir restrição de ${descreverAlvo(restricao)}`}
                     className="cursor-pointer text-[12px] font-semibold hover:underline"
                     style={{ color: 'var(--concorrencia)' }}
                   >
@@ -262,17 +285,12 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
         <h3 className="text-[14px] font-bold text-[var(--texto)]">Nova restrição</h3>
 
         <div role="radiogroup" aria-label="Tipo de restrição" className="mt-3 flex flex-col gap-2">
-          {(
-            [
-              { valor: 'anunciante', rotulo: 'Anunciante específico' },
-              { valor: 'setorIndustria', rotulo: 'Setor e indústria' },
-              { valor: 'categoria', rotulo: 'Segmentação SE' },
-            ] as { valor: Modo; rotulo: string }[]
-          ).map((opcao) => (
-            <label
-              key={opcao.valor}
-              className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold text-[var(--texto)]"
-            >
+          {([
+            { valor: 'anunciante', rotulo: 'Anunciante específico' },
+            { valor: 'setorIndustria', rotulo: 'Setor e indústria' },
+            { valor: 'segmentacaoSe', rotulo: 'Segmentação SE' },
+          ] as { valor: Modo; rotulo: string }[]).map((opcao) => (
+            <label key={opcao.valor} className="flex cursor-pointer items-center gap-2 text-[13px] font-semibold text-[var(--texto)]">
               <input
                 type="radio"
                 name="modo-da-restricao"
@@ -298,8 +316,8 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
               />
               {clienteEscolhido && (
                 <p className="text-[12px] text-[var(--texto-3)]">
-                  Setor e indústria vêm da carteira, travados: {clienteEscolhido.setor ?? 'sem setor'} ·{' '}
-                  {clienteEscolhido.industria ?? 'sem indústria'}.
+                  Setor e indústria: {clienteEscolhido.setor ?? 'sem setor'} · {clienteEscolhido.industria ?? 'sem indústria'}
+                  {clienteEscolhido.segmentacao_se ? ` · Segmentação SE: ${clienteEscolhido.segmentacao_se}` : ''}
                 </p>
               )}
             </div>
@@ -308,82 +326,65 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
           {modo === 'setorIndustria' && (
             <div className="flex flex-col gap-3">
               <div>
-                <label htmlFor="restricao-setor" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">
-                  Setor
-                </label>
+                <label htmlFor="restricao-setor" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">Setor</label>
                 <select
                   id="restricao-setor"
                   value={setorEscolhido}
                   onChange={(evento) => {
                     setSetorEscolhido(evento.target.value)
-                    if (evento.target.value === '') setAlcance(null)
+                    setAlcance(null)
                     setSucesso(null)
                   }}
-                  className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none focus:border-[#A031F5]"
+                  className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
                 >
                   <option value="">Selecione um setor…</option>
-                  {setores.map((valor) => (
-                    <option key={valor} value={valor}>{valor}</option>
-                  ))}
+                  {setores.map((valor) => <option key={valor} value={valor}>{valor}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="restricao-industria" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">
-                  Indústria
-                </label>
+                <label htmlFor="restricao-industria" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">Indústria</label>
                 <select
                   id="restricao-industria"
                   value={industriaEscolhida}
                   onChange={(evento) => {
                     setIndustriaEscolhida(evento.target.value)
-                    if (evento.target.value === '') setAlcance(null)
+                    setAlcance(null)
                     setSucesso(null)
                   }}
-                  className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none focus:border-[#A031F5]"
+                  className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
                 >
                   <option value="">Selecione uma indústria…</option>
-                  {industrias.map((valor) => (
-                    <option key={valor} value={valor}>{valor}</option>
-                  ))}
+                  {industrias.map((valor) => <option key={valor} value={valor}>{valor}</option>)}
                 </select>
               </div>
             </div>
           )}
 
-          {modo === 'categoria' && (
+          {modo === 'segmentacaoSe' && (
             <div>
-              <label htmlFor="restricao-categoria" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">
-                Segmentação SE
-              </label>
+              <label htmlFor="restricao-segmentacao-se" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">Segmentação SE</label>
               <select
-                id="restricao-categoria"
-                value={categoria ? `${categoria.eixo}:${categoria.valor}` : ''}
+                id="restricao-segmentacao-se"
+                value={segmentacaoSeEscolhida}
                 onChange={(evento) => {
-                  const [eixo, valor] = evento.target.value.split(':') as [EixoDaCategoria, string]
-                  setCategoria(evento.target.value === '' ? null : { eixo, valor })
-                  if (evento.target.value === '') setAlcance(null)
+                  setSegmentacaoSeEscolhida(evento.target.value)
+                  setAlcance(null)
                   setSucesso(null)
                 }}
-                className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none focus:border-[#A031F5]"
+                className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
               >
-                <option value="">Selecione uma segmentação…</option>
-                <optgroup label="Setor">
-                  {setores.map((valor) => (
-                    <option key={`setor:${valor}`} value={`setor:${valor}`}>{valor}</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Indústria">
-                  {industrias.map((valor) => (
-                    <option key={`industria:${valor}`} value={`industria:${valor}`}>{valor}</option>
-                  ))}
-                </optgroup>
+                <option value="">Selecione uma Segmentação SE…</option>
+                {segmentacoesSe.map((valor) => <option key={valor} value={valor}>{valor}</option>)}
               </select>
+              <p className="mt-2 text-[10.5px] leading-[1.4] text-[var(--texto-3)]">
+                Lista alimentada diretamente pela coluna Segmentação SE da Carteira.
+              </p>
             </div>
           )}
         </div>
 
         {alvoValido && (
-          <p className="mt-3 text-[12.5px] font-semibold" style={{ color: 'var(--texto-2)' }}>
+          <p className="mt-3 text-[12.5px] font-semibold text-[var(--texto-2)]">
             {calculandoAlcance
               ? 'Calculando quantos clientes esta restrição afeta…'
               : alcance === null
@@ -392,9 +393,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
           </p>
         )}
 
-        <label htmlFor="restricao-motivo" className="mb-[7px] mt-4 block text-[12px] font-semibold text-[var(--texto-2)]">
-          Motivo (obrigatório)
-        </label>
+        <label htmlFor="restricao-motivo" className="mb-[7px] mt-4 block text-[12px] font-semibold text-[var(--texto-2)]">Motivo (obrigatório)</label>
         <textarea
           id="restricao-motivo"
           ref={campoDeMotivo}
@@ -403,26 +402,20 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
             setMotivo(evento.target.value)
             setSucesso(null)
           }}
-          placeholder="Ex.: Apresentador não pode ser associado a bebidas alcoólicas."
+          placeholder="Ex.: Apresentador não pode ser associado a determinadas categorias."
           rows={3}
-          className="w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] p-3 text-[13px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+          className="w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] p-3 text-[13px] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
         />
 
         {erros.length > 0 && (
           <ul role="alert" className="mt-3 flex flex-col gap-1">
             {erros.map((erro) => (
-              <li key={erro} className="text-[12.5px] font-semibold" style={{ color: 'var(--concorrencia)' }}>
-                {erro}
-              </li>
+              <li key={erro} className="text-[12.5px] font-semibold" style={{ color: 'var(--concorrencia)' }}>{erro}</li>
             ))}
           </ul>
         )}
 
-        {sucesso && (
-          <p role="status" className="mt-3 text-[12.5px] font-semibold" style={{ color: 'var(--disponivel)' }}>
-            {sucesso}
-          </p>
-        )}
+        {sucesso && <p role="status" className="mt-3 text-[12.5px] font-semibold text-[var(--disponivel)]">{sucesso}</p>}
 
         <BotaoDeGravacao
           type="button"
