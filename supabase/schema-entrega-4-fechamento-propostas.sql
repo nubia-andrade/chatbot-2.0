@@ -7,6 +7,8 @@
 -- 1. MARCAS MANUAIS
 -- Permite cadastrar uma marca que ainda não apareceu no Globo Take e ligá-la
 -- imediatamente a um cliente/anunciante oficial da carteira.
+-- Um vínculo manual é uma decisão explícita de governança e, por isso, tem
+-- precedência sobre relações aprendidas automaticamente para a mesma marca.
 -- ---------------------------------------------------------------------------
 create table if not exists marca_cliente_manual (
   marca_id uuid not null references marcas (id) on delete cascade,
@@ -15,6 +17,12 @@ create table if not exists marca_cliente_manual (
   criado_em timestamptz not null default now(),
   primary key (marca_id, cliente_id)
 );
+
+-- Uma marca pode ter somente um anunciante oficial definido manualmente.
+-- Mantemos a PK composta por compatibilidade estrutural, mas este índice
+-- garante a regra de governança na coluna que realmente precisa ser única.
+create unique index if not exists marca_cliente_manual_marca_unica_idx
+  on marca_cliente_manual (marca_id);
 
 create index if not exists marca_cliente_manual_cliente_idx
   on marca_cliente_manual (cliente_id, marca_id);
@@ -66,9 +74,17 @@ begin
         ultimo_visto_em = greatest(marcas.ultimo_visto_em, excluded.ultimo_visto_em)
   returning id into v_marca_id;
 
-  insert into marca_cliente_manual (marca_id, cliente_id, criado_por)
-  values (v_marca_id, p_cliente_id, auth.uid())
-  on conflict (marca_id, cliente_id) do nothing;
+  -- Se já havia uma decisão manual para a marca, substitui o anunciante
+  -- anterior em vez de manter duas verdades concorrentes.
+  delete from marca_cliente_manual
+  where marca_id = v_marca_id
+    and cliente_id is distinct from p_cliente_id;
+
+  insert into marca_cliente_manual (marca_id, cliente_id, criado_por, criado_em)
+  values (v_marca_id, p_cliente_id, auth.uid(), now())
+  on conflict (marca_id, cliente_id) do update
+    set criado_por = excluded.criado_por,
+        criado_em = excluded.criado_em;
 
   return v_marca_id;
 end;
@@ -101,8 +117,8 @@ grant execute on function remover_vinculo_marca_manual(uuid, uuid) to authentica
 
 -- Busca consolidada da Nova Consulta:
 --   * respeita carteira do executivo;
---   * preserva overrides manuais Marca + alias do Take;
---   * inclui marcas cadastradas manualmente;
+--   * vínculo manual Marca → Cliente prevalece para aquela marca;
+--   * na ausência dele, preserva override Marca + alias do Take;
 --   * mantém cliente selecionável mesmo sem marca.
 create or replace function buscar_marcas(
   termo_busca text,
@@ -146,6 +162,7 @@ as $$
        )
   ),
   relacoes_marca as (
+    -- Relações do Take somente quando não há uma decisão manual para a marca.
     select distinct
       m.id as marca_id,
       m.nome as marca_nome,
@@ -154,9 +171,15 @@ as $$
     join anunciantes_take at on at.id = atm.anunciante_take_id
     join marcas m on m.id = atm.marca_id
     where coalesce(atm.cliente_id_override, at.cliente_id) is not null
+      and not exists (
+        select 1
+        from marca_cliente_manual mcm
+        where mcm.marca_id = m.id
+      )
 
-    union
+    union all
 
+    -- Vínculo explícito é a fonte de verdade quando existir.
     select
       m.id,
       m.nome,
@@ -311,7 +334,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public, auth
-as $$;
+as $$
 begin
   if not e_consultor_de(p_programa_id) then
     raise exception 'Você não pode configurar o e-mail deste programa.';
