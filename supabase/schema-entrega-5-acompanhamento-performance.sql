@@ -16,7 +16,7 @@ alter table propostas
 
 alter table propostas drop constraint if exists propostas_negociacao_status_check;
 alter table propostas add constraint propostas_negociacao_status_check
-  check (negociacao_status in ('em_negociacao', 'fechada', 'perdida', 'cancelada'));
+  check (negociacao_status in ('em_negociacao', 'fechada', 'perdida', 'cancelada', 'substituida'));
 
 alter table propostas drop constraint if exists propostas_valor_final_negociado_check;
 alter table propostas add constraint propostas_valor_final_negociado_check
@@ -28,7 +28,9 @@ create index if not exists propostas_negociacao_idx
 -- ---------------------------------------------------------------------------
 -- 2. VERSIONAMENTO
 -- Cada proposta emitida é imutável. Alterações geram uma nova proposta ligada
--- à mesma família por grupo_versao_id. A primeira é v1.
+-- à mesma família por grupo_versao_id. A primeira é v1. Depois que uma nova
+-- versão é emitida com sucesso, a anterior fica como "substituída": continua
+-- auditável, mas sai dos KPIs de negociações ativas.
 -- ---------------------------------------------------------------------------
 alter table propostas
   add column if not exists grupo_versao_id uuid,
@@ -54,12 +56,15 @@ create index if not exists propostas_anterior_idx on propostas (proposta_anterio
 -- Consultor visualiza pelo RLS de SELECT, mas não altera status comercial.
 -- ---------------------------------------------------------------------------
 drop policy if exists "proposta propria atualizar" on propostas;
+drop policy if exists "proposta acompanhamento atualizar" on propostas;
 create policy "proposta acompanhamento atualizar" on propostas
   for update to authenticated
   using (usuario_id = auth.uid() or e_proprietario())
   with check (usuario_id = auth.uid() or e_proprietario());
 
 -- RPC centraliza validações do status para que a UI não seja a única barreira.
+-- "substituida" é um estado técnico do versionamento e não pode ser escolhido
+-- manualmente pelo executivo.
 create or replace function atualizar_negociacao_proposta(
   p_proposta_id uuid,
   p_status text,
@@ -94,6 +99,13 @@ begin
 
   if p_status not in ('em_negociacao', 'fechada', 'perdida', 'cancelada') then
     raise exception 'Status de negociação inválido.';
+  end if;
+
+  if exists (
+    select 1 from propostas
+    where id = p_proposta_id and negociacao_status = 'substituida'
+  ) then
+    raise exception 'Uma versão substituída não pode ter a negociação alterada.';
   end if;
 
   if p_status = 'fechada' then
