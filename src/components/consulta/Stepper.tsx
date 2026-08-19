@@ -15,11 +15,7 @@ type Props = {
 const ESTILO_BASE =
   'inline-flex items-center rounded-full px-3 py-[7px] text-[12.5px] font-bold outline-none whitespace-nowrap'
 
-/**
- * Stepper do wizard. Antes da geração, etapas concluídas podem ser revisitadas.
- * Depois que o PDF é gerado, a consulta vira um registro fechado: os passos
- * anteriores continuam visíveis como contexto, mas deixam de ser links.
- */
+/** Três etapas reais: Contexto, Calendário e Resumo. */
 export function Stepper({ passoAtual, estado }: Props) {
   const pendente = primeiroPassoPendente(estado)
   const indexPendente = PASSOS.findIndex((passo) => passo.slug === pendente)
@@ -34,12 +30,7 @@ export function Stepper({ passoAtual, estado }: Props) {
 
         if (ativo) {
           return (
-            <span
-              key={passo.slug}
-              aria-current="step"
-              className={ESTILO_BASE}
-              style={{ background: 'var(--marca)', color: '#FFFFFF' }}
-            >
+            <span key={passo.slug} aria-current="step" className={ESTILO_BASE} style={{ background: 'var(--marca)', color: '#FFFFFF' }}>
               {numero}·{passo.rotulo}
             </span>
           )
@@ -63,7 +54,7 @@ export function Stepper({ passoAtual, estado }: Props) {
           return (
             <Link
               key={passo.slug}
-              href={`/consulta/${passo.slug}`}
+              href={passo.href}
               className={`${ESTILO_BASE} focus-visible:ring-2 focus-visible:ring-[var(--roxo)]`}
               style={{ background: 'var(--disponivel-fundo)', color: 'var(--disponivel)' }}
             >
