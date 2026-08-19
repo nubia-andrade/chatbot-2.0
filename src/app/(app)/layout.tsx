@@ -26,7 +26,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         perfis={sessao.perfis}
         secoes={sessao.secoes}
       />
-      <main className="flex-1 overflow-auto p-10">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto px-4 pb-24 pt-20 sm:px-6 md:p-10">{children}</main>
     </div>
   )
 }
