@@ -88,6 +88,9 @@ export default function PassoResumo() {
         incluirRedesSociais: estado.incluirRedesSociais,
       })
       setResultado(retorno)
+      if (retorno.pdfGerado) {
+        window.setTimeout(() => document.getElementById('resultado-proposta')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
+      }
     } finally {
       setGerando(false)
     }
@@ -238,15 +241,68 @@ function ValorCompacto({ rotulo, valor }: { rotulo: string; valor: number }) {
 
 function ResultadoDaGeracao({ resultado }: { resultado: ResultadoGerarProposta }) {
   const sucessoPdf = resultado.pdfGerado
+
   return (
-    <section className={`rounded-[var(--raio-card)] border p-5 ${sucessoPdf ? 'border-[var(--disponivel)] bg-[var(--disponivel-fundo)]' : 'border-[var(--concorrencia)] bg-[var(--concorrencia-fundo)]'}`}>
-      <h3 className="text-[14px] font-bold text-[var(--texto)]">{sucessoPdf ? '✓ Proposta gerada' : 'Não foi possível gerar a proposta'}</h3>
-      {resultado.propostaId && <p className="mt-1 text-[11.5px] text-[var(--texto-2)]">Código: {resultado.propostaId.slice(0, 8).toUpperCase()}</p>}
-      {sucessoPdf && <p className="mt-3 text-[12px] text-[var(--texto-2)]">PDF armazenado com segurança.</p>}
-      {resultado.emailEnviado ? <p className="mt-1 text-[12px] font-semibold text-[var(--disponivel-texto)]">E-mail enviado ao executivo e aos consultores vinculados ao programa.</p> : sucessoPdf && !resultado.emailConfigurado ? <p className="mt-1 text-[12px] text-[var(--texto-2)]">O envio será habilitado após a configuração do Microsoft 365.</p> : null}
-      {resultado.destinatarios.length > 0 && <p className="mt-2 text-[11px] text-[var(--texto-3)]">Destinatários: {resultado.destinatarios.join(', ')}</p>}
-      {resultado.erro && <p className="mt-2 text-[11.5px] text-[var(--concorrencia-texto)]">{resultado.erro}</p>}
-      {sucessoPdf && <Link href="/propostas" className="mt-4 inline-flex rounded-[9px] border border-[var(--borda-forte)] bg-white px-4 py-2 text-[12px] font-bold text-[var(--texto-2)]">Ver propostas</Link>}
+    <section id="resultado-proposta" className="scroll-mt-5 overflow-hidden rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)]">
+      <div className={`p-5 ${sucessoPdf ? 'bg-[var(--disponivel-fundo)]' : 'bg-[var(--concorrencia-fundo)]'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-[16px] font-bold text-[var(--texto)]">{sucessoPdf ? '✓ Proposta gerada com sucesso' : 'Não foi possível gerar a proposta'}</h3>
+            {resultado.propostaId && <p className="mt-1 text-[11px] text-[var(--texto-3)]">Código {resultado.propostaId.slice(0, 8).toUpperCase()}</p>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className={`rounded-full px-3 py-1 text-[10.5px] font-bold ${sucessoPdf ? 'bg-white text-[var(--disponivel-texto)]' : 'bg-white text-[var(--concorrencia-texto)]'}`}>PDF · {sucessoPdf ? 'Gerado' : 'Falha'}</span>
+            {sucessoPdf && (
+              <span className={`rounded-full px-3 py-1 text-[10.5px] font-bold ${resultado.emailEnviado ? 'bg-white text-[var(--disponivel-texto)]' : 'bg-white text-[var(--texto-2)]'}`}>
+                E-mail · {resultado.emailEnviado ? 'Enviado' : resultado.emailAtivo ? 'Pendente' : 'Desativado'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {resultado.erro && <p className="mt-3 text-[12px] font-semibold text-[var(--concorrencia-texto)]">{resultado.erro}</p>}
+
+        {sucessoPdf && (
+          <div className="mt-3 text-[12px] leading-[1.55] text-[var(--texto-2)]">
+            {resultado.emailEnviado ? (
+              <p><strong>E-mail enviado.</strong> O executivo recebeu a proposta em “Para” e os responsáveis configurados no programa receberam em cópia.</p>
+            ) : !resultado.emailAtivo ? (
+              <p>O PDF foi gerado. O disparo automático de e-mail está desativado para este programa.</p>
+            ) : !resultado.emailConfigurado ? (
+              <p>O PDF foi gerado. O disparo está ativo, mas o Microsoft 365 ainda precisa ser configurado.</p>
+            ) : resultado.emailErro ? (
+              <p className="font-semibold text-[#A65A00]">PDF gerado; o e-mail não foi enviado: {resultado.emailErro}</p>
+            ) : (
+              <p>PDF gerado. O status do e-mail será registrado separadamente.</p>
+            )}
+            {resultado.destinatarios.length > 0 && <p className="mt-1 text-[10.5px] text-[var(--texto-3)]">Destinatários: {resultado.destinatarios.join(', ')}</p>}
+          </div>
+        )}
+      </div>
+
+      {sucessoPdf && resultado.pdfUrl && (
+        <div className="p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[.06em] text-[var(--roxo)]">Prévia do PDF</p>
+              <p className="mt-0.5 text-[11px] text-[var(--texto-3)]">A proposta já está aberta aqui. O link seguro desta geração é válido por 30 dias.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={resultado.pdfUrl} target="_blank" rel="noreferrer" className="rounded-[9px] px-4 py-2 text-[11.5px] font-bold text-white" style={{ background: 'var(--marca)' }}>Abrir em nova aba ↗</a>
+              <Link href="/propostas" className="rounded-[9px] border border-[var(--borda-forte)] bg-white px-4 py-2 text-[11.5px] font-bold text-[var(--texto-2)]">Ver propostas</Link>
+            </div>
+          </div>
+          <iframe
+            title="Prévia da proposta comercial"
+            src={resultado.pdfUrl}
+            className="h-[720px] w-full rounded-[12px] border border-[var(--borda)] bg-[#F5F3F7]"
+          />
+        </div>
+      )}
+
+      {sucessoPdf && !resultado.pdfUrl && (
+        <div className="p-5 text-[12px] text-[var(--texto-2)]">O PDF foi salvo, mas a prévia segura não pôde ser criada. Ele continua disponível na seção Propostas.</div>
+      )}
     </section>
   )
 }
