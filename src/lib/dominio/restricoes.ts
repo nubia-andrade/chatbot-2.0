@@ -21,9 +21,12 @@ export type VendaNaData = {
 
 /**
  * R13 — a restrição CADASTRADA pelo consultor: o que ninguém consegue deduzir,
- * como o apresentador não fazer bebidas alcoólicas. Casa do mais específico
- * para o mais genérico: anunciante nomeado, depois setor+indústria, depois
- * setor ou indústria isolados.
+ * como o apresentador não fazer bebidas alcoólicas.
+ *
+ * A prioridade é estrutural e NÃO depende da ordem em que o banco devolve as
+ * linhas: anunciante específico > setor + indústria > Segmentação SE (setor
+ * ou indústria isolados). Assim, quando mais de uma regra casa com o mesmo
+ * cliente, a interface consegue explicar sempre a restrição mais específica.
  */
 export function restricaoQueBloqueia(
   restricoes: Restricao[],
@@ -33,22 +36,30 @@ export function restricaoQueBloqueia(
   const setor = normalizar(cliente.setor)
   const industria = normalizar(cliente.industria)
 
-  for (const restricao of restricoes) {
+  const porAnunciante = restricoes.find((restricao) => {
     const rAnunciante = normalizar(restricao.anunciante)
+    return rAnunciante !== '' && rAnunciante === nome
+  })
+  if (porAnunciante) return porAnunciante
+
+  const porSetorEIndustria = restricoes.find((restricao) => {
+    if (normalizar(restricao.anunciante) !== '') return false
     const rSetor = normalizar(restricao.setor)
     const rIndustria = normalizar(restricao.industria)
+    return rSetor !== '' && rIndustria !== '' && rSetor === setor && rIndustria === industria
+  })
+  if (porSetorEIndustria) return porSetorEIndustria
 
-    if (rAnunciante !== '' && rAnunciante === nome) return restricao
+  const porSegmentacao = restricoes.find((restricao) => {
+    if (normalizar(restricao.anunciante) !== '') return false
+    const rSetor = normalizar(restricao.setor)
+    const rIndustria = normalizar(restricao.industria)
+    const apenasSetor = rSetor !== '' && rIndustria === '' && rSetor === setor
+    const apenasIndustria = rSetor === '' && rIndustria !== '' && rIndustria === industria
+    return apenasSetor || apenasIndustria
+  })
 
-    if (rAnunciante === '') {
-      const setorCasa = rSetor === '' || rSetor === setor
-      const industriaCasa = rIndustria === '' || rIndustria === industria
-      const temAlgumCriterio = rSetor !== '' || rIndustria !== ''
-      if (temAlgumCriterio && setorCasa && industriaCasa) return restricao
-    }
-  }
-
-  return null
+  return porSegmentacao ?? null
 }
 
 /**
