@@ -41,6 +41,7 @@ update propostas
 set grupo_versao_id = coalesce(grupo_versao_id, id)
 where grupo_versao_id is null;
 
+alter table propostas alter column grupo_versao_id set default gen_random_uuid();
 alter table propostas alter column grupo_versao_id set not null;
 
 alter table propostas drop constraint if exists propostas_versao_check;
