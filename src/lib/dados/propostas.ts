@@ -49,7 +49,7 @@ function statusEmailLegado(linha: LinhaAntiga): StatusEmailDaProposta {
   return 'desativado'
 }
 
-function acompanharLegado<T extends LinhaSemAcompanhamento>(linha: T): Linha {
+function acompanharLegado(linha: LinhaSemAcompanhamento): Linha {
   return {
     ...linha,
     negociacao_status: 'em_negociacao',
@@ -75,43 +75,38 @@ export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
   const supabase = await criarClienteServidor()
   const podeAcompanharPrograma = temPerfil(sessao.perfis, 'consultor_programa') || temPerfil(sessao.perfis, 'proprietario')
 
-  const aplicarEscopo = <T extends { eq: (coluna: string, valor: string) => T }>(builder: T): T => {
-    if (!podeAcompanharPrograma) return builder.eq('usuario_id', sessao.usuarioId)
-    return builder
-  }
+  let completaBuilder = supabase
+    .from('propostas')
+    .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}`)
+    .order('criado_em', { ascending: false })
+    .limit(100)
+  if (!podeAcompanharPrograma) completaBuilder = completaBuilder.eq('usuario_id', sessao.usuarioId)
 
-  const consultaCompleta = await aplicarEscopo(
-    supabase
-      .from('propostas')
-      .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}`)
-      .order('criado_em', { ascending: false })
-      .limit(100),
-  )
-
+  const consultaCompleta = await completaBuilder
   let linhas: Linha[] = []
 
   if (!consultaCompleta.error) {
     linhas = (consultaCompleta.data ?? []) as unknown as Linha[]
   } else if (erroDeCampo(consultaCompleta.error.message, ['negociacao_status', 'grupo_versao_id', 'versao'])) {
-    const consultaSemAcompanhamento = await aplicarEscopo(
-      supabase
-        .from('propostas')
-        .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}`)
-        .order('criado_em', { ascending: false })
-        .limit(100),
-    )
+    let semAcompanhamentoBuilder = supabase
+      .from('propostas')
+      .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}`)
+      .order('criado_em', { ascending: false })
+      .limit(100)
+    if (!podeAcompanharPrograma) semAcompanhamentoBuilder = semAcompanhamentoBuilder.eq('usuario_id', sessao.usuarioId)
 
+    const consultaSemAcompanhamento = await semAcompanhamentoBuilder
     if (!consultaSemAcompanhamento.error) {
       linhas = ((consultaSemAcompanhamento.data ?? []) as unknown as LinhaSemAcompanhamento[]).map(acompanharLegado)
     } else if (erroDeCampo(consultaSemAcompanhamento.error.message, ['email_status', 'email_erro'])) {
-      const consultaAntiga = await aplicarEscopo(
-        supabase
-          .from('propostas')
-          .select(CAMPOS_BASE)
-          .order('criado_em', { ascending: false })
-          .limit(100),
-      )
+      let antigaBuilder = supabase
+        .from('propostas')
+        .select(CAMPOS_BASE)
+        .order('criado_em', { ascending: false })
+        .limit(100)
+      if (!podeAcompanharPrograma) antigaBuilder = antigaBuilder.eq('usuario_id', sessao.usuarioId)
 
+      const consultaAntiga = await antigaBuilder
       if (consultaAntiga.error) {
         console.error('Falha ao listar propostas:', consultaAntiga.error.message)
         return []
