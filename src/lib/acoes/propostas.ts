@@ -7,10 +7,15 @@ import { listarDatasEspeciais } from '../dados/datas-especiais'
 import { listarPrecos } from '../dados/regional'
 import { carregarDisponibilidade } from '../dados/disponibilidade'
 import { listarSlidesDoModelo } from '../dados/modelo-proposta'
+import { emailAutomaticoAtivo } from '../dados/email-programa'
 import { calcularResumoFinanceiro, type ItemParaResumoFinanceiro } from '../dominio/resumo-financeiro'
 import { gravarConsulta } from './consultas'
 import { gerarPdfDaProposta } from '../propostas/pdf'
 import { enviarPropostaPorEmail, emailMicrosoftConfigurado } from '../propostas/email-microsoft'
+import { assuntoDoEmailDaProposta, montarEmailDaProposta } from '../propostas/template-email'
+
+const VALIDADE_LINK_PDF_SEGUNDOS = 60 * 60 * 24 * 30
+const SCHEMA_FECHAMENTO = 'supabase/schema-entrega-4-fechamento-propostas.sql'
 
 export type EntradaGerarProposta = {
   marcaId: string | null
@@ -31,16 +36,19 @@ export type ResultadoGerarProposta = {
   propostaId: string | null
   consultaId: string | null
   pdfGerado: boolean
+  pdfUrl: string | null
+  emailAtivo: boolean
   emailEnviado: boolean
   emailConfigurado: boolean
   destinatarios: string[]
   erro: string | null
+  emailErro: string | null
 }
 
 type DestinatarioRpc = {
   usuario_id: string
   email: string
-  tipo: 'executivo' | 'consultor_programa'
+  tipo: 'executivo' | 'responsavel_programa' | 'consultor_programa'
 }
 
 function resultadoFalha(erro: string, extras: Partial<ResultadoGerarProposta> = {}): ResultadoGerarProposta {
@@ -48,10 +56,13 @@ function resultadoFalha(erro: string, extras: Partial<ResultadoGerarProposta> = 
     propostaId: null,
     consultaId: null,
     pdfGerado: false,
+    pdfUrl: null,
+    emailAtivo: false,
     emailEnviado: false,
     emailConfigurado: emailMicrosoftConfigurado(),
     destinatarios: [],
     erro,
+    emailErro: null,
     ...extras,
   }
 }
@@ -114,13 +125,35 @@ async function validarLimiteMensal(entrada: EntradaGerarProposta): Promise<strin
   return null
 }
 
-function escaparHtml(valor: string): string {
-  return valor
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
+async function criarLinkDoPdf(
+  supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
+  pdfPath: string,
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from('propostas')
+    .createSignedUrl(pdfPath, VALIDADE_LINK_PDF_SEGUNDOS)
+
+  if (error) {
+    console.error('Falha ao assinar link da proposta:', error.message)
+    return null
+  }
+  return data?.signedUrl ?? null
+}
+
+async function atualizarStatusEmail(
+  supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
+  propostaId: string,
+  valores: Record<string, unknown>,
+) {
+  const { error } = await supabase.from('propostas').update(valores).eq('id', propostaId)
+  if (error) {
+    const texto = error.message.toLowerCase()
+    if (texto.includes('email_status') || texto.includes('email_erro') || texto.includes('could not find')) {
+      console.warn(`Schema de e-mail ainda não aplicado. Execute ${SCHEMA_FECHAMENTO}.`)
+      return
+    }
+    console.error('Falha ao atualizar status de e-mail:', error.message)
+  }
 }
 
 export async function gerarProposta(entrada: EntradaGerarProposta): Promise<ResultadoGerarProposta> {
@@ -216,9 +249,8 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   const propostaId = proposta.id as string
   const pdfPath = `${sessao.usuarioId}/${propostaId}.pdf`
 
-  let pdf: Uint8Array
   try {
-    pdf = await gerarPdfDaProposta({
+    const pdf = await gerarPdfDaProposta({
       propostaId,
       marcaNome: entrada.marcaNome,
       clienteNome: entrada.clienteNome,
@@ -242,17 +274,62 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
     return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id })
   }
 
+  const pdfUrl = await criarLinkDoPdf(supabase, pdfPath)
+  const emailAtivo = await emailAutomaticoAtivo(entrada.programaId)
+
+  const resultadoBase: ResultadoGerarProposta = {
+    propostaId,
+    consultaId: consulta.id,
+    pdfGerado: true,
+    pdfUrl,
+    emailAtivo,
+    emailEnviado: false,
+    emailConfigurado: emailMicrosoftConfigurado(),
+    destinatarios: [],
+    erro: null,
+    emailErro: null,
+  }
+
+  if (!emailAtivo) {
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'desativado', email_erro: null })
+    return resultadoBase
+  }
+
+  if (!emailMicrosoftConfigurado()) {
+    const mensagem = 'O disparo automático está ativo, mas o Microsoft 365 ainda não foi configurado.'
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'nao_configurado', email_erro: mensagem })
+    return { ...resultadoBase, emailErro: mensagem }
+  }
+
+  if (!pdfUrl) {
+    const mensagem = 'PDF gerado, mas não foi possível criar o link seguro para o e-mail.'
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'falha', email_erro: mensagem })
+    return { ...resultadoBase, emailErro: mensagem }
+  }
+
   const { data: destinatariosRpc, error: erroDestinatarios } = await supabase.rpc('destinatarios_da_proposta', {
     p_programa_id: entrada.programaId,
+    p_executivo_id: sessao.usuarioId,
   })
 
   if (erroDestinatarios) {
-    const mensagem = 'PDF gerado, mas não foi possível resolver os destinatários.'
-    await supabase.from('propostas').update({ status: 'falha', erro: mensagem }).eq('id', propostaId)
-    return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id, pdfGerado: true })
+    const texto = erroDestinatarios.message.toLowerCase()
+    const mensagem = texto.includes('destinatarios_da_proposta') || texto.includes('could not find')
+      ? `PDF gerado. Execute ${SCHEMA_FECHAMENTO} no Supabase para habilitar o novo envio por e-mail.`
+      : 'PDF gerado, mas não foi possível resolver os destinatários do e-mail.'
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'falha', email_erro: mensagem })
+    return { ...resultadoBase, emailErro: mensagem }
   }
 
   const destinatarios = ((destinatariosRpc ?? []) as DestinatarioRpc[]).filter((item) => Boolean(item.email))
+  const para = destinatarios.filter((item) => item.tipo === 'executivo')
+  const cc = destinatarios.filter((item) => item.tipo === 'responsavel_programa')
+
+  if (para.length === 0) {
+    const mensagem = 'PDF gerado, mas o executivo não possui e-mail cadastrado no Chatbot 2.0.'
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'falha', email_erro: mensagem })
+    return { ...resultadoBase, destinatarios: destinatarios.map((item) => item.email), emailErro: mensagem }
+  }
 
   if (destinatarios.length > 0) {
     await supabase.from('proposta_destinatarios').upsert(
@@ -262,78 +339,63 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
         email: item.email,
         tipo: item.tipo,
         status: 'pendente',
+        erro: null,
+        enviado_em: null,
       })),
       { onConflict: 'proposta_id,email' },
     )
   }
 
-  if (!emailMicrosoftConfigurado()) {
-    const mensagem = 'PDF gerado. O envio por e-mail aguarda configuração do Microsoft 365.'
-    await supabase.from('propostas').update({ status: 'gerada', erro: mensagem }).eq('id', propostaId)
-    return {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: true,
-      emailEnviado: false,
-      emailConfigurado: false,
-      destinatarios: destinatarios.map((item) => item.email),
-      erro: null,
-    }
-  }
-
-  if (destinatarios.length === 0) {
-    const mensagem = 'PDF gerado, mas não há destinatários com e-mail para este programa.'
-    await supabase.from('propostas').update({ status: 'gerada', erro: mensagem }).eq('id', propostaId)
-    return resultadoFalha(mensagem, { propostaId, consultaId: consulta.id, pdfGerado: true, emailConfigurado: true })
-  }
+  const dadosEmail = {
+    executivoNome: sessao.nome,
+    clienteNome: entrada.clienteNome,
+    marcaNome: entrada.marcaNome,
+    produto,
+    programaNome: entrada.programaNome,
+    modalidade: entrada.modalidade,
+    objetivo,
+    itens: entrada.itens,
+    totalComercial: resumo.total_comercial,
+    linkPdf: pdfUrl,
+  } as const
 
   try {
-    await supabase.from('propostas').update({ status: 'enviando', erro: null }).eq('id', propostaId)
+    await atualizarStatusEmail(supabase, propostaId, { email_status: 'enviando', email_erro: null })
 
     await enviarPropostaPorEmail({
-      destinatarios,
-      assunto: `Proposta ${entrada.marcaNome ?? entrada.clienteNome} · ${entrada.programaNome}`,
-      html: `
-        <p>Olá,</p>
-        <p>Uma nova proposta foi gerada para <strong>${escaparHtml(entrada.marcaNome ?? entrada.clienteNome)}</strong> no programa <strong>${escaparHtml(entrada.programaNome)}</strong>.</p>
-        <p>Produto: <strong>${escaparHtml(produto)}</strong>.</p>
-        <p>Total comercial: <strong>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumo.total_comercial)}</strong>.</p>
-        <p>O PDF da proposta segue em anexo.</p>
-      `,
-      pdf,
-      nomeArquivo: `proposta-${propostaId.slice(0, 8)}.pdf`,
+      para,
+      cc,
+      assunto: assuntoDoEmailDaProposta(dadosEmail),
+      html: montarEmailDaProposta(dadosEmail),
     })
 
     const agora = new Date().toISOString()
     await Promise.all([
-      supabase.from('propostas').update({ status: 'enviada', erro: null, enviado_em: agora }).eq('id', propostaId),
+      atualizarStatusEmail(supabase, propostaId, {
+        email_status: 'enviado',
+        email_erro: null,
+        email_enviado_em: agora,
+        enviado_em: agora,
+      }),
       supabase.from('proposta_destinatarios').update({ status: 'enviado', erro: null, enviado_em: agora }).eq('proposta_id', propostaId),
     ])
 
     return {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: true,
+      ...resultadoBase,
       emailEnviado: true,
-      emailConfigurado: true,
       destinatarios: destinatarios.map((item) => item.email),
-      erro: null,
     }
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : 'Falha ao enviar a proposta por e-mail.'
     await Promise.all([
-      supabase.from('propostas').update({ status: 'falha', erro: mensagem }).eq('id', propostaId),
+      atualizarStatusEmail(supabase, propostaId, { email_status: 'falha', email_erro: mensagem }),
       supabase.from('proposta_destinatarios').update({ status: 'falha', erro: mensagem }).eq('proposta_id', propostaId),
     ])
 
     return {
-      propostaId,
-      consultaId: consulta.id,
-      pdfGerado: true,
-      emailEnviado: false,
-      emailConfigurado: true,
+      ...resultadoBase,
       destinatarios: destinatarios.map((item) => item.email),
-      erro: mensagem,
+      emailErro: mensagem,
     }
   }
 }
