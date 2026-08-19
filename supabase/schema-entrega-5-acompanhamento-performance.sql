@@ -161,3 +161,83 @@ end;
 $$;
 
 grant execute on function proxima_versao_da_proposta(uuid) to authenticated;
+
+-- Vincula a proposta recém-gerada à família anterior SOMENTE depois de o PDF
+-- existir. A atualização das duas propostas ocorre na mesma transação.
+create or replace function vincular_nova_versao(
+  p_proposta_anterior_id uuid,
+  p_nova_proposta_id uuid
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_anterior propostas%rowtype;
+  v_nova propostas%rowtype;
+  v_proxima integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Sessão expirada.';
+  end if;
+
+  select * into v_anterior from propostas where id = p_proposta_anterior_id for update;
+  select * into v_nova from propostas where id = p_nova_proposta_id for update;
+
+  if v_anterior.id is null or v_nova.id is null then
+    raise exception 'Proposta anterior ou nova proposta não encontrada.';
+  end if;
+
+  if v_nova.usuario_id is distinct from auth.uid() and not e_proprietario() then
+    raise exception 'Você não pode vincular esta nova versão.';
+  end if;
+
+  if v_anterior.usuario_id is distinct from auth.uid() and not e_proprietario() then
+    raise exception 'Você não pode criar versão desta proposta.';
+  end if;
+
+  if v_anterior.cliente_id is distinct from v_nova.cliente_id
+     or v_anterior.programa_id is distinct from v_nova.programa_id then
+    raise exception 'Nova versão deve manter o mesmo anunciante e programa.';
+  end if;
+
+  if v_nova.pdf_path is null or v_nova.status <> 'gerada' then
+    raise exception 'A nova versão precisa ter PDF gerado antes de substituir a anterior.';
+  end if;
+
+  if exists (
+    select 1 from propostas p
+    where p.grupo_versao_id = v_anterior.grupo_versao_id
+      and p.versao > v_anterior.versao
+      and p.id <> p_nova_proposta_id
+  ) then
+    raise exception 'Já existe uma versão mais recente desta proposta.';
+  end if;
+
+  select coalesce(max(p.versao), 0) + 1
+    into v_proxima
+  from propostas p
+  where p.grupo_versao_id = v_anterior.grupo_versao_id;
+
+  update propostas
+  set grupo_versao_id = v_anterior.grupo_versao_id,
+      versao = v_proxima,
+      proposta_anterior_id = v_anterior.id,
+      negociacao_status = 'em_negociacao',
+      negociacao_atualizado_por = auth.uid(),
+      negociacao_atualizado_em = now()
+  where id = v_nova.id;
+
+  update propostas
+  set negociacao_status = 'substituida',
+      negociacao_atualizado_por = auth.uid(),
+      negociacao_atualizado_em = now()
+  where id = v_anterior.id;
+
+  return v_proxima;
+end;
+$$;
+
+revoke all on function vincular_nova_versao(uuid, uuid) from public;
+grant execute on function vincular_nova_versao(uuid, uuid) to authenticated;
