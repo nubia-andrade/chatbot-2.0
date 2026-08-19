@@ -92,7 +92,12 @@ export function InicioDaConsulta({ programas }: Props) {
       <div className="grid min-h-[620px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex flex-col gap-8 p-7 lg:border-r lg:border-[var(--borda)]">
           <div>
-            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. {emNovaVersao ? 'Anunciante e marca' : 'Qual cliente ou marca deseja consultar?'}</h2>
+            <h2 className="text-[15px] font-bold text-[var(--texto)]">1. {emNovaVersao ? 'Anunciante e marca' : 'Cliente ou marca'}</h2>
+            {!emNovaVersao && (
+              <p className="mb-3 mt-1 max-w-[760px] text-[11.5px] leading-[1.5] text-[var(--texto-3)]">
+                Busque primeiro pelo nome exato da marca. Se apenas o cliente/anunciante for encontrado, cadastre a marca com o nome oficial, sem campanha, produto, slogan ou variações de escrita. O vínculo será usado imediatamente e passará por revisão de governança para permanecer na base.
+              </p>
+            )}
 
             {!emNovaVersao && (
               <CampoDeBuscaDeMarca
