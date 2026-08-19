@@ -77,16 +77,16 @@ export default async function PaginaInicio() {
 
           <GradeMetricas metricas={performance.executivo.metricasMes} modo="executivo" />
 
-          <GraficoEvolucaoComercial
-            titulo="Evolução da minha performance"
-            subtitulo="Ofertado x Vendido pela data de criação da proposta."
-            pontos={performance.executivo.evolucao12Meses}
-          />
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,.7fr)]">
-            <ListaRecentes titulo="Minhas propostas recentes" propostas={performance.executivo.recentes} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)] xl:items-start">
+            <GraficoEvolucaoComercial
+              titulo="Evolução da minha performance"
+              subtitulo="Ofertado x Vendido pela data de criação da proposta."
+              pontos={performance.executivo.evolucao12Meses}
+            />
             <Funil metricas={performance.executivo.metricasMes} />
           </div>
+
+          <ListaRecentes titulo="Minhas propostas recentes" propostas={performance.executivo.recentes} />
         </section>
       )}
 
@@ -100,45 +100,18 @@ export default async function PaginaInicio() {
 
           <GradeMetricas metricas={performance.programas.metricasMes} modo="programa" />
 
-          <GraficoEvolucaoComercial
-            titulo="Evolução comercial dos programas"
-            subtitulo="Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
-            pontos={performance.programas.evolucao12Meses}
-          />
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
-            <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-[14px] font-bold text-[var(--texto)]">Programas por valor proposto</h3>
-                <span className="text-[10.5px] text-[var(--texto-3)]">Mês atual</span>
-              </div>
-              <div className="mt-4 divide-y divide-[var(--borda)]">
-                {performance.programas.porPrograma.length === 0 ? (
-                  <Vazio texto="Ainda não há propostas dos seus programas neste mês." />
-                ) : performance.programas.porPrograma.slice(0, 8).map((programa) => (
-                  <div key={programa.programaId ?? programa.programaNome} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_120px_90px] sm:items-center">
-                    <div>
-                      <p className="text-[12.5px] font-bold text-[var(--texto)]">{programa.programaNome}</p>
-                      <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">{programa.metricas.propostas} proposta{programa.metricas.propostas === 1 ? '' : 's'} · {programa.metricas.clientes} anunciante{programa.metricas.clientes === 1 ? '' : 's'}</p>
-                    </div>
-                    <div className="sm:text-right">
-                      <p className="text-[10px] uppercase text-[var(--texto-3)]">Proposto</p>
-                      <p className="mt-0.5 text-[12px] font-bold text-[var(--texto)]">{moeda(programa.metricas.valorProposto)}</p>
-                    </div>
-                    <div className="sm:text-right">
-                      <p className="text-[10px] uppercase text-[var(--texto-3)]">Conversão</p>
-                      <p className="mt-0.5 text-[12px] font-bold text-[var(--roxo)]">{programa.metricas.conversao === null ? '—' : `${programa.metricas.conversao}%`}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)] xl:items-start">
+            <GraficoEvolucaoComercial
+              titulo="Evolução comercial dos programas"
+              subtitulo="Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
+              pontos={performance.programas.evolucao12Meses}
+            />
 
             <div className="grid gap-4">
               <Funil metricas={performance.programas.metricasMes} />
-              <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-                <h3 className="text-[14px] font-bold text-[var(--texto)]">Composição das propostas</h3>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+              <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
+                <h3 className="text-[13px] font-bold text-[var(--texto)]">Composição das propostas</h3>
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
                   <MiniMetrica rotulo="Com Digital" valor={`${performance.programas.metricasMes.percentualDigital}%`} />
                   <MiniMetrica rotulo="Com Redes" valor={`${performance.programas.metricasMes.percentualRedes}%`} />
                   <MiniMetrica rotulo="Nacionais" valor={String(performance.programas.metricasMes.nacionais)} />
@@ -147,6 +120,33 @@ export default async function PaginaInicio() {
               </section>
             </div>
           </div>
+
+          <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[14px] font-bold text-[var(--texto)]">Programas por valor proposto</h3>
+              <span className="text-[10.5px] text-[var(--texto-3)]">Mês atual</span>
+            </div>
+            <div className="mt-4 divide-y divide-[var(--borda)]">
+              {performance.programas.porPrograma.length === 0 ? (
+                <Vazio texto="Ainda não há propostas dos seus programas neste mês." />
+              ) : performance.programas.porPrograma.slice(0, 8).map((programa) => (
+                <div key={programa.programaId ?? programa.programaNome} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_120px_90px] sm:items-center">
+                  <div>
+                    <p className="text-[12.5px] font-bold text-[var(--texto)]">{programa.programaNome}</p>
+                    <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">{programa.metricas.propostas} proposta{programa.metricas.propostas === 1 ? '' : 's'} · {programa.metricas.clientes} anunciante{programa.metricas.clientes === 1 ? '' : 's'}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] uppercase text-[var(--texto-3)]">Proposto</p>
+                    <p className="mt-0.5 text-[12px] font-bold text-[var(--texto)]">{moeda(programa.metricas.valorProposto)}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] uppercase text-[var(--texto-3)]">Conversão</p>
+                    <p className="mt-0.5 text-[12px] font-bold text-[var(--roxo)]">{programa.metricas.conversao === null ? '—' : `${programa.metricas.conversao}%`}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <ListaRecentes titulo="Propostas recentes dos programas" propostas={performance.programas.recentes} />
         </section>
@@ -204,9 +204,9 @@ function ListaRecentes({ titulo, propostas }: { titulo: string; propostas: Propo
 
 function Funil({ metricas }: { metricas: MetricasPerformance }) {
   return (
-    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-      <h3 className="text-[14px] font-bold text-[var(--texto)]">Andamento comercial</h3>
-      <div className="mt-4 grid gap-2">
+    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
+      <h3 className="text-[13px] font-bold text-[var(--texto)]">Andamento comercial</h3>
+      <div className="mt-3 grid gap-2">
         <LinhaFunil rotulo="Em negociação" valor={metricas.emNegociacao} total={metricas.propostas} />
         <LinhaFunil rotulo="Fechadas" valor={metricas.fechadas} total={metricas.propostas} />
         <LinhaFunil rotulo="Perdidas" valor={metricas.perdidas} total={metricas.propostas} />
@@ -220,19 +220,19 @@ function LinhaFunil({ rotulo, valor, total }: { rotulo: string; valor: number; t
   const percentual = total > 0 ? Math.round((valor / total) * 100) : 0
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 text-[10.5px]">
+      <div className="flex items-center justify-between gap-3 text-[10px]">
         <span className="font-semibold text-[var(--texto-2)]">{rotulo}</span>
         <strong className="text-[var(--texto)]">{valor} · {percentual}%</strong>
       </div>
-      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-[var(--superficie-suave)]">
-        <div className="h-full rounded-full bg-[var(--roxo)]" style={{ width: `${percentual}%`, opacity: 0.72 }} />
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--superficie-suave)]">
+        <div className="h-full rounded-full bg-[var(--roxo)]" style={{ width: `${percentual}%`, opacity: 0.66 }} />
       </div>
     </div>
   )
 }
 
 function MiniMetrica({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return <div className="rounded-[10px] bg-[var(--superficie-suave)] p-3"><p className="text-[9.5px] font-bold uppercase text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[16px] font-bold text-[var(--texto)]">{valor}</p></div>
+  return <div className="rounded-[9px] bg-[var(--superficie-suave)] p-2.5"><p className="text-[9px] font-bold uppercase text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{valor}</p></div>
 }
 
 function Vazio({ texto }: { texto: string }) {
