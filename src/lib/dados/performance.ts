@@ -125,7 +125,7 @@ function montarPerformancePrograma(
     programaNome,
     metricasMes: calcularMetricasPerformance(mes),
     evolucao12Meses: calcularEvolucaoMensal(linhas),
-    ranking: calcularRankingExecutivos(mes).slice(0, 5),
+    ranking: calcularRankingExecutivos(mes),
     recentes: recentes(linhas),
   }
 }
@@ -172,7 +172,7 @@ export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
     programas: temVisaoProgramas ? {
       metricasMes: calcularMetricasPerformance(mesProgramas),
       evolucao12Meses: calcularEvolucaoMensal(atuaisProgramas),
-      ranking: calcularRankingExecutivos(mesProgramas).slice(0, 5),
+      ranking: calcularRankingExecutivos(mesProgramas),
       porPrograma,
       recentes: recentes(atuaisProgramas),
     } : null,
