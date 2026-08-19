@@ -42,7 +42,7 @@ async function obterToken(): Promise<string> {
   return json.access_token
 }
 
-export async function enviarPropostaPorEmail(params: {
+export async function enviarEmailMicrosoft(params: {
   para: Destinatario[]
   cc?: Destinatario[]
   assunto: string
@@ -51,7 +51,7 @@ export async function enviarPropostaPorEmail(params: {
   if (!emailMicrosoftConfigurado()) {
     throw new Error('Envio de e-mail ainda não configurado no Microsoft 365.')
   }
-  if (params.para.length === 0) throw new Error('O e-mail da proposta precisa de um destinatário principal.')
+  if (params.para.length === 0) throw new Error('O e-mail precisa de ao menos um destinatário principal.')
 
   const c = configuracao()
   const token = await obterToken()
@@ -90,4 +90,13 @@ export async function enviarPropostaPorEmail(params: {
     const detalhe = await resposta.text().catch(() => '')
     throw new Error(`Falha ao enviar e-mail pelo Microsoft 365 (${resposta.status})${detalhe ? `: ${detalhe.slice(0, 300)}` : '.'}`)
   }
+}
+
+export async function enviarPropostaPorEmail(params: {
+  para: Destinatario[]
+  cc?: Destinatario[]
+  assunto: string
+  html: string
+}): Promise<void> {
+  return enviarEmailMicrosoft(params)
 }
