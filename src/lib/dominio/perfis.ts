@@ -4,21 +4,20 @@ export type Perfil =
   | 'consultor_programa'
   | 'proprietario'
 
-export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'historico' | 'configuracoes'
+export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'configuracoes'
 
 export const SECOES_DO_APP: { valor: SecaoApp; rotulo: string }[] = [
   { valor: 'inicio', rotulo: 'Início' },
   { valor: 'consulta', rotulo: 'Nova consulta' },
   { valor: 'propostas', rotulo: 'Propostas' },
-  { valor: 'historico', rotulo: 'Histórico' },
   { valor: 'configuracoes', rotulo: 'Configurações' },
 ]
 
 export const SECOES_PADRAO_POR_PERFIL: Record<Perfil, SecaoApp[]> = {
   executivo: ['inicio', 'consulta', 'propostas'],
   executivo_regional: ['inicio', 'consulta', 'propostas'],
-  consultor_programa: ['inicio', 'propostas', 'historico', 'configuracoes'],
-  proprietario: ['inicio', 'consulta', 'propostas', 'historico', 'configuracoes'],
+  consultor_programa: ['inicio', 'propostas', 'configuracoes'],
+  proprietario: ['inicio', 'consulta', 'propostas', 'configuracoes'],
 }
 
 export function temPerfil(perfis: Perfil[], procurado: Perfil): boolean {
@@ -39,6 +38,11 @@ export function podeAcessarSecao(secoes: SecaoApp[], secao: SecaoApp): boolean {
 
 export function podeAdministrarProgramas(perfis: Perfil[]): boolean {
   return temPerfil(perfis, 'consultor_programa') || temPerfil(perfis, 'proprietario')
+}
+
+/** Governança global afeta toda a base, não apenas um programa. */
+export function podeAdministrarGovernancaGlobal(perfis: Perfil[]): boolean {
+  return temPerfil(perfis, 'proprietario')
 }
 
 // Excluir programa leva junto datas bloqueadas, restrições, preços e ações
