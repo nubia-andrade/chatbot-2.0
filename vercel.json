@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/relatorio-marcas",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}
