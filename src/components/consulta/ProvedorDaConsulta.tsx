@@ -25,6 +25,9 @@ export type EstadoDaConsulta = {
   incluirRedesSociais: boolean
   /** Mantido por compatibilidade com sessões já abertas; não é mais gate de navegação. */
   datasConfirmadas: boolean
+  /** Depois que o PDF é gerado, a consulta vira um registro fechado e não pode ser reeditada. */
+  finalizada: boolean
+  propostaId: string | null
 }
 
 const CHAVE_SESSAO = 'chatbot2:consulta'
@@ -46,6 +49,8 @@ function estadoInicial(): EstadoDaConsulta {
     incluirDigital: false,
     incluirRedesSociais: false,
     datasConfirmadas: false,
+    finalizada: false,
+    propostaId: null,
   }
 }
 
@@ -54,6 +59,7 @@ type ContextoConsulta = {
   hidratado: boolean
   atualizar: (parcial: Partial<EstadoDaConsulta>) => void
   confirmarDatas: () => void
+  finalizar: (propostaId: string) => void
   limpar: () => void
 }
 
@@ -88,6 +94,9 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
 
   function atualizar(parcial: Partial<EstadoDaConsulta>) {
     setEstado((atual) => {
+      // Depois da geração, a proposta é imutável nesta jornada. A única saída
+      // para editar dados é iniciar uma nova consulta, que chama `limpar()`.
+      if (atual.finalizada) return atual
       const proximo = { ...atual, ...parcial }
       if ('itens' in parcial) proximo.datasConfirmadas = false
       return proximo
@@ -95,7 +104,11 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   }
 
   function confirmarDatas() {
-    setEstado((atual) => ({ ...atual, datasConfirmadas: true }))
+    setEstado((atual) => atual.finalizada ? atual : { ...atual, datasConfirmadas: true })
+  }
+
+  function finalizar(propostaId: string) {
+    setEstado((atual) => ({ ...atual, finalizada: true, propostaId }))
   }
 
   function limpar() {
@@ -108,7 +121,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Contexto.Provider value={{ estado, hidratado, atualizar, confirmarDatas, limpar }}>
+    <Contexto.Provider value={{ estado, hidratado, atualizar, confirmarDatas, finalizar, limpar }}>
       {children}
     </Contexto.Provider>
   )
@@ -130,6 +143,7 @@ export const PASSOS: { slug: string; rotulo: string }[] = [
 ]
 
 export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
+  if (estado.finalizada) return 'resumo'
   if (!estado.cliente) return 'cliente'
   if (!estado.programaId || estado.produto.trim() === '' || estado.objetivo.trim() === '') return 'programa'
   if (estado.itens.length === 0) return 'calendario'
@@ -143,6 +157,12 @@ export function useGuardaDoPasso(slug: string): boolean {
 
   useEffect(() => {
     if (!hidratado) return
+
+    if (estado.finalizada && slug !== 'resumo') {
+      setRedirecionando(true)
+      router.replace('/consulta/resumo')
+      return
+    }
 
     const pendente = primeiroPassoPendente(estado)
     const indexPendente = PASSOS.findIndex((passo) => passo.slug === pendente)
