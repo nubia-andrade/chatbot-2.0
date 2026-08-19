@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { carregarPerformanceInicio, type MetricasPerformance, type PropostaRecente } from '@/lib/dados/performance'
+import { carregarPerformanceInicio, type ItemAtencaoPerformance, type MetricasPerformance, type PropostaRecente } from '@/lib/dados/performance'
 import { obterSessao } from '@/lib/sessao-servidor'
 import { temPerfil } from '@/lib/dominio/perfis'
 import type { StatusNegociacao } from '@/lib/dados/propostas'
@@ -77,6 +77,7 @@ export default async function PaginaInicio() {
           </div>
 
           <GradeMetricas metricas={performance.executivo.metricasMes} modo="executivo" />
+          <BlocoAtencao itens={performance.executivo.atencoes} titulo="Atenção necessária" />
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)] xl:items-start">
             <GraficoEvolucaoComercial
@@ -114,6 +115,25 @@ function Metrica({ rotulo, valor, apoio, destaque = false }: { rotulo: string; v
       <p className={`mt-2 text-[22px] font-bold ${destaque ? 'text-[var(--roxo)]' : 'text-[var(--texto)]'}`}>{valor}</p>
       <p className="mt-1 text-[10.5px] text-[var(--texto-3)]">{apoio}</p>
     </div>
+  )
+}
+
+export function BlocoAtencao({ itens, titulo }: { itens: ItemAtencaoPerformance[]; titulo: string }) {
+  return (
+    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[12.5px] font-bold text-[var(--texto)]">{titulo}</h3>
+        <Link href="/propostas" className="text-[10px] font-bold text-[var(--roxo)]">Revisar propostas →</Link>
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        {itens.slice(0, 4).map((item, indice) => (
+          <div key={`${item.titulo}-${indice}`} className={`rounded-[10px] border px-3 py-2.5 ${item.tipo === 'alerta' ? 'border-[#F1D3A6] bg-[#FFF8EC]' : item.tipo === 'sucesso' ? 'border-[#CDEBDD] bg-[#F1FBF6]' : 'border-[var(--borda)] bg-[var(--superficie-suave)]'}`}>
+            <p className={`text-[10.5px] font-bold ${item.tipo === 'alerta' ? 'text-[#8A5700]' : item.tipo === 'sucesso' ? 'text-[var(--disponivel-texto)]' : 'text-[var(--texto)]'}`}>{item.titulo}</p>
+            <p className="mt-0.5 text-[9.8px] leading-[1.45] text-[var(--texto-3)]">{item.detalhe}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
