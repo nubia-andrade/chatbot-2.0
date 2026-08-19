@@ -185,15 +185,24 @@ export default function PassoCalendario() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Disponibilidade elegível</h2>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Disponibilidade elegível para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong>.{' '}
+      <section className="overflow-hidden rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)]">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--borda)] bg-[var(--superficie-suave)] px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[var(--roxo)]">Programa em consulta</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2.5">
+              <h2 className="text-[24px] font-bold leading-tight text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>{estado.programaNome ?? programa?.nome ?? 'Programa'}</h2>
+              <span className="rounded-full bg-[#F5F3FF] px-3 py-1 text-[10.5px] font-bold text-[var(--roxo)]">{modalidade === 'regional' ? 'Regional' : 'Nacional'}</span>
+            </div>
+            <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">{programa?.canal ? `${programa.canal} · ` : ''}Disponibilidade para <strong className="text-[var(--texto-2)]">{cliente.nome}</strong></p>
+          </div>
+          <Link href="/consulta" className="rounded-[9px] border border-[var(--borda-forte)] bg-white px-3.5 py-2 text-[11px] font-bold text-[var(--texto-2)]">Trocar programa</Link>
+        </div>
+        <p className="px-5 py-3 text-[12px] leading-[1.5] text-[var(--texto-3)] sm:px-6">
           {modalidade === 'regional'
             ? `Selecione diretamente as praças verdes de cada data. Você pode combinar até ${maxPracasPorAcao} ${maxPracasPorAcao === 1 ? 'praça' : 'praças'} por ação.`
             : 'Selecione as datas verdes e configure os complementos no painel ao lado.'}
         </p>
-      </div>
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4 rounded-[var(--raio-card)] border border-[var(--borda)] p-4 sm:p-5" style={{ background: 'var(--superficie)' }}>
