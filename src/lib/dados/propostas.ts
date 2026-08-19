@@ -3,6 +3,7 @@ import { obterSessao } from '../sessao-servidor'
 import { temPerfil } from '../dominio/perfis'
 
 export type StatusEmailDaProposta = 'desativado' | 'nao_configurado' | 'pendente' | 'enviando' | 'enviado' | 'falha'
+export type StatusNegociacao = 'em_negociacao' | 'fechada' | 'perdida' | 'cancelada' | 'substituida'
 
 export type PropostaDaLista = {
   id: string
@@ -20,21 +21,51 @@ export type PropostaDaLista = {
   email_status: StatusEmailDaProposta
   email_erro: string | null
   email_enviado_em: string | null
+  negociacao_status: StatusNegociacao
+  valor_final_negociado: number | null
+  data_fechamento: string | null
+  observacao_negociacao: string | null
+  motivo_perda: string | null
+  grupo_versao_id: string
+  versao: number
+  proposta_anterior_id: string | null
   criado_em: string
   enviado_em: string | null
   pdf_url: string | null
 }
 
 type Linha = Omit<PropostaDaLista, 'pdf_url'> & { pdf_path: string | null }
-type LinhaAntiga = Omit<Linha, 'email_status' | 'email_erro' | 'email_enviado_em'>
+type LinhaSemAcompanhamento = Omit<Linha, 'negociacao_status' | 'valor_final_negociado' | 'data_fechamento' | 'observacao_negociacao' | 'motivo_perda' | 'grupo_versao_id' | 'versao' | 'proposta_anterior_id'>
+type LinhaAntiga = Omit<LinhaSemAcompanhamento, 'email_status' | 'email_erro' | 'email_enviado_em'>
 
 const CAMPOS_BASE = 'id, usuario_id, marca_nome, cliente_nome, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_total_geral, status, erro, criado_em, enviado_em, pdf_path'
+const CAMPOS_EMAIL = 'email_status, email_erro, email_enviado_em'
+const CAMPOS_ACOMPANHAMENTO = 'negociacao_status, valor_final_negociado, data_fechamento, observacao_negociacao, motivo_perda, grupo_versao_id, versao, proposta_anterior_id'
 
 function statusEmailLegado(linha: LinhaAntiga): StatusEmailDaProposta {
   if (linha.status === 'enviada') return 'enviado'
   if (linha.status === 'enviando') return 'pendente'
   if (linha.status === 'falha' && linha.pdf_path) return 'falha'
   return 'desativado'
+}
+
+function acompanharLegado<T extends LinhaSemAcompanhamento>(linha: T): Linha {
+  return {
+    ...linha,
+    negociacao_status: 'em_negociacao',
+    valor_final_negociado: null,
+    data_fechamento: null,
+    observacao_negociacao: null,
+    motivo_perda: null,
+    grupo_versao_id: linha.id,
+    versao: 1,
+    proposta_anterior_id: null,
+  }
+}
+
+function erroDeCampo(mensagem: string, campos: string[]): boolean {
+  const texto = mensagem.toLowerCase()
+  return texto.includes('could not find') || campos.some((campo) => texto.includes(campo))
 }
 
 export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
@@ -44,53 +75,61 @@ export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
   const supabase = await criarClienteServidor()
   const podeAcompanharPrograma = temPerfil(sessao.perfis, 'consultor_programa') || temPerfil(sessao.perfis, 'proprietario')
 
-  let consultaNovaBuilder = supabase
-    .from('propostas')
-    .select(`${CAMPOS_BASE}, email_status, email_erro, email_enviado_em`)
-    .order('criado_em', { ascending: false })
-    .limit(100)
-
-  // Defesa em profundidade: perfis comerciais pedem explicitamente só as
-  // próprias propostas. O RLS do banco aplica a mesma restrição novamente.
-  if (!podeAcompanharPrograma) {
-    consultaNovaBuilder = consultaNovaBuilder.eq('usuario_id', sessao.usuarioId)
+  const aplicarEscopo = <T extends { eq: (coluna: string, valor: string) => T }>(builder: T): T => {
+    if (!podeAcompanharPrograma) return builder.eq('usuario_id', sessao.usuarioId)
+    return builder
   }
 
-  const consultaNova = await consultaNovaBuilder
+  const consultaCompleta = await aplicarEscopo(
+    supabase
+      .from('propostas')
+      .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}`)
+      .order('criado_em', { ascending: false })
+      .limit(100),
+  )
+
   let linhas: Linha[] = []
 
-  if (!consultaNova.error) {
-    linhas = (consultaNova.data ?? []) as unknown as Linha[]
+  if (!consultaCompleta.error) {
+    linhas = (consultaCompleta.data ?? []) as unknown as Linha[]
+  } else if (erroDeCampo(consultaCompleta.error.message, ['negociacao_status', 'grupo_versao_id', 'versao'])) {
+    const consultaSemAcompanhamento = await aplicarEscopo(
+      supabase
+        .from('propostas')
+        .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}`)
+        .order('criado_em', { ascending: false })
+        .limit(100),
+    )
+
+    if (!consultaSemAcompanhamento.error) {
+      linhas = ((consultaSemAcompanhamento.data ?? []) as unknown as LinhaSemAcompanhamento[]).map(acompanharLegado)
+    } else if (erroDeCampo(consultaSemAcompanhamento.error.message, ['email_status', 'email_erro'])) {
+      const consultaAntiga = await aplicarEscopo(
+        supabase
+          .from('propostas')
+          .select(CAMPOS_BASE)
+          .order('criado_em', { ascending: false })
+          .limit(100),
+      )
+
+      if (consultaAntiga.error) {
+        console.error('Falha ao listar propostas:', consultaAntiga.error.message)
+        return []
+      }
+
+      linhas = ((consultaAntiga.data ?? []) as unknown as LinhaAntiga[]).map((linha) => acompanharLegado({
+        ...linha,
+        email_status: statusEmailLegado(linha),
+        email_erro: linha.status === 'falha' && linha.pdf_path ? linha.erro : null,
+        email_enviado_em: linha.enviado_em,
+      }))
+    } else {
+      console.error('Falha ao listar propostas:', consultaSemAcompanhamento.error.message)
+      return []
+    }
   } else {
-    const texto = consultaNova.error.message.toLowerCase()
-    const schemaAntigo = texto.includes('email_status') || texto.includes('email_erro') || texto.includes('could not find')
-    if (!schemaAntigo) {
-      console.error('Falha ao listar propostas:', consultaNova.error.message)
-      return []
-    }
-
-    let consultaAntigaBuilder = supabase
-      .from('propostas')
-      .select(CAMPOS_BASE)
-      .order('criado_em', { ascending: false })
-      .limit(100)
-
-    if (!podeAcompanharPrograma) {
-      consultaAntigaBuilder = consultaAntigaBuilder.eq('usuario_id', sessao.usuarioId)
-    }
-
-    const consultaAntiga = await consultaAntigaBuilder
-    if (consultaAntiga.error) {
-      console.error('Falha ao listar propostas:', consultaAntiga.error.message)
-      return []
-    }
-
-    linhas = ((consultaAntiga.data ?? []) as unknown as LinhaAntiga[]).map((linha) => ({
-      ...linha,
-      email_status: statusEmailLegado(linha),
-      email_erro: linha.status === 'falha' && linha.pdf_path ? linha.erro : null,
-      email_enviado_em: linha.enviado_em,
-    }))
+    console.error('Falha ao listar propostas:', consultaCompleta.error.message)
+    return []
   }
 
   return Promise.all(linhas.map(async (linha) => {
