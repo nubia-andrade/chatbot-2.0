@@ -18,6 +18,7 @@ const ITENS_MENU: ItemMenu[] = [
   { href: '/inicio', rotulo: 'Início', rotuloMobile: 'Início', secao: 'inicio' },
   { href: '/consulta', rotulo: 'Nova consulta', rotuloMobile: 'Consulta', secao: 'consulta' },
   { href: '/propostas', rotulo: 'Propostas', rotuloMobile: 'Propostas', secao: 'propostas' },
+  { href: '/aprovacoes', rotulo: 'Aprovações', rotuloMobile: 'Aprovar', secao: 'aprovacoes' },
   { href: '/configuracoes', rotulo: 'Configurações', rotuloMobile: 'Config.', secao: 'configuracoes' },
 ]
 
