@@ -1,5 +1,6 @@
-import { SecaoEmConstrucao } from '@/components/layout/SecaoEmConstrucao'
+import { redirect } from 'next/navigation'
 
+/** Histórico deixou de ser uma seção principal; rastreabilidade vive na proposta. */
 export default function PaginaHistorico() {
-  return <SecaoEmConstrucao titulo="Histórico" />
+  redirect('/propostas')
 }
