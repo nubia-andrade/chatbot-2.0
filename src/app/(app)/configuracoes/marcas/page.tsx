@@ -35,7 +35,7 @@ export default async function PaginaMarcasEAnunciantes() {
         <p className="text-[11px] font-bold uppercase tracking-[.1em] text-[var(--roxo)]">Governança de dados</p>
         <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]">Marcas e anunciantes</h1>
         <p className="mt-2 max-w-[900px] text-[13px] leading-[1.55] text-[var(--texto-3)]">
-          Gerencie tanto os relacionamentos aprendidos pelo Globo Take quanto marcas cadastradas manualmente. Uma marca manual pode ser usada imediatamente em uma Nova Consulta, mesmo antes de aparecer na API.
+          Gerencie tanto os relacionamentos aprendidos pelo Globo Take quanto marcas cadastradas manualmente. Marcas incluídas por executivos ficam disponíveis imediatamente, entram como pendentes de revisão e são consolidadas no relatório diário de governança.
         </p>
       </header>
 
