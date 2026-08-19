@@ -16,6 +16,11 @@ export type LinhaParaPerformance = {
   criado_em?: string
 }
 
+export type LinhaExecutivoPerformance = LinhaParaPerformance & {
+  usuario_id: string
+  executivo_nome?: string | null
+}
+
 export type MetricasPerformance = {
   propostas: number
   valorProposto: number
@@ -40,6 +45,12 @@ export type PontoEvolucaoMensal = {
   vendido: number
   propostas: number
   fechadas: number
+}
+
+export type ItemRankingExecutivo = {
+  usuarioId: string
+  nome: string
+  metricas: MetricasPerformance
 }
 
 function arredondar(valor: number): number {
@@ -87,6 +98,34 @@ export function calcularMetricasPerformance<T extends LinhaParaPerformance>(linh
     nacionais: linhas.filter((linha) => linha.modalidade === 'nacional').length,
     regionais: linhas.filter((linha) => linha.modalidade === 'regional').length,
   }
+}
+
+/**
+ * Ranking comercial do período informado.
+ * Ordena primeiro pelo valor vendido e, em empate, pelo valor ofertado.
+ */
+export function calcularRankingExecutivos<T extends LinhaExecutivoPerformance>(linhas: T[]): ItemRankingExecutivo[] {
+  const porExecutivo = new Map<string, T[]>()
+
+  for (const linha of linhas) {
+    const grupo = porExecutivo.get(linha.usuario_id) ?? []
+    grupo.push(linha)
+    porExecutivo.set(linha.usuario_id, grupo)
+  }
+
+  return [...porExecutivo.entries()]
+    .map(([usuarioId, propostas]) => ({
+      usuarioId,
+      nome: propostas.find((linha) => linha.executivo_nome?.trim())?.executivo_nome?.trim() || 'Executivo',
+      metricas: calcularMetricasPerformance(propostas),
+    }))
+    .sort((a, b) => {
+      const vendido = b.metricas.valorFechado - a.metricas.valorFechado
+      if (vendido !== 0) return vendido
+      const ofertado = b.metricas.valorProposto - a.metricas.valorProposto
+      if (ofertado !== 0) return ofertado
+      return a.nome.localeCompare(b.nome, 'pt-BR')
+    })
 }
 
 const MESES_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const
