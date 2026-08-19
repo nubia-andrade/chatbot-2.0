@@ -134,24 +134,21 @@ export function useConsulta(): ContextoConsulta {
   return contexto
 }
 
-/** A proposta é gerada como ação final do Resumo, não como uma tela adicional. */
-export const PASSOS: { slug: string; rotulo: string }[] = [
-  { slug: 'cliente', rotulo: 'Cliente' },
-  { slug: 'setor', rotulo: 'Setor' },
-  { slug: 'programa', rotulo: 'Programa' },
-  { slug: 'calendario', rotulo: 'Calendário' },
-  { slug: 'resumo', rotulo: 'Resumo' },
+/** A jornada real tem três momentos: contexto, disponibilidade e confirmação. */
+export const PASSOS: { slug: 'contexto' | 'calendario' | 'resumo'; rotulo: string; href: string }[] = [
+  { slug: 'contexto', rotulo: 'Contexto', href: '/consulta' },
+  { slug: 'calendario', rotulo: 'Calendário', href: '/consulta/calendario' },
+  { slug: 'resumo', rotulo: 'Resumo', href: '/consulta/resumo' },
 ]
 
-export function primeiroPassoPendente(estado: EstadoDaConsulta): string {
+export function primeiroPassoPendente(estado: EstadoDaConsulta): 'contexto' | 'calendario' | 'resumo' {
   if (estado.finalizada) return 'resumo'
-  if (!estado.cliente) return 'cliente'
-  if (!estado.programaId || estado.produto.trim() === '' || estado.objetivo.trim() === '') return 'programa'
+  if (!estado.cliente || !estado.programaId || estado.produto.trim() === '' || estado.objetivo.trim() === '') return 'contexto'
   if (estado.itens.length === 0) return 'calendario'
   return 'resumo'
 }
 
-export function useGuardaDoPasso(slug: string): boolean {
+export function useGuardaDoPasso(slug: 'contexto' | 'calendario' | 'resumo'): boolean {
   const { estado, hidratado } = useConsulta()
   const router = useRouter()
   const [redirecionando, setRedirecionando] = useState(false)
@@ -171,10 +168,10 @@ export function useGuardaDoPasso(slug: string): boolean {
 
     if (indexEstePasso > indexPendente) {
       setRedirecionando(true)
-      const destino = pendente === 'cliente' || pendente === 'programa'
-        ? '/consulta'
-        : `/consulta/${pendente}`
+      const destino = PASSOS[indexPendente]?.href ?? '/consulta'
       router.replace(destino)
+    } else {
+      setRedirecionando(false)
     }
   }, [estado, hidratado, router, slug])
 
