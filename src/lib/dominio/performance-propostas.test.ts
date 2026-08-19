@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { calcularMetricasPerformance, selecionarVersoesAtuais, type LinhaParaPerformance } from './performance-propostas'
+import {
+  calcularEvolucaoMensal,
+  calcularMetricasPerformance,
+  selecionarVersoesAtuais,
+  type LinhaParaPerformance,
+} from './performance-propostas'
 
 function linha(parcial: Partial<LinhaParaPerformance> = {}): LinhaParaPerformance {
   return {
@@ -15,6 +20,7 @@ function linha(parcial: Partial<LinhaParaPerformance> = {}): LinhaParaPerformanc
     grupo_versao_id: parcial.grupo_versao_id ?? 'g-1',
     versao: parcial.versao ?? 1,
     status: parcial.status ?? 'gerada',
+    criado_em: parcial.criado_em,
   }
 }
 
@@ -61,5 +67,45 @@ describe('calcularMetricasPerformance', () => {
     ])
 
     expect(metricas.conversao).toBeNull()
+  })
+})
+
+describe('calcularEvolucaoMensal', () => {
+  it('agrupa ofertado e vendido pelo mês de criação da proposta', () => {
+    const evolucao = calcularEvolucaoMensal([
+      linha({
+        grupo_versao_id: '1',
+        criado_em: '2026-06-10T10:00:00.000Z',
+        valor_total_comercial: 100,
+        negociacao_status: 'fechada',
+        valor_final_negociado: 80,
+      }),
+      linha({
+        grupo_versao_id: '2',
+        criado_em: '2026-06-20T10:00:00.000Z',
+        valor_total_comercial: 200,
+        negociacao_status: 'em_negociacao',
+      }),
+      linha({
+        grupo_versao_id: '3',
+        criado_em: '2026-07-05T10:00:00.000Z',
+        valor_total_comercial: 300,
+        negociacao_status: 'fechada',
+        valor_final_negociado: 250,
+      }),
+    ], new Date('2026-08-19T12:00:00.000Z'), 3)
+
+    expect(evolucao).toEqual([
+      { mes: '2026-06', rotulo: 'jun/26', ofertado: 300, vendido: 80, propostas: 2, fechadas: 1 },
+      { mes: '2026-07', rotulo: 'jul/26', ofertado: 300, vendido: 250, propostas: 1, fechadas: 1 },
+      { mes: '2026-08', rotulo: 'ago/26', ofertado: 0, vendido: 0, propostas: 0, fechadas: 0 },
+    ])
+  })
+
+  it('mantém meses sem propostas para preservar a continuidade da linha', () => {
+    const evolucao = calcularEvolucaoMensal([], new Date('2026-08-19T12:00:00.000Z'), 4)
+
+    expect(evolucao.map((ponto) => ponto.mes)).toEqual(['2026-05', '2026-06', '2026-07', '2026-08'])
+    expect(evolucao.every((ponto) => ponto.ofertado === 0 && ponto.vendido === 0)).toBe(true)
   })
 })
