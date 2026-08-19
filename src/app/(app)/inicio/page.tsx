@@ -4,6 +4,7 @@ import { obterSessao } from '@/lib/sessao-servidor'
 import { temPerfil } from '@/lib/dominio/perfis'
 import type { StatusNegociacao } from '@/lib/dados/propostas'
 import { GraficoEvolucaoComercial } from '@/components/inicio/GraficoEvolucaoComercial'
+import { PerformanceProgramas } from '@/components/inicio/PerformanceProgramas'
 
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(valor)
@@ -61,7 +62,7 @@ export default async function PaginaInicio() {
       {!performance.schemaDisponivel && (
         <section className="rounded-[var(--raio-card)] border border-[#F1D3A6] bg-[#FFF8EC] p-4">
           <p className="text-[12.5px] font-bold text-[#8A5700]">Acompanhamento comercial ainda não habilitado</p>
-          <p className="mt-1 text-[11.5px] text-[var(--texto-2)]">Execute <strong>supabase/schema-entrega-5-acompanhamento-performance.sql</strong> no Supabase para liberar status, conversão e versionamento.</p>
+          <p className="mt-1 text-[11.5px] text-[var(--texto-2)]">Execute <strong>supabase/schema-entrega-5-filtro-ranking-programas.sql</strong> no Supabase para liberar o ranking de executivos.</p>
         </section>
       )}
 
@@ -90,67 +91,7 @@ export default async function PaginaInicio() {
         </section>
       )}
 
-      {performance.programas && (
-        <section className="flex flex-col gap-4 border-t border-[var(--borda)] pt-7">
-          <div>
-            <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[var(--roxo)]">Meus programas</p>
-            <h2 className="mt-1 text-[19px] font-bold text-[var(--texto)]">Performance dos programas</h2>
-            <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">Indicadores do mês atual considerando somente a versão vigente de cada proposta.</p>
-          </div>
-
-          <GradeMetricas metricas={performance.programas.metricasMes} modo="programa" />
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)] xl:items-start">
-            <GraficoEvolucaoComercial
-              titulo="Evolução comercial dos programas"
-              subtitulo="Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
-              pontos={performance.programas.evolucao12Meses}
-            />
-
-            <div className="grid gap-4">
-              <Funil metricas={performance.programas.metricasMes} />
-              <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
-                <h3 className="text-[13px] font-bold text-[var(--texto)]">Composição das propostas</h3>
-                <div className="mt-3 grid grid-cols-2 gap-2.5">
-                  <MiniMetrica rotulo="Com Digital" valor={`${performance.programas.metricasMes.percentualDigital}%`} />
-                  <MiniMetrica rotulo="Com Redes" valor={`${performance.programas.metricasMes.percentualRedes}%`} />
-                  <MiniMetrica rotulo="Nacionais" valor={String(performance.programas.metricasMes.nacionais)} />
-                  <MiniMetrica rotulo="Regionais" valor={String(performance.programas.metricasMes.regionais)} />
-                </div>
-              </section>
-            </div>
-          </div>
-
-          <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-[14px] font-bold text-[var(--texto)]">Programas por valor proposto</h3>
-              <span className="text-[10.5px] text-[var(--texto-3)]">Mês atual</span>
-            </div>
-            <div className="mt-4 divide-y divide-[var(--borda)]">
-              {performance.programas.porPrograma.length === 0 ? (
-                <Vazio texto="Ainda não há propostas dos seus programas neste mês." />
-              ) : performance.programas.porPrograma.slice(0, 8).map((programa) => (
-                <div key={programa.programaId ?? programa.programaNome} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_120px_90px] sm:items-center">
-                  <div>
-                    <p className="text-[12.5px] font-bold text-[var(--texto)]">{programa.programaNome}</p>
-                    <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">{programa.metricas.propostas} proposta{programa.metricas.propostas === 1 ? '' : 's'} · {programa.metricas.clientes} anunciante{programa.metricas.clientes === 1 ? '' : 's'}</p>
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-[10px] uppercase text-[var(--texto-3)]">Proposto</p>
-                    <p className="mt-0.5 text-[12px] font-bold text-[var(--texto)]">{moeda(programa.metricas.valorProposto)}</p>
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-[10px] uppercase text-[var(--texto-3)]">Conversão</p>
-                    <p className="mt-0.5 text-[12px] font-bold text-[var(--roxo)]">{programa.metricas.conversao === null ? '—' : `${programa.metricas.conversao}%`}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <ListaRecentes titulo="Propostas recentes dos programas" propostas={performance.programas.recentes} />
-        </section>
-      )}
+      {performance.programas && <PerformanceProgramas dados={performance.programas} />}
     </div>
   )
 }
@@ -229,10 +170,6 @@ function LinhaFunil({ rotulo, valor, total }: { rotulo: string; valor: number; t
       </div>
     </div>
   )
-}
-
-function MiniMetrica({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return <div className="rounded-[9px] bg-[var(--superficie-suave)] p-2.5"><p className="text-[9px] font-bold uppercase text-[var(--texto-3)]">{rotulo}</p><p className="mt-1 text-[15px] font-bold text-[var(--texto)]">{valor}</p></div>
 }
 
 function Vazio({ texto }: { texto: string }) {
