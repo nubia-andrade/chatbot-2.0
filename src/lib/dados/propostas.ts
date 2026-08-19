@@ -4,6 +4,7 @@ import { temPerfil } from '../dominio/perfis'
 
 export type StatusEmailDaProposta = 'desativado' | 'nao_configurado' | 'pendente' | 'enviando' | 'enviado' | 'falha'
 export type StatusNegociacao = 'em_negociacao' | 'fechada' | 'perdida' | 'cancelada' | 'substituida'
+export type StatusAprovacaoDaProposta = 'nao_requerida' | 'pendente' | 'aprovada' | 'rejeitada'
 
 export type PropostaDaLista = {
   id: string
@@ -29,18 +30,26 @@ export type PropostaDaLista = {
   grupo_versao_id: string
   versao: number
   proposta_anterior_id: string | null
+  aprovacao_status: StatusAprovacaoDaProposta
+  aprovacao_solicitada_em: string | null
+  aprovacao_decidida_em: string | null
+  aprovacao_justificativa: string | null
+  aprovacao_email_solicitacao_status: string
+  aprovacao_email_devolutiva_status: string
   criado_em: string
   enviado_em: string | null
   pdf_url: string | null
 }
 
 type Linha = Omit<PropostaDaLista, 'pdf_url'> & { pdf_path: string | null }
-type LinhaSemAcompanhamento = Omit<Linha, 'negociacao_status' | 'valor_final_negociado' | 'data_fechamento' | 'observacao_negociacao' | 'motivo_perda' | 'grupo_versao_id' | 'versao' | 'proposta_anterior_id'>
+type LinhaSemAprovacao = Omit<Linha, 'aprovacao_status' | 'aprovacao_solicitada_em' | 'aprovacao_decidida_em' | 'aprovacao_justificativa' | 'aprovacao_email_solicitacao_status' | 'aprovacao_email_devolutiva_status'>
+type LinhaSemAcompanhamento = Omit<LinhaSemAprovacao, 'negociacao_status' | 'valor_final_negociado' | 'data_fechamento' | 'observacao_negociacao' | 'motivo_perda' | 'grupo_versao_id' | 'versao' | 'proposta_anterior_id'>
 type LinhaAntiga = Omit<LinhaSemAcompanhamento, 'email_status' | 'email_erro' | 'email_enviado_em'>
 
 const CAMPOS_BASE = 'id, usuario_id, marca_nome, cliente_nome, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_total_geral, status, erro, criado_em, enviado_em, pdf_path'
 const CAMPOS_EMAIL = 'email_status, email_erro, email_enviado_em'
 const CAMPOS_ACOMPANHAMENTO = 'negociacao_status, valor_final_negociado, data_fechamento, observacao_negociacao, motivo_perda, grupo_versao_id, versao, proposta_anterior_id'
+const CAMPOS_APROVACAO = 'aprovacao_status, aprovacao_solicitada_em, aprovacao_decidida_em, aprovacao_justificativa, aprovacao_email_solicitacao_status, aprovacao_email_devolutiva_status'
 
 function statusEmailLegado(linha: LinhaAntiga): StatusEmailDaProposta {
   if (linha.status === 'enviada') return 'enviado'
@@ -49,93 +58,62 @@ function statusEmailLegado(linha: LinhaAntiga): StatusEmailDaProposta {
   return 'desativado'
 }
 
-function acompanharLegado(linha: LinhaSemAcompanhamento): Linha {
-  return {
-    ...linha,
-    negociacao_status: 'em_negociacao',
-    valor_final_negociado: null,
-    data_fechamento: null,
-    observacao_negociacao: null,
-    motivo_perda: null,
-    grupo_versao_id: linha.id,
-    versao: 1,
-    proposta_anterior_id: null,
-  }
+function acompanharLegado(linha: LinhaSemAcompanhamento): LinhaSemAprovacao {
+  return { ...linha, negociacao_status: 'em_negociacao', valor_final_negociado: null, data_fechamento: null, observacao_negociacao: null, motivo_perda: null, grupo_versao_id: linha.id, versao: 1, proposta_anterior_id: null }
+}
+
+function aprovarLegado(linha: LinhaSemAprovacao): Linha {
+  return { ...linha, aprovacao_status: 'nao_requerida', aprovacao_solicitada_em: null, aprovacao_decidida_em: null, aprovacao_justificativa: null, aprovacao_email_solicitacao_status: 'nao_enviado', aprovacao_email_devolutiva_status: 'nao_enviado' }
 }
 
 function erroDeCampo(mensagem: string, campos: string[]): boolean {
   const texto = mensagem.toLowerCase()
-  return texto.includes('could not find') || campos.some((campo) => texto.includes(campo))
+  return texto.includes('could not find') || texto.includes('does not exist') || campos.some((campo) => texto.includes(campo))
 }
 
 export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
   const sessao = await obterSessao()
   if (!sessao) return []
-
   const supabase = await criarClienteServidor()
   const podeAcompanharPrograma = temPerfil(sessao.perfis, 'consultor_programa') || temPerfil(sessao.perfis, 'proprietario')
 
-  let completaBuilder = supabase
-    .from('propostas')
-    .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}`)
-    .order('criado_em', { ascending: false })
-    .limit(100)
-  if (!podeAcompanharPrograma) completaBuilder = completaBuilder.eq('usuario_id', sessao.usuarioId)
+  const base = (campos: string) => {
+    let builder = supabase.from('propostas').select(campos).order('criado_em', { ascending: false }).limit(500)
+    if (!podeAcompanharPrograma) builder = builder.eq('usuario_id', sessao.usuarioId)
+    return builder
+  }
 
-  const consultaCompleta = await completaBuilder
+  const completa = await base(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}, ${CAMPOS_APROVACAO}`)
   let linhas: Linha[] = []
 
-  if (!consultaCompleta.error) {
-    linhas = (consultaCompleta.data ?? []) as unknown as Linha[]
-  } else if (erroDeCampo(consultaCompleta.error.message, ['negociacao_status', 'grupo_versao_id', 'versao'])) {
-    let semAcompanhamentoBuilder = supabase
-      .from('propostas')
-      .select(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}`)
-      .order('criado_em', { ascending: false })
-      .limit(100)
-    if (!podeAcompanharPrograma) semAcompanhamentoBuilder = semAcompanhamentoBuilder.eq('usuario_id', sessao.usuarioId)
-
-    const consultaSemAcompanhamento = await semAcompanhamentoBuilder
-    if (!consultaSemAcompanhamento.error) {
-      linhas = ((consultaSemAcompanhamento.data ?? []) as unknown as LinhaSemAcompanhamento[]).map(acompanharLegado)
-    } else if (erroDeCampo(consultaSemAcompanhamento.error.message, ['email_status', 'email_erro'])) {
-      let antigaBuilder = supabase
-        .from('propostas')
-        .select(CAMPOS_BASE)
-        .order('criado_em', { ascending: false })
-        .limit(100)
-      if (!podeAcompanharPrograma) antigaBuilder = antigaBuilder.eq('usuario_id', sessao.usuarioId)
-
-      const consultaAntiga = await antigaBuilder
-      if (consultaAntiga.error) {
-        console.error('Falha ao listar propostas:', consultaAntiga.error.message)
-        return []
-      }
-
-      linhas = ((consultaAntiga.data ?? []) as unknown as LinhaAntiga[]).map((linha) => acompanharLegado({
-        ...linha,
-        email_status: statusEmailLegado(linha),
-        email_erro: linha.status === 'falha' && linha.pdf_path ? linha.erro : null,
-        email_enviado_em: linha.enviado_em,
-      }))
-    } else {
-      console.error('Falha ao listar propostas:', consultaSemAcompanhamento.error.message)
-      return []
-    }
+  if (!completa.error) {
+    linhas = (completa.data ?? []) as unknown as Linha[]
+  } else if (erroDeCampo(completa.error.message, ['aprovacao_status'])) {
+    const semAprovacao = await base(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}, ${CAMPOS_ACOMPANHAMENTO}`)
+    if (!semAprovacao.error) {
+      linhas = ((semAprovacao.data ?? []) as unknown as LinhaSemAprovacao[]).map(aprovarLegado)
+    } else if (erroDeCampo(semAprovacao.error.message, ['negociacao_status', 'grupo_versao_id', 'versao'])) {
+      const semAcompanhamento = await base(`${CAMPOS_BASE}, ${CAMPOS_EMAIL}`)
+      if (!semAcompanhamento.error) {
+        linhas = ((semAcompanhamento.data ?? []) as unknown as LinhaSemAcompanhamento[]).map(acompanharLegado).map(aprovarLegado)
+      } else if (erroDeCampo(semAcompanhamento.error.message, ['email_status', 'email_erro'])) {
+        const antiga = await base(CAMPOS_BASE)
+        if (antiga.error) { console.error('Falha ao listar propostas:', antiga.error.message); return [] }
+        linhas = ((antiga.data ?? []) as unknown as LinhaAntiga[]).map((linha) => aprovarLegado(acompanharLegado({ ...linha, email_status: statusEmailLegado(linha), email_erro: linha.status === 'falha' && linha.pdf_path ? linha.erro : null, email_enviado_em: linha.enviado_em })))
+      } else { console.error('Falha ao listar propostas:', semAcompanhamento.error.message); return [] }
+    } else { console.error('Falha ao listar propostas:', semAprovacao.error.message); return [] }
   } else {
-    console.error('Falha ao listar propostas:', consultaCompleta.error.message)
+    console.error('Falha ao listar propostas:', completa.error.message)
     return []
   }
 
   return Promise.all(linhas.map(async (linha) => {
     let pdfUrl: string | null = null
-    if (linha.pdf_path) {
-      const { data: assinatura } = await supabase.storage
-        .from('propostas')
-        .createSignedUrl(linha.pdf_path, 60 * 60)
+    const podeLerPdf = podeAcompanharPrograma || linha.aprovacao_status === 'nao_requerida' || linha.aprovacao_status === 'aprovada'
+    if (linha.pdf_path && podeLerPdf) {
+      const { data: assinatura } = await supabase.storage.from('propostas').createSignedUrl(linha.pdf_path, 60 * 60)
       pdfUrl = assinatura?.signedUrl ?? null
     }
-
     const { pdf_path: _pdfPath, ...resto } = linha
     return { ...resto, pdf_url: pdfUrl }
   }))
