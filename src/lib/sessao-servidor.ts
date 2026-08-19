@@ -1,6 +1,11 @@
 import { criarClienteServidor } from './supabase/cliente-servidor'
 import { listarProgramasVinculados } from './dados/vinculos'
-import { podeAdministrarProgramas, type Perfil } from './dominio/perfis'
+import {
+  podeAdministrarProgramas,
+  secoesPadraoDosPerfis,
+  type Perfil,
+  type SecaoApp,
+} from './dominio/perfis'
 
 export type Sessao = {
   usuarioId: string
@@ -9,6 +14,7 @@ export type Sessao = {
   cargo: string | null
   perfis: Perfil[]
   programasVinculados: string[]
+  secoes: SecaoApp[]
 }
 
 /**
@@ -38,16 +44,35 @@ export async function obterSessao(): Promise<Sessao | null> {
     supabase.from('perfil_usuario').select('perfil').eq('usuario_id', usuarioAutenticado.id),
   ])
 
-  const perfis = (linhasDePerfil ?? []).map((linha) => linha.perfil as Perfil)
+  const perfisLidos = (linhasDePerfil ?? []).map((linha) => linha.perfil as Perfil)
+  const perfis = perfisLidos.length > 0 ? perfisLidos : ['executivo' as Perfil]
   const programasVinculados = await listarProgramasVinculados(usuarioAutenticado.id)
+
+  // A matriz no banco é configurável pela Proprietária. Enquanto a migration
+  // ainda não tiver sido aplicada, usa os padrões do domínio para não impedir
+  // o login nem a navegação durante a atualização do ambiente.
+  let secoes = secoesPadraoDosPerfis(perfis)
+  const { data: permissoes, error: erroPermissoes } = await supabase
+    .from('perfil_secao')
+    .select('perfil, secao, permitido')
+    .in('perfil', perfis)
+    .eq('permitido', true)
+
+  if (!erroPermissoes && permissoes) {
+    const permitidas = new Set<SecaoApp>(['inicio'])
+    for (const linha of permissoes) permitidas.add(linha.secao as SecaoApp)
+    secoes = ['inicio', 'consulta', 'propostas', 'historico', 'configuracoes']
+      .filter((secao): secao is SecaoApp => permitidas.has(secao as SecaoApp))
+  }
 
   return {
     usuarioId: usuarioAutenticado.id,
     email: usuarioAutenticado.email ?? '',
     nome: usuario?.nome ?? usuarioAutenticado.email ?? '',
     cargo: usuario?.cargo ?? null,
-    perfis: perfis.length > 0 ? perfis : ['executivo'],
+    perfis,
     programasVinculados,
+    secoes,
   }
 }
 
