@@ -79,7 +79,7 @@ export default async function PaginaInicio() {
 
           <GraficoEvolucaoComercial
             titulo="Evolução da minha performance"
-            subtitulo="Últimos 12 meses · Ofertado x Vendido pela data de criação da proposta."
+            subtitulo="Ofertado x Vendido pela data de criação da proposta."
             pontos={performance.executivo.evolucao12Meses}
           />
 
@@ -102,7 +102,7 @@ export default async function PaginaInicio() {
 
           <GraficoEvolucaoComercial
             titulo="Evolução comercial dos programas"
-            subtitulo="Últimos 12 meses · Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
+            subtitulo="Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
             pontos={performance.programas.evolucao12Meses}
           />
 
