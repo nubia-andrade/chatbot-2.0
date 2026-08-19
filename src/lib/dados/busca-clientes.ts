@@ -9,7 +9,8 @@ export type Cliente = {
   cnpj: string | null
   setor: string | null
   industria: string | null
-  segmentacao_se: string | null
+  /** Campo próprio da Carteira. Opcional para compatibilidade com estados antigos da sessão. */
+  segmentacao_se?: string | null
   apto_regional: boolean
 }
 
