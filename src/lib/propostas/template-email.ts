@@ -9,6 +9,18 @@ function escaparHtml(valor: string): string {
     .replaceAll("'", '&#039;')
 }
 
+function imagemExternaSegura(valor: string | null | undefined): string | null {
+  const url = (valor ?? '').trim()
+  if (!/^https?:\/\//i.test(url)) return null
+  try {
+    const analisada = new URL(url)
+    if (analisada.protocol !== 'http:' && analisada.protocol !== 'https:') return null
+    return url
+  } catch {
+    return null
+  }
+}
+
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
@@ -43,6 +55,7 @@ export type DadosDoEmailDaProposta = {
   marcaNome: string | null
   produto: string
   programaNome: string
+  programaImagemUrl?: string | null
   modalidade: 'nacional' | 'regional'
   objetivo: string
   itens: ItemParaResumoFinanceiro[]
@@ -59,6 +72,10 @@ export function montarEmailDaProposta(dados: DadosDoEmailDaProposta): string {
   const datas = datasDaProposta(dados.itens)
   const pracas = dados.modalidade === 'regional' ? pracasDaProposta(dados.itens) : ''
   const modalidade = dados.modalidade === 'regional' ? 'Regional' : 'Nacional'
+  const imagemPrograma = imagemExternaSegura(dados.programaImagemUrl)
+  const hero = imagemPrograma
+    ? `<tr><td style="padding:0;background:#211d24;"><img src="${escaparHtml(imagemPrograma)}" width="640" alt="${escaparHtml(dados.programaNome)}" style="display:block;width:100%;max-width:640px;height:auto;max-height:220px;border:0;outline:none;text-decoration:none;object-fit:cover;"></td></tr>`
+    : ''
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -68,11 +85,12 @@ export function montarEmailDaProposta(dados: DadosDoEmailDaProposta): string {
     <tr>
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e7e3ea;">
+          ${hero}
           <tr>
-            <td style="background:#f20a6b;padding:28px 34px 24px 34px;">
+            <td style="background:#f20a6b;padding:${imagemPrograma ? '20px 34px 19px 34px' : '28px 34px 24px 34px'};">
               <div style="font-family:Arial,sans-serif;font-size:11px;line-height:16px;color:#ffffff;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.88;">Globo Publicidade</div>
-              <div style="margin-top:8px;font-family:Arial,sans-serif;font-size:30px;line-height:34px;color:#ffffff;font-weight:700;">${escaparHtml(dados.programaNome)}</div>
-              <div style="margin-top:8px;font-family:Arial,sans-serif;font-size:14px;line-height:20px;color:#ffffff;opacity:.92;">Nova proposta comercial pronta para consulta</div>
+              <div style="margin-top:6px;font-family:Arial,sans-serif;font-size:${imagemPrograma ? '25px' : '30px'};line-height:${imagemPrograma ? '30px' : '34px'};color:#ffffff;font-weight:700;">${escaparHtml(dados.programaNome)}</div>
+              <div style="margin-top:6px;font-family:Arial,sans-serif;font-size:13px;line-height:19px;color:#ffffff;opacity:.92;">Nova proposta comercial pronta para consulta</div>
             </td>
           </tr>
           <tr>
