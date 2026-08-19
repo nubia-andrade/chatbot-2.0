@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { buscarMarcas, type MarcaDaCarteira } from '@/lib/dados/busca-marcas'
+import { cadastrarMarcaNaConsulta } from '@/lib/acoes/marcas-consulta'
 
 type Props = {
   aoEscolher: (marca: MarcaDaCarteira) => void
@@ -37,15 +38,19 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
   const [aberto, setAberto] = useState(false)
   const [destaque, setDestaque] = useState(-1)
   const [clienteEmEscolhaDeMarca, setClienteEmEscolhaDeMarca] = useState<MarcaDaCarteira | null>(null)
+  const [clienteSemMarca, setClienteSemMarca] = useState<MarcaDaCarteira | null>(null)
+  const [nomeNovaMarca, setNomeNovaMarca] = useState('')
+  const [erroCadastro, setErroCadastro] = useState<string | null>(null)
   const [resolvendoCliente, setResolvendoCliente] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [salvandoMarca, iniciarCadastro] = useTransition()
 
   const termoLimpo = termo.trim()
   const sugestoesAtuais = termoDasSugestoes === termoLimpo ? sugestoes : []
-  const buscando = aberto && !escolhida && !clienteEmEscolhaDeMarca && termoDasSugestoes !== termoLimpo
+  const buscando = aberto && !escolhida && !clienteEmEscolhaDeMarca && !clienteSemMarca && termoDasSugestoes !== termoLimpo
 
   useEffect(() => {
-    if (!aberto || escolhida || clienteEmEscolhaDeMarca) return
+    if (!aberto || escolhida || clienteEmEscolhaDeMarca || clienteSemMarca) return
 
     const numeroDaConsulta = ++consultaAtual.current
     const temporizador = setTimeout(async () => {
@@ -57,7 +62,7 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
     }, termoLimpo === '' ? 0 : ATRASO_DA_BUSCA_MS)
 
     return () => clearTimeout(temporizador)
-  }, [aberto, escolhida, clienteEmEscolhaDeMarca, termoLimpo])
+  }, [aberto, escolhida, clienteEmEscolhaDeMarca, clienteSemMarca, termoLimpo])
 
   useEffect(() => {
     if (!aberto) return
@@ -68,6 +73,12 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
     return () => document.removeEventListener('mousedown', aoClicarFora)
   }, [aberto])
 
+  function limparCadastroPendente() {
+    setClienteSemMarca(null)
+    setNomeNovaMarca('')
+    setErroCadastro(null)
+  }
+
   function finalizarEscolha(item: MarcaDaCarteira, avisoDepois: string | null = null) {
     consultaAtual.current += 1
     setEscolhida(item)
@@ -77,24 +88,22 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
     setDestaque(-1)
     setAberto(false)
     setClienteEmEscolhaDeMarca(null)
+    limparCadastroPendente()
     setResolvendoCliente(false)
     setAviso(avisoDepois)
     aoEscolher(item)
   }
 
   async function escolher(item: MarcaDaCarteira) {
-    // Marca já explícita: não há nada a resolver.
     if (item.marca_id && item.marca_nome) {
       finalizarEscolha(item)
       return
     }
 
-    // O usuário escolheu o ANUNCIANTE genérico. Antes de concluir, procura as
-    // marcas conhecidas desse mesmo cliente. Isso evita perder `marca_nome`
-    // quando a busca pelo anunciante também devolve uma linha de cliente.
     const numeroDaConsulta = ++consultaAtual.current
     setResolvendoCliente(true)
     setAviso(null)
+    limparCadastroPendente()
 
     const relacionadas = await buscarMarcas(item.cliente_nome, LIMITE_MARCAS_DO_CLIENTE)
     if (numeroDaConsulta !== consultaAtual.current) return
@@ -117,12 +126,38 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
       return
     }
 
-    // Clientes ainda não aprendidos pelo Take continuam consultáveis. Nesse
-    // caso não existe uma marca confiável para inventar no PDF.
-    finalizarEscolha(
-      item,
-      'Este anunciante ainda não possui marca relacionada no Globo Take. A proposta seguirá somente com o anunciante até esse relacionamento existir.',
-    )
+    // Sem marca conhecida: não deixa a proposta seguir sem marca. O executivo
+    // cadastra o nome ali mesmo e o vínculo entra na fila de governança.
+    setClienteSemMarca(item)
+    setTermo(item.cliente_nome)
+    setSugestoes([])
+    setTermoDasSugestoes(null)
+    setAberto(false)
+    setResolvendoCliente(false)
+  }
+
+  function cadastrarNovaMarca() {
+    const cliente = clienteSemMarca
+    const nome = nomeNovaMarca.trim()
+    if (!cliente || !nome || salvandoMarca) return
+
+    setErroCadastro(null)
+    iniciarCadastro(async () => {
+      const retorno = await cadastrarMarcaNaConsulta(nome, cliente.cliente_id)
+      if (retorno.erro || !retorno.marcaId || !retorno.marcaNome) {
+        setErroCadastro(retorno.erro ?? 'Não foi possível cadastrar a marca.')
+        return
+      }
+
+      finalizarEscolha(
+        {
+          ...cliente,
+          marca_id: retorno.marcaId,
+          marca_nome: retorno.marcaNome,
+        },
+        'Marca cadastrada e vinculada ao anunciante. O vínculo ficará disponível para revisão da governança.',
+      )
+    })
   }
 
   function aoTeclar(evento: React.KeyboardEvent<HTMLInputElement>) {
@@ -152,7 +187,7 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
     }
   }
 
-  const mostrarLista = aberto && !escolhida
+  const mostrarLista = aberto && !escolhida && !clienteSemMarca
   const nomeExibido = escolhida?.marca_nome ?? escolhida?.cliente_nome ?? termo
 
   return (
@@ -174,6 +209,7 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
           consultaAtual.current += 1
           setEscolhida(null)
           setClienteEmEscolhaDeMarca(null)
+          limparCadastroPendente()
           setResolvendoCliente(false)
           setAviso(null)
           setTermo(evento.target.value)
@@ -182,7 +218,7 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
           setAberto(true)
         }}
         onFocus={() => {
-          if (!escolhida) setAberto(true)
+          if (!escolhida && !clienteSemMarca) setAberto(true)
         }}
         onKeyDown={aoTeclar}
         className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
@@ -200,6 +236,58 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
 
       {aviso && (
         <p className="mt-[6px] text-[11.5px] leading-[1.45] text-[var(--texto-3)]">{aviso}</p>
+      )}
+
+      {clienteSemMarca && (
+        <div className="mt-3 rounded-[12px] border border-[#DDD6FE] bg-[#FAF8FF] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.06em] text-[var(--roxo)]">Marca não encontrada</p>
+          <p className="mt-1 text-[12.5px] font-bold text-[var(--texto)]">{clienteSemMarca.cliente_nome}</p>
+
+          <div className="mt-3 rounded-[9px] border border-[#E9DDFB] bg-white px-3 py-2.5">
+            <p className="text-[11.5px] font-bold text-[var(--texto)]">Cadastre somente o nome exato da marca.</p>
+            <p className="mt-0.5 text-[10.5px] leading-[1.45] text-[var(--texto-3)]">
+              Evite campanha, produto, slogan ou variações de escrita. Esse nome será salvo na base de marcas e usado em consultas futuras.
+            </p>
+          </div>
+
+          <label className="mt-3 grid gap-1.5">
+            <span className="text-[11.5px] font-bold text-[var(--texto-2)]">Nome da marca</span>
+            <input
+              type="text"
+              value={nomeNovaMarca}
+              maxLength={120}
+              autoFocus
+              onChange={(evento) => {
+                setNomeNovaMarca(evento.target.value)
+                setErroCadastro(null)
+              }}
+              onKeyDown={(evento) => {
+                if (evento.key === 'Enter') {
+                  evento.preventDefault()
+                  cadastrarNovaMarca()
+                }
+              }}
+              placeholder="Ex.: ADEMICON"
+              className="h-[42px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-white px-3 text-[13.5px] outline-none placeholder:text-[var(--placeholder)] focus:border-[#A031F5]"
+            />
+          </label>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              {erroCadastro && <p role="alert" className="text-[10.5px] font-semibold text-[var(--concorrencia-texto)]">{erroCadastro}</p>}
+              <p className="text-[10px] text-[var(--texto-3)]">O cadastro ficará pendente de revisão pela governança.</p>
+            </div>
+            <button
+              type="button"
+              disabled={!nomeNovaMarca.trim() || salvandoMarca}
+              onClick={cadastrarNovaMarca}
+              className="rounded-[9px] px-4 py-2.5 text-[11.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
+              style={{ background: 'var(--marca)' }}
+            >
+              {salvandoMarca ? 'Cadastrando…' : 'Cadastrar marca e continuar'}
+            </button>
+          </div>
+        </div>
       )}
 
       {mostrarLista && (
