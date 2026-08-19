@@ -11,6 +11,7 @@ export type DadosDeRestricao = {
   anunciante: string | null
   setor: string | null
   industria: string | null
+  segmentacao_se: string | null
   motivo: string
 }
 
@@ -30,11 +31,16 @@ function validar(dados: Partial<DadosDeRestricao>): string[] {
     erros.push('Informe o motivo da restrição.')
   }
 
-  const temAlvo = Boolean(
-    dados.anunciante?.trim() || dados.setor?.trim() || dados.industria?.trim(),
-  )
-  if (!temAlvo) {
+  const temAnunciante = Boolean(dados.anunciante?.trim())
+  const temSetorEIndustria = Boolean(dados.setor?.trim() && dados.industria?.trim())
+  const temSegmentacaoSe = Boolean(dados.segmentacao_se?.trim())
+
+  if (!temAnunciante && !temSetorEIndustria && !temSegmentacaoSe) {
     erros.push('Escolha um anunciante, um setor e indústria, ou uma Segmentação SE.')
+  }
+
+  if ((dados.setor?.trim() && !dados.industria?.trim()) || (!dados.setor?.trim() && dados.industria?.trim())) {
+    erros.push('Para este tipo de restrição, informe Setor e Indústria juntos.')
   }
 
   return erros
@@ -62,11 +68,13 @@ export async function salvarRestricao(
       anunciante: dados.anunciante?.trim() || null,
       setor: dados.setor?.trim() || null,
       industria: dados.industria?.trim() || null,
+      segmentacao_se: dados.segmentacao_se?.trim() || null,
       motivo: dados.motivo!.trim(),
     })
     .select('id')
 
   if (error) {
+    console.error('Falha ao gravar restrição:', error.message)
     return { erros: ['Não foi possível gravar a restrição. Tente novamente.'], id: null }
   }
 
@@ -107,14 +115,18 @@ export async function excluirRestricao(
 }
 
 /**
- * Valida a combinação Programa + Cliente assim que o executivo escolhe o
- * cliente na Nova Consulta. Usa a mesma regra canônica do calendário, mas
- * devolve somente a restrição mais específica e uma descrição pronta para a
- * interface. Nenhuma regra fica duplicada no componente.
+ * Valida Programa + Cliente assim que o executivo escolhe o cliente/marca.
+ * Segmentação SE vem do campo próprio da Carteira, sem qualquer inferência a
+ * partir de Setor ou Indústria.
  */
 export async function verificarRestricaoDaConsulta(
   programaId: string,
-  cliente: { nome: string; setor: string | null; industria: string | null },
+  cliente: {
+    nome: string
+    setor: string | null
+    industria: string | null
+    segmentacao_se: string | null
+  },
 ): Promise<{ restricao: RestricaoAplicadaNaConsulta | null; erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { restricao: null, erro: ERRO_SESSAO_EXPIRADA }
@@ -123,7 +135,7 @@ export async function verificarRestricaoDaConsulta(
   const supabase = await criarClienteServidor()
   const { data, error } = await supabase
     .from('restricoes_anunciante')
-    .select('anunciante, setor, industria, motivo')
+    .select('anunciante, setor, industria, segmentacao_se, motivo')
     .eq('programa_id', programaId)
 
   if (error) {
@@ -162,7 +174,7 @@ export async function verificarRestricaoDaConsulta(
   return {
     restricao: {
       tipo: 'Segmentação SE',
-      alvo: encontrada.setor?.trim() || encontrada.industria?.trim() || 'Segmentação cadastrada',
+      alvo: encontrada.segmentacao_se?.trim() || 'Segmentação cadastrada',
       motivo: encontrada.motivo,
     },
     erro: null,
@@ -176,13 +188,20 @@ export async function calcularAlcanceDaRestricao(
   if (!sessao) return { alcance: 0, totalDaCarteira: 0, erro: ERRO_SESSAO_EXPIRADA }
 
   const temAlvo = Boolean(
-    dados.anunciante?.trim() || dados.setor?.trim() || dados.industria?.trim(),
+    dados.anunciante?.trim() ||
+    (dados.setor?.trim() && dados.industria?.trim()) ||
+    dados.segmentacao_se?.trim(),
   )
   if (!temAlvo) return { alcance: 0, totalDaCarteira: 0, erro: null }
 
   const supabase = await criarClienteServidor()
-  const { linhas, erro } = await lerPaginado<{ nome: string; setor: string | null; industria: string | null }>(
-    (de, ate) => supabase.from('clientes').select('nome, setor, industria').range(de, ate),
+  const { linhas, erro } = await lerPaginado<{
+    nome: string
+    setor: string | null
+    industria: string | null
+    segmentacao_se: string | null
+  }>(
+    (de, ate) => supabase.from('clientes').select('nome, setor, industria, segmentacao_se').range(de, ate),
   )
 
   if (erro) {
@@ -197,16 +216,13 @@ export async function calcularAlcanceDaRestricao(
     anunciante: dados.anunciante?.trim() || null,
     setor: dados.setor?.trim() || null,
     industria: dados.industria?.trim() || null,
+    segmentacao_se: dados.segmentacao_se?.trim() || null,
     motivo: dados.motivo?.trim() || '—',
   }
 
   const alcance = linhas.reduce(
     (total, cliente) =>
-      restricaoQueBloqueia([restricaoDeTeste], {
-        nome: cliente.nome,
-        setor: cliente.setor,
-        industria: cliente.industria,
-      })
+      restricaoQueBloqueia([restricaoDeTeste], cliente)
         ? total + 1
         : total,
     0,
