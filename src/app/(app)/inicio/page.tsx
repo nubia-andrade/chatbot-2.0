@@ -3,6 +3,7 @@ import { carregarPerformanceInicio, type MetricasPerformance, type PropostaRecen
 import { obterSessao } from '@/lib/sessao-servidor'
 import { temPerfil } from '@/lib/dominio/perfis'
 import type { StatusNegociacao } from '@/lib/dados/propostas'
+import { GraficoEvolucaoComercial } from '@/components/inicio/GraficoEvolucaoComercial'
 
 function moeda(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(valor)
@@ -76,6 +77,12 @@ export default async function PaginaInicio() {
 
           <GradeMetricas metricas={performance.executivo.metricasMes} modo="executivo" />
 
+          <GraficoEvolucaoComercial
+            titulo="Evolução da minha performance"
+            subtitulo="Últimos 12 meses · Ofertado x Vendido pela data de criação da proposta."
+            pontos={performance.executivo.evolucao12Meses}
+          />
+
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,.7fr)]">
             <ListaRecentes titulo="Minhas propostas recentes" propostas={performance.executivo.recentes} />
             <Funil metricas={performance.executivo.metricasMes} />
@@ -92,6 +99,12 @@ export default async function PaginaInicio() {
           </div>
 
           <GradeMetricas metricas={performance.programas.metricasMes} modo="programa" />
+
+          <GraficoEvolucaoComercial
+            titulo="Evolução comercial dos programas"
+            subtitulo="Últimos 12 meses · Ofertado x Vendido das propostas dos programas sob sua responsabilidade."
+            pontos={performance.programas.evolucao12Meses}
+          />
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
             <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
