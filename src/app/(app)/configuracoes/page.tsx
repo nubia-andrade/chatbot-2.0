@@ -9,13 +9,19 @@ const SECOES: Secao[] = [
     href: '/configuracoes/programas',
     titulo: 'Programas',
     descricao:
-      'Cadastro dos programas, suas regras comerciais e os apelidos que casam com o nome vindo da API.',
+      'Cadastro dos programas, regras comerciais, disponibilidade, modelos de proposta e configurações específicas.',
+  },
+  {
+    href: '/configuracoes/emails',
+    titulo: 'E-mails das propostas',
+    descricao:
+      'Visão central dos disparos automáticos e dos responsáveis que recebem cópia das propostas de cada programa.',
   },
   {
     href: '/configuracoes/perfis',
     titulo: 'Perfis e acessos',
     descricao:
-      'Perfis dos usuários e vínculos dos consultores com os programas. Esses vínculos também definem quem recebe cada proposta.',
+      'Perfis dos usuários, seções visíveis no aplicativo e vínculos dos consultores com os programas que administram.',
     somenteProprietario: true,
   },
   {
@@ -34,7 +40,7 @@ const SECOES: Secao[] = [
     href: '/configuracoes/marcas',
     titulo: 'Marcas e anunciantes',
     descricao:
-      'Relacionamentos aprendidos do Globo Take e pendências entre o nome do anunciante na API e o cliente oficial da carteira.',
+      'Relacionamentos aprendidos do Globo Take, vínculos manuais e pendências entre marcas e clientes oficiais da carteira.',
   },
 ]
 
@@ -74,7 +80,7 @@ export default async function PaginaConfiguracoes() {
           Configurações
         </h1>
         <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Cadastros e fontes que alimentam as regras comerciais, a disponibilidade e as propostas.
+          Cadastros, distribuição e fontes que alimentam as regras comerciais, a disponibilidade e as propostas.
         </p>
       </header>
 
