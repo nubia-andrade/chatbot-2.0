@@ -1,17 +1,23 @@
 type Destinatario = { email: string }
 
+const REMETENTE_TEMPORARIO = 'nubia.andrade@g.globo'
+
 function configuracao() {
   return {
     tenantId: process.env.MICROSOFT_TENANT_ID ?? '',
     clientId: process.env.MICROSOFT_CLIENT_ID ?? '',
     clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? '',
-    senderEmail: process.env.MICROSOFT_SENDER_EMAIL ?? '',
+    senderEmail: process.env.MICROSOFT_SENDER_EMAIL ?? REMETENTE_TEMPORARIO,
   }
 }
 
 export function emailMicrosoftConfigurado(): boolean {
   const c = configuracao()
   return Boolean(c.tenantId && c.clientId && c.clientSecret && c.senderEmail)
+}
+
+export function remetenteMicrosoft(): string {
+  return configuracao().senderEmail
 }
 
 async function obterToken(): Promise<string> {
@@ -37,19 +43,23 @@ async function obterToken(): Promise<string> {
 }
 
 export async function enviarPropostaPorEmail(params: {
-  destinatarios: Destinatario[]
+  para: Destinatario[]
+  cc?: Destinatario[]
   assunto: string
   html: string
-  pdf: Uint8Array
-  nomeArquivo: string
 }): Promise<void> {
   if (!emailMicrosoftConfigurado()) {
     throw new Error('Envio de e-mail ainda não configurado no Microsoft 365.')
   }
+  if (params.para.length === 0) throw new Error('O e-mail da proposta precisa de um destinatário principal.')
 
   const c = configuracao()
   const token = await obterToken()
-  const conteudoBase64 = Buffer.from(params.pdf).toString('base64')
+  const emailsPara = new Set(params.para.map((item) => item.email.trim().toLowerCase()).filter(Boolean))
+  const ccSemDuplicar = (params.cc ?? []).filter((item) => {
+    const email = item.email.trim().toLowerCase()
+    return Boolean(email) && !emailsPara.has(email)
+  })
 
   const resposta = await fetch(
     `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(c.senderEmail)}/sendMail`,
@@ -63,17 +73,12 @@ export async function enviarPropostaPorEmail(params: {
         message: {
           subject: params.assunto,
           body: { contentType: 'HTML', content: params.html },
-          toRecipients: params.destinatarios.map((destinatario) => ({
+          toRecipients: params.para.map((destinatario) => ({
             emailAddress: { address: destinatario.email },
           })),
-          attachments: [
-            {
-              '@odata.type': '#microsoft.graph.fileAttachment',
-              name: params.nomeArquivo,
-              contentType: 'application/pdf',
-              contentBytes: conteudoBase64,
-            },
-          ],
+          ccRecipients: ccSemDuplicar.map((destinatario) => ({
+            emailAddress: { address: destinatario.email },
+          })),
         },
         saveToSentItems: true,
       }),
