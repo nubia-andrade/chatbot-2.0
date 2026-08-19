@@ -4,20 +4,21 @@ export type Perfil =
   | 'consultor_programa'
   | 'proprietario'
 
-export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'configuracoes'
+export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'aprovacoes' | 'configuracoes'
 
 export const SECOES_DO_APP: { valor: SecaoApp; rotulo: string }[] = [
   { valor: 'inicio', rotulo: 'Início' },
   { valor: 'consulta', rotulo: 'Nova consulta' },
   { valor: 'propostas', rotulo: 'Propostas' },
+  { valor: 'aprovacoes', rotulo: 'Aprovações' },
   { valor: 'configuracoes', rotulo: 'Configurações' },
 ]
 
 export const SECOES_PADRAO_POR_PERFIL: Record<Perfil, SecaoApp[]> = {
   executivo: ['inicio', 'consulta', 'propostas'],
   executivo_regional: ['inicio', 'consulta', 'propostas'],
-  consultor_programa: ['inicio', 'propostas', 'configuracoes'],
-  proprietario: ['inicio', 'consulta', 'propostas', 'configuracoes'],
+  consultor_programa: ['inicio', 'propostas', 'aprovacoes', 'configuracoes'],
+  proprietario: ['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'],
 }
 
 export function temPerfil(perfis: Perfil[], procurado: Perfil): boolean {
@@ -64,4 +65,14 @@ export function podeEditarPrograma(
   if (temPerfil(perfis, 'proprietario')) return true
   if (!temPerfil(perfis, 'consultor_programa')) return false
   return programasVinculados.includes(programaId)
+}
+
+/** A decisão de aprovação é restrita ao consultor vinculado ao programa ou proprietário. */
+export function podeAprovarPrograma(
+  perfis: Perfil[],
+  programasVinculados: string[],
+  programaId: string,
+): boolean {
+  if (temPerfil(perfis, 'proprietario')) return true
+  return temPerfil(perfis, 'consultor_programa') && programasVinculados.includes(programaId)
 }
