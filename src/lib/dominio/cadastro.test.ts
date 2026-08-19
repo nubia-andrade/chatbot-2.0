@@ -85,7 +85,22 @@ describe('validarPrograma', () => {
     expect(erros).toEqual([])
   })
 
-  it('exige preço de mídia digital maior que zero quando o programa oferece Digital', () => {
+  it('permite configurar Digital e Redes antes de liberar o programa para proposta', () => {
+    const erros = validarPrograma(
+      programa({
+        disponivel_para_proposta: false,
+        contem_digital: true,
+        redes_sociais: true,
+        custo_midia_tv: null,
+        custo_producao_tv: null,
+        custo_midia_digital: null,
+        custo_midia_redes_sociais: null,
+      }),
+    )
+    expect(erros).toEqual([])
+  })
+
+  it('exige preço de mídia digital maior que zero quando o programa liberado oferece Digital', () => {
     expect(validarPrograma(programa({ contem_digital: true, custo_midia_digital: null })))
       .toContain('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
     expect(validarPrograma(programa({ contem_digital: true, custo_midia_digital: 0 })))
@@ -94,7 +109,7 @@ describe('validarPrograma', () => {
       .not.toContain('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
   })
 
-  it('exige preço de Redes Sociais maior que zero quando o programa oferece Redes Sociais', () => {
+  it('exige preço de Redes Sociais maior que zero quando o programa liberado oferece Redes Sociais', () => {
     expect(validarPrograma(programa({ redes_sociais: true, custo_midia_redes_sociais: null })))
       .toContain('Informe um valor de Redes Sociais maior que zero para programas que oferecem Redes Sociais.')
     expect(validarPrograma(programa({ redes_sociais: true, custo_midia_redes_sociais: 0 })))
