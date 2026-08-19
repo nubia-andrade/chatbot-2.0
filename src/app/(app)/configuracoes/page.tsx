@@ -3,44 +3,60 @@ import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
 import { temPerfil } from '@/lib/dominio/perfis'
 
 type Secao = { href: string; titulo: string; descricao: string; somenteProprietario?: boolean }
+type Grupo = { titulo: string; descricao: string; secoes: Secao[] }
 
-const SECOES: Secao[] = [
+const GRUPOS: Grupo[] = [
   {
-    href: '/configuracoes/programas',
-    titulo: 'Programas',
-    descricao:
-      'Cadastro dos programas, regras comerciais, disponibilidade, modelos de proposta e configurações específicas.',
+    titulo: 'Programas e proposta',
+    descricao: 'Configurações diretamente ligadas aos programas que você administra e à distribuição das propostas.',
+    secoes: [
+      {
+        href: '/configuracoes/programas',
+        titulo: 'Programas',
+        descricao: 'Regras comerciais, disponibilidade, datas, restrições, Regional e modelos de proposta.',
+      },
+      {
+        href: '/configuracoes/emails',
+        titulo: 'E-mails das propostas',
+        descricao: 'Disparos automáticos e responsáveis que recebem cópia das propostas de cada programa.',
+      },
+    ],
   },
   {
-    href: '/configuracoes/emails',
-    titulo: 'E-mails das propostas',
-    descricao:
-      'Visão central dos disparos automáticos e dos responsáveis que recebem cópia das propostas de cada programa.',
+    titulo: 'Governança de dados',
+    descricao: 'Dados globais que afetam o aplicativo inteiro. Disponível somente para Proprietário.',
+    secoes: [
+      {
+        href: '/configuracoes/marcas',
+        titulo: 'Marcas e anunciantes',
+        descricao: 'Vínculos, cadastros manuais e pendências entre marcas e anunciantes oficiais.',
+        somenteProprietario: true,
+      },
+      {
+        href: '/configuracoes/clientes-regionais',
+        titulo: 'Clientes regionais',
+        descricao: 'Elegibilidade global dos anunciantes para propostas regionais.',
+        somenteProprietario: true,
+      },
+      {
+        href: '/configuracoes/importacao',
+        titulo: 'Importação Globo Take',
+        descricao: 'Saúde da última carga, ações importadas e formatos ainda sem classificação.',
+        somenteProprietario: true,
+      },
+    ],
   },
   {
-    href: '/configuracoes/perfis',
-    titulo: 'Perfis e acessos',
-    descricao:
-      'Perfis dos usuários, seções visíveis no aplicativo e vínculos dos consultores com os programas que administram.',
-    somenteProprietario: true,
-  },
-  {
-    href: '/configuracoes/importacao',
-    titulo: 'Importação',
-    descricao:
-      'Quando foi a última carga das vendas do Globo Take, quantas ações vieram e quais formatos ainda não têm categoria.',
-  },
-  {
-    href: '/configuracoes/clientes-regionais',
-    titulo: 'Clientes regionais',
-    descricao:
-      'Quem pode comprar ação regional — elegibilidade do cliente, válida para todos os programas que aceitam regional.',
-  },
-  {
-    href: '/configuracoes/marcas',
-    titulo: 'Marcas e anunciantes',
-    descricao:
-      'Relacionamentos aprendidos do Globo Take, vínculos manuais e pendências entre marcas e clientes oficiais da carteira.',
+    titulo: 'Administração',
+    descricao: 'Usuários, perfis e regras de acesso ao aplicativo.',
+    secoes: [
+      {
+        href: '/configuracoes/perfis',
+        titulo: 'Perfis e acessos',
+        descricao: 'Perfis dos usuários, seções visíveis e vínculos dos consultores com programas.',
+        somenteProprietario: true,
+      },
+    ],
   },
 ]
 
@@ -49,64 +65,51 @@ export default async function PaginaConfiguracoes() {
 
   if (!podeAdministrar(sessao)) {
     return (
-      <section
-        style={{
-          background: 'var(--superficie)',
-          borderRadius: 'var(--raio-janela)',
-          padding: '40px',
-          border: '1px solid var(--borda)',
-        }}
-      >
-        <h1 style={{ fontFamily: 'var(--fonte-titulo)', fontSize: 26, fontWeight: 700 }}>
-          Configurações
-        </h1>
-        <p style={{ color: 'var(--concorrencia)', marginTop: 8 }}>
-          Você não tem permissão para ver esta página.
-        </p>
+      <section className="rounded-[var(--raio-janela)] border border-[var(--borda)] bg-[var(--superficie)] p-10">
+        <h1 className="text-[26px] font-bold" style={{ fontFamily: 'var(--fonte-titulo)' }}>Configurações</h1>
+        <p className="mt-2 text-[13px] text-[var(--concorrencia)]">Você não tem permissão para ver esta página.</p>
       </section>
     )
   }
 
   const proprietario = Boolean(sessao && temPerfil(sessao.perfis, 'proprietario'))
-  const secoesVisiveis = SECOES.filter((secao) => !secao.somenteProprietario || proprietario)
+  const gruposVisiveis = GRUPOS.map((grupo) => ({
+    ...grupo,
+    secoes: grupo.secoes.filter((secao) => !secao.somenteProprietario || proprietario),
+  })).filter((grupo) => grupo.secoes.length > 0)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-7">
       <header>
-        <h1
-          className="text-[26px] font-bold text-[var(--texto)]"
-          style={{ fontFamily: 'var(--fonte-titulo)' }}
-        >
-          Configurações
-        </h1>
-        <p className="mt-1 text-[13px] text-[var(--texto-3)]">
-          Cadastros, distribuição e fontes que alimentam as regras comerciais, a disponibilidade e as propostas.
+        <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Administração do produto</p>
+        <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Configurações</h1>
+        <p className="mt-1 max-w-[820px] text-[13px] text-[var(--texto-3)]">
+          Ajuste programas e distribuição. Governança global e acessos ficam separados para reduzir risco de alterações fora do escopo do consultor.
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {secoesVisiveis.map((secao) => (
-          <Link
-            key={secao.href}
-            href={secao.href}
-            className="flex flex-col gap-2 rounded-[var(--raio-card)] border border-[var(--borda)] p-6 transition-shadow hover:shadow-[var(--sombra-janela)]"
-            style={{ background: 'var(--superficie)' }}
-          >
-            <span
-              aria-hidden
-              className="h-[7px] w-[34px] rounded-full"
-              style={{ background: 'var(--marca)' }}
-            />
-            <h2
-              className="text-[17px] font-bold text-[var(--texto)]"
-              style={{ fontFamily: 'var(--fonte-titulo)' }}
-            >
-              {secao.titulo}
-            </h2>
-            <p className="text-[13px] leading-[1.5] text-[var(--texto-2)]">{secao.descricao}</p>
-          </Link>
-        ))}
-      </div>
+      {gruposVisiveis.map((grupo) => (
+        <section key={grupo.titulo} className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-[16px] font-bold text-[var(--texto)]">{grupo.titulo}</h2>
+            <p className="mt-0.5 text-[11.5px] text-[var(--texto-3)]">{grupo.descricao}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {grupo.secoes.map((secao) => (
+              <Link
+                key={secao.href}
+                href={secao.href}
+                className="flex min-h-[150px] flex-col gap-2 rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5 transition hover:-translate-y-0.5 hover:shadow-[var(--sombra-janela)]"
+              >
+                <span aria-hidden className="h-[6px] w-[30px] rounded-full" style={{ background: 'var(--marca)' }} />
+                <h3 className="mt-1 text-[16px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>{secao.titulo}</h3>
+                <p className="text-[12px] leading-[1.5] text-[var(--texto-2)]">{secao.descricao}</p>
+                <span className="mt-auto text-[10.5px] font-bold text-[var(--roxo)]">Abrir →</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
