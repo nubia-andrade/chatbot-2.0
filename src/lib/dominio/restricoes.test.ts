@@ -8,22 +8,46 @@ const restricoes = [
 ]
 
 describe('restricaoQueBloqueia', () => {
-  // R13: por anunciante nomeado
   it('bloqueia o anunciante cadastrado, sem depender de acento ou caixa', () => {
     const achado = restricaoQueBloqueia(restricoes, { nome: 'ambev', setor: 'Bebidas', industria: 'Cervejas' })
     expect(achado?.motivo).toBe('Concorrente do patrocinador')
   })
 
-  // por setor + indústria
   it('bloqueia pelo par setor e indústria', () => {
     const achado = restricaoQueBloqueia(restricoes, { nome: 'Outra Marca', setor: 'Bebidas', industria: 'Alcoólicas' })
     expect(achado?.motivo).toBe('Apresentadora não faz')
   })
 
-  // por categoria isolada — o caso "não faz bebidas alcoólicas"
-  it('bloqueia pela indústria sozinha', () => {
+  it('bloqueia por Segmentação SE quando há somente indústria', () => {
     const achado = restricaoQueBloqueia(restricoes, { nome: 'Marca X', setor: 'Tabaco', industria: 'Cigarros' })
     expect(achado?.motivo).toBe('Política editorial')
+  })
+
+  it('prioriza anunciante específico mesmo quando uma regra genérica aparece antes', () => {
+    const achado = restricaoQueBloqueia([
+      { anunciante: null, setor: 'Apostas', industria: null, motivo: 'Segmentação genérica' },
+      { anunciante: null, setor: 'Apostas', industria: 'Bet', motivo: 'Setor e indústria' },
+      { anunciante: 'BETANO BR', setor: null, industria: null, motivo: 'Restrição específica da marca' },
+    ], {
+      nome: 'Betano BR',
+      setor: 'Apostas',
+      industria: 'Bet',
+    })
+
+    expect(achado?.motivo).toBe('Restrição específica da marca')
+  })
+
+  it('prioriza setor e indústria sobre Segmentação SE', () => {
+    const achado = restricaoQueBloqueia([
+      { anunciante: null, setor: 'Bebidas', industria: null, motivo: 'Só setor' },
+      { anunciante: null, setor: 'Bebidas', industria: 'Alcoólicas', motivo: 'Par completo' },
+    ], {
+      nome: 'Cliente',
+      setor: 'Bebidas',
+      industria: 'Alcoólicas',
+    })
+
+    expect(achado?.motivo).toBe('Par completo')
   })
 
   it('libera cliente que não casa com nenhuma restrição', () => {
@@ -41,7 +65,6 @@ describe('concorrenteNaData', () => {
     { anunciante: 'NESTLÉ', setor: 'Alimentos', industria: 'Chocolates' },
   ]
 
-  // R14: concorrência é calculada, não cadastrada
   it('acusa concorrente de mesmo setor e indústria', () => {
     const achado = concorrenteNaData(vendas, { nome: 'PEPSI', setor: 'Bebidas', industria: 'Refrigerantes' })
     expect(achado?.anunciante).toBe('COCA-COLA')
