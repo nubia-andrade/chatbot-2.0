@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { buscarClientes, type Cliente } from '@/lib/dados/busca-clientes'
-import { removerVinculoMarcaManual, vincularMarcaManual } from '@/lib/acoes/marcas-manuais'
+import { marcarMarcaManualRevisada, removerVinculoMarcaManual, vincularMarcaManual } from '@/lib/acoes/marcas-manuais'
 import type { VinculoManualDeMarca } from '@/lib/dados/marcas-manuais'
 
 type Props = {
@@ -41,9 +41,14 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
   }, [termoCliente, cliente])
 
   const ordenados = useMemo(
-    () => [...iniciais].sort((a, b) => a.marca_nome.localeCompare(b.marca_nome, 'pt-BR')),
+    () => [...iniciais].sort((a, b) => {
+      if (a.revisao_status !== b.revisao_status) return a.revisao_status === 'pendente' ? -1 : 1
+      return b.criado_em.localeCompare(a.criado_em)
+    }),
     [iniciais],
   )
+
+  const quantidadePendentes = iniciais.filter((item) => item.revisao_status === 'pendente').length
 
   function salvar() {
     if (!cliente || !nomeMarca.trim()) return
@@ -61,6 +66,19 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
       setCliente(null)
       setSugestoes([])
       setAberto(false)
+      window.location.reload()
+    })
+  }
+
+  function revisar(vinculo: VinculoManualDeMarca) {
+    setErro(null)
+    setMensagem(null)
+    iniciarTransicao(async () => {
+      const retorno = await marcarMarcaManualRevisada(vinculo.marca_id, vinculo.cliente_id)
+      if (retorno.erro) {
+        setErro(retorno.erro)
+        return
+      }
       window.location.reload()
     })
   }
@@ -84,9 +102,16 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Cadastro complementar</p>
-          <h2 className="mt-1 text-[17px] font-bold text-[var(--texto)]">Vincular nova marca</h2>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h2 className="text-[17px] font-bold text-[var(--texto)]">Vincular nova marca</h2>
+            {quantidadePendentes > 0 && (
+              <span className="rounded-full bg-[#FFF4E5] px-2.5 py-1 text-[9.5px] font-bold text-[#8A5700]">
+                {quantidadePendentes} pendente{quantidadePendentes === 1 ? '' : 's'} de revisão
+              </span>
+            )}
+          </div>
           <p className="mt-1 max-w-[760px] text-[12.5px] leading-[1.55] text-[var(--texto-3)]">
-            Cadastre uma marca mesmo que ela ainda não tenha aparecido no Globo Take. O vínculo fica disponível imediatamente na Nova Consulta e continua separado dos relacionamentos aprendidos da API.
+            Marcas cadastradas pelos executivos ficam disponíveis imediatamente e entram como pendentes para revisão. Use esta área para confirmar ou corrigir os vínculos quando necessário.
           </p>
         </div>
         <button
@@ -173,17 +198,33 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
         </div>
       )}
 
+      {erro && !aberto && <p role="alert" className="mt-3 text-[11.5px] font-semibold text-[var(--concorrencia-texto)]">{erro}</p>}
+
       {ordenados.length > 0 && (
         <div className="mt-5 border-t border-[var(--borda)] pt-4">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[.05em] text-[var(--texto-3)]">Vínculos manuais ativos</p>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {ordenados.map((vinculo) => (
-              <div key={`${vinculo.marca_id}-${vinculo.cliente_id}`} className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[12.5px] font-bold text-[var(--texto)]">{vinculo.marca_nome}</p>
-                  <p className="mt-0.5 truncate text-[10.5px] text-[var(--texto-3)]">→ {vinculo.cliente_nome}</p>
+              <div key={`${vinculo.marca_id}-${vinculo.cliente_id}`} className={`rounded-[10px] border p-3 ${vinculo.revisao_status === 'pendente' ? 'border-[#F1D3A6] bg-[#FFF8EC]' : 'border-[var(--borda)] bg-[var(--superficie-suave)]'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-[12.5px] font-bold text-[var(--texto)]">{vinculo.marca_nome}</p>
+                      {vinculo.revisao_status === 'pendente' && (
+                        <span className="rounded-full bg-[#FFE8C2] px-2 py-0.5 text-[8.5px] font-bold uppercase text-[#8A5700]">Pendente</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-[10.5px] text-[var(--texto-3)]">→ {vinculo.cliente_nome}</p>
+                    <p className="mt-1 text-[9.5px] text-[var(--texto-3)]">Origem: {vinculo.origem === 'consulta' ? 'Nova Consulta' : 'Administração'}</p>
+                  </div>
                 </div>
-                <button type="button" disabled={pendente} onClick={() => remover(vinculo)} className="shrink-0 text-[10.5px] font-bold text-[var(--concorrencia-texto)]">Remover</button>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-black/5 pt-2.5">
+                  {vinculo.revisao_status === 'pendente' && (
+                    <button type="button" disabled={pendente} onClick={() => revisar(vinculo)} className="text-[10.5px] font-bold text-[var(--disponivel-texto)]">Marcar revisada</button>
+                  )}
+                  <button type="button" disabled={pendente} onClick={() => remover(vinculo)} className="text-[10.5px] font-bold text-[var(--concorrencia-texto)]">Remover/corrigir</button>
+                </div>
               </div>
             ))}
           </div>
