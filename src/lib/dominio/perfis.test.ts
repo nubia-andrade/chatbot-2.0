@@ -5,6 +5,8 @@ import {
   podeExcluirPrograma,
   podeConsultarRegional,
   podeEditarPrograma,
+  secoesPadraoDosPerfis,
+  podeAcessarSecao,
 } from './perfis'
 
 describe('temPerfil', () => {
@@ -18,8 +20,31 @@ describe('temPerfil', () => {
   })
 })
 
+describe('seções por perfil', () => {
+  it('executivo vê somente início, nova consulta e propostas por padrão', () => {
+    expect(secoesPadraoDosPerfis(['executivo'])).toEqual(['inicio', 'consulta', 'propostas'])
+    expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'historico')).toBe(false)
+    expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'configuracoes')).toBe(false)
+  })
+
+  it('executivo regional tem as mesmas seções comerciais', () => {
+    expect(secoesPadraoDosPerfis(['executivo_regional'])).toEqual(['inicio', 'consulta', 'propostas'])
+  })
+
+  it('perfis acumulados somam suas permissões', () => {
+    expect(secoesPadraoDosPerfis(['executivo', 'consultor_programa'])).toEqual([
+      'inicio', 'consulta', 'propostas', 'historico', 'configuracoes',
+    ])
+  })
+
+  it('proprietário possui todas as seções', () => {
+    expect(secoesPadraoDosPerfis(['proprietario'])).toEqual([
+      'inicio', 'consulta', 'propostas', 'historico', 'configuracoes',
+    ])
+  })
+})
+
 describe('podeConsultarRegional', () => {
-  // Perfis se acumulam: quem vende nacional e regional tem os dois
   it('exige o perfil regional', () => {
     expect(podeConsultarRegional(['executivo', 'executivo_regional'])).toBe(true)
     expect(podeConsultarRegional(['executivo'])).toBe(false)
@@ -42,7 +67,6 @@ describe('podeAdministrarProgramas', () => {
 })
 
 describe('podeExcluirPrograma', () => {
-  // Só o proprietário apaga: excluir leva junto datas, restrições e preços
   it('só o proprietário', () => {
     expect(podeExcluirPrograma(['proprietario'])).toBe(true)
     expect(podeExcluirPrograma(['consultor_programa'])).toBe(false)
