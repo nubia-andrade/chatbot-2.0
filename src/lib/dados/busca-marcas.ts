@@ -3,7 +3,6 @@
 import { criarClienteNavegador } from '../supabase/cliente-navegador'
 
 export type MarcaDaCarteira = {
-  /** Nulos quando o executivo escolhe diretamente um cliente sem marca conhecida no Take. */
   marca_id: string | null
   marca_nome: string | null
   cliente_id: string
@@ -11,7 +10,8 @@ export type MarcaDaCarteira = {
   cnpj: string | null
   setor: string | null
   industria: string | null
-  segmentacao_se: string | null
+  /** Pode faltar em sessões/RPCs anteriores; a validação de restrição consulta a Carteira no servidor. */
+  segmentacao_se?: string | null
   apto_regional: boolean
 }
 
@@ -21,7 +21,6 @@ type LinhaDaBuscaDeMarca = Omit<MarcaDaCarteira, 'apto_regional'> & {
 
 const LIMITE_PADRAO = 20
 
-/** Busca textual por cliente/anunciante ou marca dentro da carteira permitida. */
 export async function buscarMarcas(
   termo: string,
   limite: number = LIMITE_PADRAO,
@@ -40,7 +39,6 @@ export async function buscarMarcas(
   return ((data ?? []) as LinhaDaBuscaDeMarca[]).map(normalizarLinha)
 }
 
-/** Retorna todas as marcas vinculadas ao cliente selecionado. */
 export async function listarMarcasDoCliente(clienteId: string): Promise<MarcaDaCarteira[]> {
   const supabase = criarClienteNavegador()
   const { data, error } = await supabase.rpc('marcas_do_cliente', {
