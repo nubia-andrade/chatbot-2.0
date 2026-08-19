@@ -1,3 +1,6 @@
+'use client'
+
+import { useMemo, useState } from 'react'
 import type { PontoEvolucaoMensal } from '@/lib/dados/performance'
 
 type Props = {
@@ -6,9 +9,11 @@ type Props = {
   pontos: PontoEvolucaoMensal[]
 }
 
+type Periodo = 6 | 12
+
 const LARGURA = 920
-const ALTURA = 300
-const MARGEM = { topo: 28, direita: 24, baixo: 48, esquerda: 72 }
+const ALTURA = 205
+const MARGEM = { topo: 16, direita: 18, baixo: 34, esquerda: 64 }
 const LARGURA_PLOT = LARGURA - MARGEM.esquerda - MARGEM.direita
 const ALTURA_PLOT = ALTURA - MARGEM.topo - MARGEM.baixo
 
@@ -53,42 +58,65 @@ function coordenadaY(valor: number, maximo: number): number {
 }
 
 export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
-  const maiorValor = Math.max(0, ...pontos.flatMap((ponto) => [ponto.ofertado, ponto.vendido]))
+  const [periodo, setPeriodo] = useState<Periodo>(6)
+  const pontosVisiveis = useMemo(() => pontos.slice(-periodo), [pontos, periodo])
+  const maiorValor = Math.max(0, ...pontosVisiveis.flatMap((ponto) => [ponto.ofertado, ponto.vendido]))
   const maximo = tetoBonito(maiorValor)
-  const temDados = pontos.some((ponto) => ponto.ofertado > 0 || ponto.vendido > 0)
-  const grade = [0, 0.25, 0.5, 0.75, 1]
-  const pontosOfertado = pontosDaLinha(pontos.map((ponto) => ponto.ofertado), maximo)
-  const pontosVendido = pontosDaLinha(pontos.map((ponto) => ponto.vendido), maximo)
+  const temDados = pontosVisiveis.some((ponto) => ponto.ofertado > 0 || ponto.vendido > 0)
+  const grade = [0, 1 / 3, 2 / 3, 1]
+  const pontosOfertado = pontosDaLinha(pontosVisiveis.map((ponto) => ponto.ofertado), maximo)
+  const pontosVendido = pontosDaLinha(pontosVisiveis.map((ponto) => ponto.vendido), maximo)
 
   return (
-    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] px-4 py-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-[14px] font-bold text-[var(--texto)]">{titulo}</h3>
-          <p className="mt-1 text-[10.5px] leading-[1.45] text-[var(--texto-3)]">
-            {subtitulo ?? 'Últimos 12 meses · valores agrupados pela data de criação da proposta vigente.'}
+          <h3 className="text-[13.5px] font-bold text-[var(--texto)]">{titulo}</h3>
+          <p className="mt-0.5 text-[10px] leading-[1.4] text-[var(--texto-3)]">
+            Últimos {periodo} meses · {subtitulo ?? 'Ofertado x Vendido pelo mês de criação da proposta.'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-[10.5px] font-semibold text-[var(--texto-2)]">
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[var(--roxo)]" /> Ofertado</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#17966F]" /> Vendido</span>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 text-[10px] font-semibold text-[var(--texto-2)]">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--roxo)]" /> Ofertado</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#17966F]" /> Vendido</span>
+          </div>
+
+          <div className="inline-flex rounded-[8px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-0.5" aria-label="Período do gráfico">
+            {([6, 12] as Periodo[]).map((opcao) => (
+              <button
+                key={opcao}
+                type="button"
+                onClick={() => setPeriodo(opcao)}
+                aria-pressed={periodo === opcao}
+                className={`rounded-[6px] px-2.5 py-1 text-[9.5px] font-bold transition ${
+                  periodo === opcao
+                    ? 'bg-white text-[var(--roxo)] shadow-sm'
+                    : 'text-[var(--texto-3)] hover:text-[var(--texto-2)]'
+                }`}
+              >
+                {opcao}M
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {!temDados ? (
-        <div className="flex h-[260px] items-center justify-center text-center">
+        <div className="flex h-[165px] items-center justify-center text-center">
           <div>
-            <p className="text-[12.5px] font-bold text-[var(--texto)]">Ainda não há histórico suficiente</p>
-            <p className="mt-1 text-[11px] text-[var(--texto-3)]">A evolução aparecerá conforme propostas forem geradas e negociações forem fechadas.</p>
+            <p className="text-[12px] font-bold text-[var(--texto)]">Ainda não há histórico suficiente</p>
+            <p className="mt-1 text-[10.5px] text-[var(--texto-3)]">A evolução aparecerá conforme propostas forem geradas e negociações forem fechadas.</p>
           </div>
         </div>
       ) : (
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-2 overflow-x-auto">
           <svg
             role="img"
             aria-label={`${titulo}: evolução mensal de valores ofertados e vendidos`}
             viewBox={`0 0 ${LARGURA} ${ALTURA}`}
-            className="min-w-[760px] w-full"
+            className="min-w-[620px] w-full"
           >
             {grade.map((fracao) => {
               const valor = maximo * fracao
@@ -100,15 +128,15 @@ export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
                     x2={LARGURA - MARGEM.direita}
                     y1={y}
                     y2={y}
-                    stroke="#E7E4EC"
+                    stroke="#ECEAF1"
                     strokeWidth="1"
                   />
                   <text
-                    x={MARGEM.esquerda - 10}
-                    y={y + 4}
+                    x={MARGEM.esquerda - 9}
+                    y={y + 3.5}
                     textAnchor="end"
-                    fontSize="10"
-                    fill="#77727F"
+                    fontSize="9"
+                    fill="#8B8791"
                   >
                     {moedaCompacta(valor)}
                   </text>
@@ -116,16 +144,16 @@ export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
               )
             })}
 
-            {pontos.map((ponto, indice) => {
-              const x = coordenadaX(indice, pontos.length)
+            {pontosVisiveis.map((ponto, indice) => {
+              const x = coordenadaX(indice, pontosVisiveis.length)
               return (
                 <text
                   key={ponto.mes}
                   x={x}
-                  y={ALTURA - 18}
+                  y={ALTURA - 10}
                   textAnchor="middle"
-                  fontSize="10"
-                  fill="#77727F"
+                  fontSize="9"
+                  fill="#8B8791"
                 >
                   {ponto.rotulo}
                 </text>
@@ -136,7 +164,7 @@ export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
               points={pontosOfertado}
               fill="none"
               stroke="#8A2BE2"
-              strokeWidth="3"
+              strokeWidth="2.2"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -144,21 +172,21 @@ export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
               points={pontosVendido}
               fill="none"
               stroke="#17966F"
-              strokeWidth="3"
+              strokeWidth="2.2"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
 
-            {pontos.map((ponto, indice) => {
-              const x = coordenadaX(indice, pontos.length)
+            {pontosVisiveis.map((ponto, indice) => {
+              const x = coordenadaX(indice, pontosVisiveis.length)
               const yOfertado = coordenadaY(ponto.ofertado, maximo)
               const yVendido = coordenadaY(ponto.vendido, maximo)
               return (
                 <g key={`${ponto.mes}-pontos`}>
-                  <circle cx={x} cy={yOfertado} r="4.5" fill="#FFFFFF" stroke="#8A2BE2" strokeWidth="2.5">
+                  <circle cx={x} cy={yOfertado} r="3.2" fill="#FFFFFF" stroke="#8A2BE2" strokeWidth="2">
                     <title>{`${ponto.rotulo} · Ofertado: ${moeda(ponto.ofertado)} · ${ponto.propostas} proposta${ponto.propostas === 1 ? '' : 's'}`}</title>
                   </circle>
-                  <circle cx={x} cy={yVendido} r="4.5" fill="#FFFFFF" stroke="#17966F" strokeWidth="2.5">
+                  <circle cx={x} cy={yVendido} r="3.2" fill="#FFFFFF" stroke="#17966F" strokeWidth="2">
                     <title>{`${ponto.rotulo} · Vendido: ${moeda(ponto.vendido)} · ${ponto.fechadas} fechada${ponto.fechadas === 1 ? '' : 's'}`}</title>
                   </circle>
                 </g>
@@ -168,8 +196,8 @@ export function GraficoEvolucaoComercial({ titulo, subtitulo, pontos }: Props) {
         </div>
       )}
 
-      <p className="mt-2 text-[10px] leading-[1.45] text-[var(--texto-3)]">
-        Vendido considera o valor final negociado das propostas fechadas e permanece no mês em que a proposta foi criada, mesmo que o fechamento aconteça depois.
+      <p className="mt-1 text-[9.5px] leading-[1.35] text-[var(--texto-3)]">
+        Vendido usa o valor final negociado das propostas fechadas e permanece no mês em que a proposta foi criada.
       </p>
     </section>
   )
