@@ -1,5 +1,5 @@
 import { obterSessao } from '@/lib/sessao-servidor'
-import { podeAdministrarProgramas } from '@/lib/dominio/perfis'
+import { podeAdministrarGovernancaGlobal } from '@/lib/dominio/perfis'
 import {
   buscarRelacionamentosMarcas,
   listarAnunciantesTakePendentes,
@@ -12,13 +12,11 @@ import { PainelDeMarcaManual } from '@/components/configuracoes/PainelDeMarcaMan
 export default async function PaginaMarcasEAnunciantes() {
   const sessao = await obterSessao()
 
-  if (!sessao || !podeAdministrarProgramas(sessao.perfis)) {
+  if (!sessao || !podeAdministrarGovernancaGlobal(sessao.perfis)) {
     return (
       <section className="rounded-[var(--raio-janela)] border border-[var(--borda)] bg-[var(--superficie)] p-8">
         <h1 className="text-[24px] font-bold text-[var(--texto)]">Marcas e anunciantes</h1>
-        <p className="mt-2 text-[13px] text-[var(--concorrencia)]">
-          Você não tem permissão para ver esta página.
-        </p>
+        <p className="mt-2 text-[13px] text-[var(--concorrencia)]">Somente Proprietário pode administrar a governança global de marcas.</p>
       </section>
     )
   }
