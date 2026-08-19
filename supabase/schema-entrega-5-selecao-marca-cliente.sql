@@ -48,20 +48,24 @@ begin
 
   return query
   with marcas_relacionadas as (
-    -- Vínculos manuais têm precedência de governança e já representam
-    -- explicitamente Marca → Cliente.
+    -- Vínculos manuais são a fonte de verdade quando existem.
     select mcm.marca_id
     from marca_cliente_manual mcm
     where mcm.cliente_id = p_cliente_id
 
     union
 
-    -- No Take, o cliente efetivo do par pode vir do override da marca ou do
-    -- cliente padrão do anunciante do Take.
+    -- O Take só participa quando a marca NÃO possui decisão manual. Assim uma
+    -- correção administrativa nunca reaparece sob o anunciante automático antigo.
     select atm.marca_id
     from anunciante_take_marcas atm
     join anunciantes_take at on at.id = atm.anunciante_take_id
     where coalesce(atm.cliente_id_override, at.cliente_id) = p_cliente_id
+      and not exists (
+        select 1
+        from marca_cliente_manual mcm
+        where mcm.marca_id = atm.marca_id
+      )
   )
   select
     m.id::uuid,
