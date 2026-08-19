@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { atualizarNegociacao } from '@/lib/acoes/acompanhamento-propostas'
 import type { StatusNegociacao } from '@/lib/dados/propostas'
@@ -46,6 +47,7 @@ export function PainelNegociacaoProposta({
   motivoPerdaInicial,
   podeEditar,
 }: Props) {
+  const router = useRouter()
   const [aberto, setAberto] = useState(false)
   const [status, setStatus] = useState<Exclude<StatusNegociacao, 'substituida'>>(
     statusInicial === 'substituida' ? 'em_negociacao' : statusInicial,
@@ -80,6 +82,7 @@ export function PainelNegociacaoProposta({
 
       setMensagem('Acompanhamento atualizado.')
       setAberto(false)
+      router.refresh()
     })
   }
 
