@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
-import { podeAdministrarProgramas } from '../dominio/perfis'
+import { podeAdministrarGovernancaGlobal } from '../dominio/perfis'
 
 const CAMINHO = '/configuracoes/marcas'
 const ARQUIVO_SCHEMA = 'supabase/schema-entrega-4-fechamento-propostas.sql'
@@ -25,13 +25,17 @@ function mensagemDeSchema(mensagem: string | undefined): string | null {
   return null
 }
 
+function podeGovernar(perfis: Parameters<typeof podeAdministrarGovernancaGlobal>[0]) {
+  return podeAdministrarGovernancaGlobal(perfis)
+}
+
 export async function vincularMarcaManual(
   nomeMarca: string,
   clienteId: string,
 ): Promise<{ erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.' }
-  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: 'Você não tem permissão para vincular marcas.' }
+  if (!podeGovernar(sessao.perfis)) return { erro: 'Somente Proprietário pode vincular marcas administrativamente.' }
 
   const nome = nomeMarca.trim()
   if (!nome) return { erro: 'Informe o nome da marca.' }
@@ -60,7 +64,7 @@ export async function marcarMarcaManualRevisada(
 ): Promise<{ erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.' }
-  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: 'Você não tem permissão para revisar marcas.' }
+  if (!podeGovernar(sessao.perfis)) return { erro: 'Somente Proprietário pode revisar marcas.' }
 
   const supabase = await criarClienteServidor()
   const { error } = await supabase.rpc('marcar_marca_manual_revisada', {
@@ -85,7 +89,7 @@ export async function removerVinculoMarcaManual(
 ): Promise<{ erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { erro: 'Sua sessão expirou. Entre de novo.' }
-  if (!podeAdministrarProgramas(sessao.perfis)) return { erro: 'Você não tem permissão para remover vínculos de marcas.' }
+  if (!podeGovernar(sessao.perfis)) return { erro: 'Somente Proprietário pode remover vínculos de marcas.' }
 
   const supabase = await criarClienteServidor()
   const { error } = await supabase.rpc('remover_vinculo_marca_manual', {
