@@ -1,20 +1,22 @@
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { temPerfil } from '../dominio/perfis'
+import { listarProgramas } from './programas'
 import {
   calcularEvolucaoMensal,
   calcularMetricasPerformance,
+  calcularRankingExecutivos,
   selecionarVersoesAtuais,
-  type LinhaParaPerformance,
+  type ItemRankingExecutivo,
+  type LinhaExecutivoPerformance,
   type MetricasPerformance,
   type PontoEvolucaoMensal,
 } from '../dominio/performance-propostas'
 import type { StatusNegociacao } from './propostas'
 
-export type { MetricasPerformance, PontoEvolucaoMensal } from '../dominio/performance-propostas'
+export type { ItemRankingExecutivo, MetricasPerformance, PontoEvolucaoMensal } from '../dominio/performance-propostas'
 
-type LinhaPerformance = LinhaParaPerformance & {
-  usuario_id: string
+type LinhaPerformance = LinhaExecutivoPerformance & {
   marca_nome: string | null
   programa_id: string | null
   programa_nome: string
@@ -33,9 +35,12 @@ export type PropostaRecente = {
 }
 
 export type PerformancePrograma = {
-  programaId: string | null
+  programaId: string
   programaNome: string
-  metricas: MetricasPerformance
+  metricasMes: MetricasPerformance
+  evolucao12Meses: PontoEvolucaoMensal[]
+  ranking: ItemRankingExecutivo[]
+  recentes: PropostaRecente[]
 }
 
 export type PerformanceInicio = {
@@ -48,12 +53,13 @@ export type PerformanceInicio = {
   programas: {
     metricasMes: MetricasPerformance
     evolucao12Meses: PontoEvolucaoMensal[]
+    ranking: ItemRankingExecutivo[]
     porPrograma: PerformancePrograma[]
     recentes: PropostaRecente[]
   } | null
 }
 
-const CAMPOS = 'id, usuario_id, marca_nome, cliente_id, cliente_nome, programa_id, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_final_negociado, negociacao_status, grupo_versao_id, versao, criado_em, status'
+const CAMPOS = 'id, usuario_id, executivo_nome, marca_nome, cliente_id, cliente_nome, programa_id, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_final_negociado, negociacao_status, grupo_versao_id, versao, criado_em, status'
 
 function inicioDoMesAtual(): string {
   const agora = new Date()
@@ -96,12 +102,32 @@ async function consultarLinhas(params: {
   const { data, error } = await consulta
   if (error) {
     const texto = error.message.toLowerCase()
-    const schemaIndisponivel = texto.includes('negociacao_status') || texto.includes('grupo_versao_id') || texto.includes('could not find')
+    const schemaIndisponivel = texto.includes('negociacao_status')
+      || texto.includes('grupo_versao_id')
+      || texto.includes('executivo_nome')
+      || texto.includes('could not find')
     if (!schemaIndisponivel) console.error('Falha ao carregar performance:', error.message)
     return { linhas: [], schemaDisponivel: !schemaIndisponivel }
   }
 
   return { linhas: (data ?? []) as unknown as LinhaPerformance[], schemaDisponivel: true }
+}
+
+function montarPerformancePrograma(
+  programaId: string,
+  programaNome: string,
+  linhas: LinhaPerformance[],
+  inicioMes: string,
+): PerformancePrograma {
+  const mes = linhas.filter((linha) => linha.criado_em >= inicioMes)
+  return {
+    programaId,
+    programaNome,
+    metricasMes: calcularMetricasPerformance(mes),
+    evolucao12Meses: calcularEvolucaoMensal(linhas),
+    ranking: calcularRankingExecutivos(mes).slice(0, 5),
+    recentes: recentes(linhas),
+  }
 }
 
 export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
@@ -111,12 +137,14 @@ export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
   const temPapelExecutivo = temPerfil(sessao.perfis, 'executivo') || temPerfil(sessao.perfis, 'executivo_regional')
   const temPapelConsultor = temPerfil(sessao.perfis, 'consultor_programa')
   const proprietario = temPerfil(sessao.perfis, 'proprietario')
+  const temVisaoProgramas = temPapelConsultor || proprietario
 
-  const [dadosExecutivo, dadosProgramas] = await Promise.all([
+  const [dadosExecutivo, dadosProgramas, programasCadastrados] = await Promise.all([
     temPapelExecutivo ? consultarLinhas({ usuarioId: sessao.usuarioId }) : Promise.resolve({ linhas: [], schemaDisponivel: true }),
-    temPapelConsultor || proprietario
+    temVisaoProgramas
       ? consultarLinhas(proprietario ? {} : { programas: sessao.programasVinculados })
       : Promise.resolve({ linhas: [], schemaDisponivel: true }),
+    temVisaoProgramas ? listarProgramas() : Promise.resolve([]),
   ])
 
   const inicioMes = inicioDoMesAtual()
@@ -125,13 +153,14 @@ export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
   const mesExecutivo = atuaisExecutivo.filter((linha) => linha.criado_em >= inicioMes)
   const mesProgramas = atuaisProgramas.filter((linha) => linha.criado_em >= inicioMes)
 
-  const grupos = new Map<string, LinhaPerformance[]>()
-  for (const linha of mesProgramas) {
-    const chave = linha.programa_id ?? linha.programa_nome
-    const grupo = grupos.get(chave) ?? []
-    grupo.push(linha)
-    grupos.set(chave, grupo)
-  }
+  const programasPermitidos = programasCadastrados
+    .filter((programa) => proprietario || sessao.programasVinculados.includes(programa.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const porPrograma = programasPermitidos.map((programa) => {
+    const linhas = atuaisProgramas.filter((linha) => linha.programa_id === programa.id)
+    return montarPerformancePrograma(programa.id, programa.nome, linhas, inicioMes)
+  })
 
   return {
     schemaDisponivel: dadosExecutivo.schemaDisponivel && dadosProgramas.schemaDisponivel,
@@ -140,16 +169,11 @@ export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
       evolucao12Meses: calcularEvolucaoMensal(atuaisExecutivo),
       recentes: recentes(atuaisExecutivo),
     } : null,
-    programas: temPapelConsultor || proprietario ? {
+    programas: temVisaoProgramas ? {
       metricasMes: calcularMetricasPerformance(mesProgramas),
       evolucao12Meses: calcularEvolucaoMensal(atuaisProgramas),
-      porPrograma: [...grupos.values()]
-        .map((linhas) => ({
-          programaId: linhas[0]?.programa_id ?? null,
-          programaNome: linhas[0]?.programa_nome ?? 'Programa',
-          metricas: calcularMetricasPerformance(linhas),
-        }))
-        .sort((a, b) => b.metricas.valorProposto - a.metricas.valorProposto),
+      ranking: calcularRankingExecutivos(mesProgramas).slice(0, 5),
+      porPrograma,
       recentes: recentes(atuaisProgramas),
     } : null,
   }
