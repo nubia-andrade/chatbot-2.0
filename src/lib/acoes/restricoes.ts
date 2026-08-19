@@ -27,9 +27,7 @@ const ERRO_SEM_PERMISSAO = 'Você não tem permissão para alterar restrições 
 function validar(dados: Partial<DadosDeRestricao>): string[] {
   const erros: string[] = []
 
-  if (!dados.motivo || dados.motivo.trim() === '') {
-    erros.push('Informe o motivo da restrição.')
-  }
+  if (!dados.motivo || dados.motivo.trim() === '') erros.push('Informe o motivo da restrição.')
 
   const temAnunciante = Boolean(dados.anunciante?.trim())
   const temSetorEIndustria = Boolean(dados.setor?.trim() && dados.industria?.trim())
@@ -60,7 +58,6 @@ export async function salvarRestricao(
   if (erros.length > 0) return { erros, id: null }
 
   const supabase = await criarClienteServidor()
-
   const { data, error } = await supabase
     .from('restricoes_anunciante')
     .insert({
@@ -79,10 +76,7 @@ export async function salvarRestricao(
   }
 
   if (!data || data.length === 0) {
-    return {
-      erros: ['O banco não deixou gravar. Confira sua permissão neste programa.'],
-      id: null,
-    }
+    return { erros: ['O banco não deixou gravar. Confira sua permissão neste programa.'], id: null }
   }
 
   revalidatePath(`/configuracoes/programas/${programaId}/restricoes`)
@@ -100,7 +94,6 @@ export async function excluirRestricao(
   }
 
   const supabase = await criarClienteServidor()
-
   const { error, count } = await supabase
     .from('restricoes_anunciante')
     .delete({ count: 'exact' })
@@ -115,49 +108,74 @@ export async function excluirRestricao(
 }
 
 /**
- * Valida Programa + Cliente assim que o executivo escolhe o cliente/marca.
- * Segmentação SE vem do campo próprio da Carteira, sem qualquer inferência a
- * partir de Setor ou Indústria.
+ * Valida Programa + Cliente no início da consulta. Segmentação SE é resolvida
+ * diretamente da Carteira para continuar correta mesmo em sessões antigas.
  */
 export async function verificarRestricaoDaConsulta(
   programaId: string,
-  cliente: {
-    nome: string
-    setor: string | null
-    industria: string | null
-    segmentacao_se: string | null
-  },
+  cliente: { nome: string; setor: string | null; industria: string | null },
 ): Promise<{ restricao: RestricaoAplicadaNaConsulta | null; erro: string | null }> {
   const sessao = await obterSessao()
   if (!sessao) return { restricao: null, erro: ERRO_SESSAO_EXPIRADA }
   if (!programaId.trim()) return { restricao: null, erro: 'Selecione um programa antes do cliente.' }
 
   const supabase = await criarClienteServidor()
-  const { data, error } = await supabase
-    .from('restricoes_anunciante')
-    .select('anunciante, setor, industria, segmentacao_se, motivo')
-    .eq('programa_id', programaId)
 
-  if (error) {
-    console.error('Falha ao validar restrições da Nova Consulta:', error.message)
+  let consultaCliente = supabase
+    .from('clientes')
+    .select('segmentacao_se')
+    .eq('nome', cliente.nome)
+    .limit(20)
+
+  consultaCliente = cliente.setor === null
+    ? consultaCliente.is('setor', null)
+    : consultaCliente.eq('setor', cliente.setor)
+  consultaCliente = cliente.industria === null
+    ? consultaCliente.is('industria', null)
+    : consultaCliente.eq('industria', cliente.industria)
+
+  const [respostaCliente, respostaRestricoes] = await Promise.all([
+    consultaCliente,
+    supabase
+      .from('restricoes_anunciante')
+      .select('anunciante, setor, industria, segmentacao_se, motivo')
+      .eq('programa_id', programaId),
+  ])
+
+  if (respostaCliente.error || respostaRestricoes.error) {
+    console.error(
+      'Falha ao validar restrições da Nova Consulta:',
+      respostaCliente.error?.message ?? respostaRestricoes.error?.message,
+    )
+    return { restricao: null, erro: 'Não foi possível validar as restrições deste programa. Tente novamente.' }
+  }
+
+  const segmentacoes = [...new Set(
+    (respostaCliente.data ?? [])
+      .map((linha) => linha.segmentacao_se?.trim() || null)
+      .filter((valor): valor is string => Boolean(valor)),
+  )]
+
+  if (segmentacoes.length > 1) {
     return {
       restricao: null,
-      erro: 'Não foi possível validar as restrições deste programa. Tente novamente.',
+      erro: 'Há mais de uma Segmentação SE para este cliente na Carteira. Solicite revisão do cadastro antes de continuar.',
     }
   }
 
-  const encontrada = restricaoQueBloqueia((data ?? []) as RegraDeRestricao[], cliente)
+  const clienteClassificado = {
+    ...cliente,
+    segmentacao_se: segmentacoes[0] ?? null,
+  }
+
+  const encontrada = restricaoQueBloqueia(
+    (respostaRestricoes.data ?? []) as RegraDeRestricao[],
+    clienteClassificado,
+  )
   if (!encontrada) return { restricao: null, erro: null }
 
   if (encontrada.anunciante?.trim()) {
-    return {
-      restricao: {
-        tipo: 'Anunciante',
-        alvo: encontrada.anunciante.trim(),
-        motivo: encontrada.motivo,
-      },
-      erro: null,
-    }
+    return { restricao: { tipo: 'Anunciante', alvo: encontrada.anunciante.trim(), motivo: encontrada.motivo }, erro: null }
   }
 
   if (encontrada.setor?.trim() && encontrada.industria?.trim()) {
@@ -200,8 +218,8 @@ export async function calcularAlcanceDaRestricao(
     setor: string | null
     industria: string | null
     segmentacao_se: string | null
-  }>(
-    (de, ate) => supabase.from('clientes').select('nome, setor, industria, segmentacao_se').range(de, ate),
+  }>((de, ate) =>
+    supabase.from('clientes').select('nome, setor, industria, segmentacao_se').range(de, ate),
   )
 
   if (erro) {
@@ -221,10 +239,7 @@ export async function calcularAlcanceDaRestricao(
   }
 
   const alcance = linhas.reduce(
-    (total, cliente) =>
-      restricaoQueBloqueia([restricaoDeTeste], cliente)
-        ? total + 1
-        : total,
+    (total, linha) => restricaoQueBloqueia([restricaoDeTeste], linha) ? total + 1 : total,
     0,
   )
 
