@@ -18,46 +18,28 @@ export type LinhaParaPerformance = {
 }
 
 export type LinhaExecutivoPerformance = LinhaParaPerformance & { usuario_id: string; executivo_nome?: string | null }
-
-export type MetricasPerformance = {
-  propostas: number
-  valorProposto: number
-  clientes: number
-  ticketMedio: number
-  emNegociacao: number
-  fechadas: number
-  perdidas: number
-  canceladas: number
-  valorFechado: number
-  conversao: number | null
-  percentualDigital: number
-  percentualRedes: number
-  nacionais: number
-  regionais: number
-}
-
+export type MetricasPerformance = { propostas: number; valorProposto: number; clientes: number; ticketMedio: number; emNegociacao: number; fechadas: number; perdidas: number; canceladas: number; valorFechado: number; conversao: number | null; percentualDigital: number; percentualRedes: number; nacionais: number; regionais: number }
 export type PontoEvolucaoMensal = { mes: string; rotulo: string; ofertado: number; vendido: number; propostas: number; fechadas: number }
 export type ItemRankingExecutivo = { usuarioId: string; nome: string; metricas: MetricasPerformance }
 
 function arredondar(valor: number): number { return Math.round((valor + Number.EPSILON) * 100) / 100 }
+function comercialmenteValida(linha: LinhaParaPerformance): boolean {
+  const aprovacaoValida = !linha.aprovacao_status || linha.aprovacao_status === 'nao_requerida' || linha.aprovacao_status === 'aprovada'
+  return linha.negociacao_status !== 'substituida' && linha.status !== 'falha' && linha.status !== 'gerando' && aprovacaoValida
+}
 
-/** Mantém somente a versão vigente e documentos comercialmente válidos. */
+/**
+ * Escolhe a versão mais alta ENTRE as versões comercialmente válidas.
+ * Assim uma v2 pendente/rejeitada não apaga dos KPIs a v1 que continua aprovada.
+ */
 export function selecionarVersoesAtuais<T extends LinhaParaPerformance>(linhas: T[]): T[] {
   const porGrupo = new Map<string, T>()
   for (const linha of linhas) {
+    if (!comercialmenteValida(linha)) continue
     const atual = porGrupo.get(linha.grupo_versao_id)
     if (!atual || linha.versao > atual.versao) porGrupo.set(linha.grupo_versao_id, linha)
   }
-
-  return [...porGrupo.values()].filter((linha) => {
-    const aprovacaoValida = !linha.aprovacao_status
-      || linha.aprovacao_status === 'nao_requerida'
-      || linha.aprovacao_status === 'aprovada'
-    return linha.negociacao_status !== 'substituida'
-      && linha.status !== 'falha'
-      && linha.status !== 'gerando'
-      && aprovacaoValida
-  })
+  return [...porGrupo.values()]
 }
 
 /** Conversão = Fechadas / (Fechadas + Perdidas). */
@@ -68,7 +50,6 @@ export function calcularMetricasPerformance<T extends LinhaParaPerformance>(linh
   const fechadas = linhas.filter((linha) => linha.negociacao_status === 'fechada')
   const perdidas = linhas.filter((linha) => linha.negociacao_status === 'perdida')
   const decididas = fechadas.length + perdidas.length
-
   return {
     propostas,
     valorProposto,
@@ -108,24 +89,18 @@ export function calcularEvolucaoMensal<T extends LinhaParaPerformance>(linhas: T
   const referenciaUtc = new Date(Date.UTC(referencia.getUTCFullYear(), referencia.getUTCMonth(), 1))
   const meses: PontoEvolucaoMensal[] = []
   const porMes = new Map<string, PontoEvolucaoMensal>()
-
   for (let deslocamento = quantidade - 1; deslocamento >= 0; deslocamento -= 1) {
     const data = new Date(Date.UTC(referenciaUtc.getUTCFullYear(), referenciaUtc.getUTCMonth() - deslocamento, 1))
     const mes = chaveMes(data)
     const ponto: PontoEvolucaoMensal = { mes, rotulo: rotuloMes(mes), ofertado: 0, vendido: 0, propostas: 0, fechadas: 0 }
     meses.push(ponto); porMes.set(mes, ponto)
   }
-
   for (const linha of linhas) {
     if (!linha.criado_em) continue
     const ponto = porMes.get(linha.criado_em.slice(0, 7))
     if (!ponto) continue
-    ponto.ofertado = arredondar(ponto.ofertado + Number(linha.valor_total_comercial || 0))
-    ponto.propostas += 1
-    if (linha.negociacao_status === 'fechada') {
-      ponto.vendido = arredondar(ponto.vendido + Number(linha.valor_final_negociado ?? linha.valor_total_comercial ?? 0))
-      ponto.fechadas += 1
-    }
+    ponto.ofertado = arredondar(ponto.ofertado + Number(linha.valor_total_comercial || 0)); ponto.propostas += 1
+    if (linha.negociacao_status === 'fechada') { ponto.vendido = arredondar(ponto.vendido + Number(linha.valor_final_negociado ?? linha.valor_total_comercial ?? 0)); ponto.fechadas += 1 }
   }
   return meses
 }
