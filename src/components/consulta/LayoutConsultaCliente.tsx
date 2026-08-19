@@ -21,7 +21,11 @@ function CabecalhoEConteudo({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { estado } = useConsulta()
 
-  const passoAtual = pathname.split('/').filter(Boolean).pop() ?? 'cliente'
+  const passoAtual = pathname === '/consulta'
+    ? 'contexto'
+    : pathname.endsWith('/resumo')
+      ? 'resumo'
+      : 'calendario'
   const indexAtual = PASSOS.findIndex((passo) => passo.slug === passoAtual)
   const etapa = indexAtual >= 0 ? indexAtual + 1 : 1
 
