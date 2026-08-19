@@ -30,8 +30,8 @@ const ATRASO_DO_CALCULO_MS = 400
 
 function descreverTipo(restricao: { anunciante: string | null; setor: string | null; industria: string | null }): string {
   if (restricao.anunciante) return 'Anunciante'
-  if (restricao.setor && restricao.industria) return 'Setor'
-  return 'Categoria'
+  if (restricao.setor && restricao.industria) return 'Setor e indústria'
+  return 'Segmentação SE'
 }
 
 function descreverAlvo(restricao: { anunciante: string | null; setor: string | null; industria: string | null }): string {
@@ -41,25 +41,11 @@ function descreverAlvo(restricao: { anunciante: string | null; setor: string | n
 }
 
 /**
- * Painel de restrições — Task 11, Step 2.
- *
- * Três modos de cadastro, escolhidos por botão de opção, todos convergindo
- * para as mesmas colunas de `restricoes_anunciante` — o que muda é qual
- * campo cada modo preenche:
- *
- * 1. Anunciante específico: `CampoDeBuscaDeCliente` (Task 8) devolve um
- *    registro real da carteira; setor e indústria vêm travados dele, não
- *    digitados.
- * 2. Setor e indústria: dois campos de seleção com os valores distintos que
- *    existem de verdade em `clientes` (`listarValoresDeCategoria`).
- * 3. Só categoria: um campo de seleção único combinando as duas listas —
- *    "não faz bebidas alcoólicas" é normalmente uma indústria isolada, sem
- *    travar o setor junto.
- *
- * Antes de habilitar "Salvar", `calcularAlcanceDaRestricao` roda a mesma
- * regra de decisão de venda (Task 5) contra a carteira inteira e mostra
- * quantos clientes a restrição afetaria — a diferença entre bloquear uma
- * marca e bloquear um setor inteiro sem perceber.
+ * Três modos de cadastro convergem para as mesmas colunas de
+ * `restricoes_anunciante`:
+ * 1. anunciante específico;
+ * 2. setor + indústria;
+ * 3. Segmentação SE, usando somente um eixo da classificação.
  */
 export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, industrias }: Props) {
   const [restricoes, setRestricoes] = useState<Restricao[]>(restricoesIniciais)
@@ -79,14 +65,8 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
   const [erros, setErros] = useState<string[]>([])
   const [sucesso, setSucesso] = useState<string | null>(null)
 
-  // Confirmação em duas etapas: a primeira troca o botão "Excluir" pelo par
-  // "Confirmar/Cancelar" naquela linha. Guarda o id da restrição em confirmação
-  // — só uma por vez, para não haver dois botões vermelhos armados na tela.
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null)
   const [excluindo, setExcluindo] = useState<string | null>(null)
-  // Retorno da exclusão fica ao lado da LISTA, não junto do formulário de
-  // cadastro na coluna da direita: mensagem longe do que a produziu é
-  // mensagem que ninguém lê.
   const [avisoDaLista, setAvisoDaLista] = useState<{ tipo: 'erro' | 'sucesso'; texto: string } | null>(null)
 
   const idDaConsultaAtual = useRef(0)
@@ -113,18 +93,10 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
   const temAlteracaoNaoSalva =
     Boolean(clienteEscolhido) || setorEscolhido !== '' || industriaEscolhida !== '' || Boolean(categoria) || motivo.trim() !== ''
 
-  // Recalcula quantos clientes o alvo escolhido afeta, 400ms depois da
-  // última mudança — o mesmo padrão de debounce do `CampoDeBuscaDeCliente`,
-  // para não disparar uma varredura da carteira a cada clique.
   useEffect(() => {
-    // Alvo incompleto (nenhum cliente/setor/categoria escolhido ainda): não
-    // há o que calcular. `alcance` já volta a `null` em quem torna o alvo
-    // inválido — `trocarModo` e os `onChange` dos campos abaixo — então este
-    // efeito só precisa deixar de agendar um novo cálculo.
     if (!alvoValido) return
 
     const numeroDaConsulta = ++idDaConsultaAtual.current
-
     const temporizador = setTimeout(async () => {
       setCalculandoAlcance(true)
       const resultado = await calcularAlcanceDaRestricao(dadosDoAlvo)
@@ -163,7 +135,6 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
     setSucesso(null)
 
     const resultado = await salvarRestricao(programaId, { ...dadosDoAlvo, motivo: motivoLimpo })
-
     setGravando(false)
 
     if (resultado.erros.length > 0) {
@@ -219,7 +190,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
         {restricoes.length === 0 ? (
           <EstadoVazio
             titulo="Nenhuma restrição cadastrada"
-            explicacao="Cadastre restrições por anunciante, por setor e indústria, ou só por categoria, para impedir propostas que o programa não aceita."
+            explicacao="Cadastre restrições por anunciante, por setor e indústria ou por Segmentação SE para impedir propostas que o programa não aceita."
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -295,7 +266,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
             [
               { valor: 'anunciante', rotulo: 'Anunciante específico' },
               { valor: 'setorIndustria', rotulo: 'Setor e indústria' },
-              { valor: 'categoria', rotulo: 'Só categoria' },
+              { valor: 'categoria', rotulo: 'Segmentação SE' },
             ] as { valor: Modo; rotulo: string }[]
           ).map((opcao) => (
             <label
@@ -352,9 +323,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                 >
                   <option value="">Selecione um setor…</option>
                   {setores.map((valor) => (
-                    <option key={valor} value={valor}>
-                      {valor}
-                    </option>
+                    <option key={valor} value={valor}>{valor}</option>
                   ))}
                 </select>
               </div>
@@ -374,9 +343,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                 >
                   <option value="">Selecione uma indústria…</option>
                   {industrias.map((valor) => (
-                    <option key={valor} value={valor}>
-                      {valor}
-                    </option>
+                    <option key={valor} value={valor}>{valor}</option>
                   ))}
                 </select>
               </div>
@@ -386,7 +353,7 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
           {modo === 'categoria' && (
             <div>
               <label htmlFor="restricao-categoria" className="mb-[7px] block text-[12px] font-semibold text-[var(--texto-2)]">
-                Categoria
+                Segmentação SE
               </label>
               <select
                 id="restricao-categoria"
@@ -399,19 +366,15 @@ export function PainelDeRestricoes({ programaId, restricoesIniciais, setores, in
                 }}
                 className="h-[44px] w-full rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] text-[var(--texto)] outline-none focus:border-[#A031F5]"
               >
-                <option value="">Selecione uma categoria…</option>
+                <option value="">Selecione uma segmentação…</option>
                 <optgroup label="Setor">
                   {setores.map((valor) => (
-                    <option key={`setor:${valor}`} value={`setor:${valor}`}>
-                      {valor}
-                    </option>
+                    <option key={`setor:${valor}`} value={`setor:${valor}`}>{valor}</option>
                   ))}
                 </optgroup>
                 <optgroup label="Indústria">
                   {industrias.map((valor) => (
-                    <option key={`industria:${valor}`} value={`industria:${valor}`}>
-                      {valor}
-                    </option>
+                    <option key={`industria:${valor}`} value={`industria:${valor}`}>{valor}</option>
                   ))}
                 </optgroup>
               </select>
