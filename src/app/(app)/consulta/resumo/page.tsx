@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useConsulta, useGuardaDoPasso } from '@/components/consulta/ProvedorDaConsulta'
 import { CarregandoDoPasso } from '@/components/consulta/CarregandoDoPasso'
 import { carregarResumoFinanceiro } from '@/lib/acoes/resumo-financeiro'
-import { gerarProposta, type ResultadoGerarProposta } from '@/lib/acoes/propostas'
+import { gerarPropostaAcompanhada } from '@/lib/acoes/acompanhamento-propostas'
+import type { ResultadoGerarProposta } from '@/lib/acoes/propostas'
 import type { DetalheFinanceiroDaPraca, ResumoFinanceiroDaProposta } from '@/lib/dominio/resumo-financeiro'
 import { descreverAcaoDaProposta } from '@/lib/dominio/texto-proposta'
 
@@ -73,7 +74,7 @@ export default function PassoResumo() {
     setGerando(true)
     setResultado(null)
     try {
-      const retorno = await gerarProposta({
+      const retorno = await gerarPropostaAcompanhada({
         marcaId: estado.marcaId,
         marcaNome: estado.marcaNome,
         clienteId: estado.cliente.id,
@@ -86,6 +87,7 @@ export default function PassoResumo() {
         itens: estado.itens,
         incluirDigital: estado.incluirDigital,
         incluirRedesSociais: estado.incluirRedesSociais,
+        propostaAnteriorId: estado.propostaAnteriorId,
       })
       setResultado(retorno)
       if (retorno.pdfGerado && retorno.propostaId) {
@@ -100,11 +102,18 @@ export default function PassoResumo() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Resumo da proposta</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-[19px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Resumo da proposta</h2>
+          {estado.propostaAnteriorId && !estado.finalizada && (
+            <span className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-[10px] font-bold text-[var(--roxo)]">Nova versão</span>
+          )}
+        </div>
         <p className="mt-1 text-[13px] text-[var(--texto-3)]">
           {estado.finalizada
             ? 'Consulta finalizada. O documento gerado preserva exatamente os dados abaixo.'
-            : 'Confira o contexto, as datas, o texto da ação e todos os valores antes de gerar o PDF e notificar o time do programa.'}
+            : estado.propostaAnteriorId
+              ? 'Revise os ajustes. Ao gerar, esta proposta se torna a nova versão válida e a anterior fica preservada como substituída.'
+              : 'Confira o contexto, as datas, o texto da ação e todos os valores antes de gerar o PDF e notificar o time do programa.'}
         </p>
       </header>
 
@@ -221,7 +230,7 @@ export default function PassoResumo() {
         {estado.finalizada ? (
           <div>
             <p className="text-[12.5px] font-bold text-[var(--disponivel-texto)]">✓ Consulta encerrada</p>
-            <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">Para alterar cliente, programa, datas ou valores, inicie uma nova consulta.</p>
+            <p className="mt-0.5 text-[10.5px] text-[var(--texto-3)]">Para alterar cliente, programa, datas ou valores, inicie uma nova consulta ou crie uma nova versão pela seção Propostas.</p>
           </div>
         ) : (
           <Link href="/consulta/calendario" className="rounded-[11px] border border-[var(--borda-forte)] px-5 py-[11px] text-[13.5px] font-bold text-[var(--texto-2)]">← Voltar ao calendário</Link>
@@ -237,7 +246,7 @@ export default function PassoResumo() {
             + Nova consulta
           </Link>
         ) : (
-          <button type="button" disabled={!resumo || gerando} onClick={aoGerar} className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}>{gerando ? 'Gerando proposta…' : 'Gerar proposta →'}</button>
+          <button type="button" disabled={!resumo || gerando} onClick={aoGerar} className="rounded-[11px] px-6 py-[11px] text-[13.5px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--marca)', boxShadow: 'var(--sombra-botao)' }}>{gerando ? 'Gerando proposta…' : estado.propostaAnteriorId ? 'Gerar nova versão →' : 'Gerar proposta →'}</button>
         )}
       </div>
     </div>
