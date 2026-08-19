@@ -137,7 +137,7 @@ begin
     null,
     null
   )
-  on conflict (marca_id, cliente_id) do nothing;
+  on conflict on constraint marca_cliente_manual_pkey do nothing;
 
   return query
   select m.id, m.nome
