@@ -64,6 +64,18 @@ export function validarPrograma(programa: Partial<Programa>): string[] {
     if (programa.custo_producao_tv == null) erros.push('Informe o custo de produção de TV para programas disponíveis para proposta.')
   }
 
+  // Complementos são opcionais na proposta, mas quando o programa declara que
+  // os oferece precisam ter preço comercial válido. Caso contrário o executivo
+  // encontra um checkbox permanentemente desabilitado no calendário, sem ter
+  // como concluir a configuração da proposta.
+  if (programa.contem_digital === true && (programa.custo_midia_digital == null || programa.custo_midia_digital <= 0)) {
+    erros.push('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
+  }
+
+  if (programa.redes_sociais === true && (programa.custo_midia_redes_sociais == null || programa.custo_midia_redes_sociais <= 0)) {
+    erros.push('Informe um valor de Redes Sociais maior que zero para programas que oferecem Redes Sociais.')
+  }
+
   if (programa.aceita_regional === true) {
     const dia = programa.dia_da_semana_regional
     if (dia == null) erros.push('Informe o dia da semana da ação regional.')
