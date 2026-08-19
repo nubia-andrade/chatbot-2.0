@@ -25,7 +25,7 @@ describe('template de e-mail da proposta', () => {
     expect(html).toContain('OXFORD PORCELANAS')
     expect(html).toContain('OXFORD')
     expect(html).toContain('SP · RJ · BH')
-    expect(html).toContain('R$&nbsp;83.000,00')
+    expect(html).toMatch(/R\$\s83\.000,00/)
     expect(html).toContain('Abrir proposta')
   })
 
