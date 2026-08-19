@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { GraficoEvolucaoComercial } from './GraficoEvolucaoComercial'
 import type {
+  ItemAtencaoPerformance,
   ItemRankingExecutivo,
   MetricasPerformance,
   PerformanceInicio,
@@ -20,6 +21,7 @@ type VisaoSelecionada = {
   evolucao12Meses: DadosProgramas['evolucao12Meses']
   ranking: ItemRankingExecutivo[]
   recentes: PropostaRecente[]
+  atencoes: ItemAtencaoPerformance[]
 }
 
 type CriterioRanking = 'quantidade' | 'vendido'
@@ -58,6 +60,7 @@ export function PerformanceProgramas({ dados }: { dados: DadosProgramas }) {
         evolucao12Meses: dados.evolucao12Meses,
         ranking: dados.ranking,
         recentes: dados.recentes,
+        atencoes: dados.atencoes,
       }
     }
 
@@ -70,6 +73,7 @@ export function PerformanceProgramas({ dados }: { dados: DadosProgramas }) {
         evolucao12Meses: dados.evolucao12Meses,
         ranking: dados.ranking,
         recentes: dados.recentes,
+        atencoes: dados.atencoes,
       }
     }
 
@@ -107,6 +111,7 @@ export function PerformanceProgramas({ dados }: { dados: DadosProgramas }) {
       </div>
 
       <GradeMetricas metricas={visao.metricasMes} />
+      <BlocoAtencaoProgramas itens={visao.atencoes} />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)] xl:items-start">
         <GraficoEvolucaoComercial
@@ -128,6 +133,25 @@ export function PerformanceProgramas({ dados }: { dados: DadosProgramas }) {
         titulo={individual ? `Propostas recentes · ${visao.programaNome}` : 'Propostas recentes dos programas'}
         propostas={visao.recentes}
       />
+    </section>
+  )
+}
+
+function BlocoAtencaoProgramas({ itens }: { itens: ItemAtencaoPerformance[] }) {
+  return (
+    <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[12.5px] font-bold text-[var(--texto)]">Atenção necessária</h3>
+        <Link href="/propostas" className="text-[10px] font-bold text-[var(--roxo)]">Revisar propostas →</Link>
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        {itens.slice(0, 4).map((item, indice) => (
+          <div key={`${item.titulo}-${indice}`} className={`rounded-[10px] border px-3 py-2.5 ${item.tipo === 'alerta' ? 'border-[#F1D3A6] bg-[#FFF8EC]' : item.tipo === 'sucesso' ? 'border-[#CDEBDD] bg-[#F1FBF6]' : 'border-[var(--borda)] bg-[var(--superficie-suave)]'}`}>
+            <p className={`text-[10.5px] font-bold ${item.tipo === 'alerta' ? 'text-[#8A5700]' : item.tipo === 'sucesso' ? 'text-[var(--disponivel-texto)]' : 'text-[var(--texto)]'}`}>{item.titulo}</p>
+            <p className="mt-0.5 text-[9.8px] leading-[1.45] text-[var(--texto-3)]">{item.detalhe}</p>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
