@@ -1,5 +1,8 @@
 import { PainelDePerfisEAcessos } from '@/components/configuracoes/PainelDePerfisEAcessos'
-import { listarUsuariosComAcessos } from '@/lib/acoes/perfis-acessos'
+import {
+  listarPermissoesDeSecoes,
+  listarUsuariosComAcessos,
+} from '@/lib/acoes/perfis-acessos'
 import { listarProgramas } from '@/lib/dados/programas'
 import { obterSessao } from '@/lib/sessao-servidor'
 import { temPerfil } from '@/lib/dominio/perfis'
@@ -20,9 +23,10 @@ export default async function PaginaPerfisEAcessos() {
     )
   }
 
-  const [usuarios, programas] = await Promise.all([
+  const [usuarios, programas, permissoesSecoes] = await Promise.all([
     listarUsuariosComAcessos(),
     listarProgramas(),
+    listarPermissoesDeSecoes(),
   ])
 
   return (
@@ -31,13 +35,14 @@ export default async function PaginaPerfisEAcessos() {
         <h1 className="text-[26px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>
           Perfis e acessos
         </h1>
-        <p className="mt-1 max-w-[760px] text-[13px] leading-[1.5] text-[var(--texto-3)]">
-          Defina o que cada usuário pode fazer e vincule os consultores aos programas que administram. Os mesmos vínculos serão usados automaticamente como destinatários das propostas geradas pelos executivos.
+        <p className="mt-1 max-w-[820px] text-[13px] leading-[1.5] text-[var(--texto-3)]">
+          Defina os perfis de cada usuário, os programas administrados pelos consultores e quais seções do Chatbot 2.0 cada perfil pode visualizar.
         </p>
       </header>
 
       <PainelDePerfisEAcessos
         usuarios={usuarios}
+        permissoesSecoes={permissoesSecoes}
         programas={programas
           .filter((programa) => programa.estado !== 'inativo')
           .map((programa) => ({ id: programa.id, nome: programa.nome }))}
