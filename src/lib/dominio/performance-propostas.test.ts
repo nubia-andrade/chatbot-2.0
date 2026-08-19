@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   calcularEvolucaoMensal,
   calcularMetricasPerformance,
+  calcularRankingExecutivos,
   selecionarVersoesAtuais,
+  type LinhaExecutivoPerformance,
   type LinhaParaPerformance,
 } from './performance-propostas'
 
@@ -21,6 +23,14 @@ function linha(parcial: Partial<LinhaParaPerformance> = {}): LinhaParaPerformanc
     versao: parcial.versao ?? 1,
     status: parcial.status ?? 'gerada',
     criado_em: parcial.criado_em,
+  }
+}
+
+function linhaExecutivo(parcial: Partial<LinhaExecutivoPerformance> = {}): LinhaExecutivoPerformance {
+  return {
+    ...linha(parcial),
+    usuario_id: parcial.usuario_id ?? 'u-1',
+    executivo_nome: parcial.executivo_nome ?? 'Executivo 1',
   }
 }
 
@@ -67,6 +77,32 @@ describe('calcularMetricasPerformance', () => {
     ])
 
     expect(metricas.conversao).toBeNull()
+  })
+})
+
+describe('calcularRankingExecutivos', () => {
+  it('ordena por vendido e depois por ofertado', () => {
+    const ranking = calcularRankingExecutivos([
+      linhaExecutivo({ usuario_id: 'u-a', executivo_nome: 'Ana', grupo_versao_id: 'a1', valor_total_comercial: 500, negociacao_status: 'em_negociacao' }),
+      linhaExecutivo({ usuario_id: 'u-b', executivo_nome: 'Bruno', grupo_versao_id: 'b1', valor_total_comercial: 300, negociacao_status: 'fechada', valor_final_negociado: 200 }),
+      linhaExecutivo({ usuario_id: 'u-c', executivo_nome: 'Carla', grupo_versao_id: 'c1', valor_total_comercial: 450, negociacao_status: 'fechada', valor_final_negociado: 200 }),
+    ])
+
+    expect(ranking.map((item) => item.nome)).toEqual(['Carla', 'Bruno', 'Ana'])
+    expect(ranking[0].metricas.valorFechado).toBe(200)
+    expect(ranking[0].metricas.valorProposto).toBe(450)
+  })
+
+  it('consolida várias propostas do mesmo executivo', () => {
+    const ranking = calcularRankingExecutivos([
+      linhaExecutivo({ usuario_id: 'u-a', executivo_nome: 'Ana', grupo_versao_id: 'a1', valor_total_comercial: 100 }),
+      linhaExecutivo({ usuario_id: 'u-a', executivo_nome: 'Ana', grupo_versao_id: 'a2', valor_total_comercial: 250, negociacao_status: 'fechada', valor_final_negociado: 220 }),
+    ])
+
+    expect(ranking).toHaveLength(1)
+    expect(ranking[0].metricas.propostas).toBe(2)
+    expect(ranking[0].metricas.valorProposto).toBe(350)
+    expect(ranking[0].metricas.valorFechado).toBe(220)
   })
 })
 
