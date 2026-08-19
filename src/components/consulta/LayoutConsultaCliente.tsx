@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   PASSOS,
@@ -19,7 +19,19 @@ export function LayoutConsultaCliente({ children }: { children: ReactNode }) {
 
 function CabecalhoEConteudo({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const { estado } = useConsulta()
+  const { estado, hidratado, limpar } = useConsulta()
+
+  /**
+   * Ao voltar para /consulta depois de gerar um PDF, a tela representa uma
+   * nova oportunidade e não pode reaproveitar o estado fechado da proposta
+   * anterior. Rascunhos não finalizados continuam preservados. A criação de
+   * nova versão também não é afetada, porque ela é preparada com
+   * `finalizada: false` antes de entrar nesta rota.
+   */
+  useEffect(() => {
+    if (pathname !== '/consulta' || !hidratado || !estado.finalizada) return
+    limpar()
+  }, [pathname, hidratado, estado.finalizada, limpar])
 
   const passoAtual = pathname === '/consulta'
     ? 'contexto'
