@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CampoDeBuscaDeMarca } from '@/components/consulta/CampoDeBuscaDeMarca'
 import { useConsulta } from '@/components/consulta/ProvedorDaConsulta'
@@ -18,8 +18,25 @@ type Props = { programas: ProgramaDaConsulta[] }
 export function InicioDaConsulta({ programas }: Props) {
   const router = useRouter()
   const { estado, atualizar } = useConsulta()
+  const emNovaVersao = Boolean(estado.propostaAnteriorId)
   const [marca, setMarca] = useState<MarcaDaCarteira | null>(null)
   const [programaId, setProgramaId] = useState('')
+
+  useEffect(() => {
+    if (!emNovaVersao || !estado.cliente || !estado.programaId) return
+    setMarca({
+      marca_id: estado.marcaId,
+      marca_nome: estado.marcaNome,
+      cliente_id: estado.cliente.id,
+      cliente_nome: estado.cliente.nome,
+      cnpj: estado.cliente.cnpj,
+      setor: estado.cliente.setor,
+      industria: estado.cliente.industria,
+      apto_regional: estado.cliente.apto_regional,
+    })
+    setProgramaId(estado.programaId)
+  }, [emNovaVersao, estado.cliente, estado.programaId, estado.marcaId, estado.marcaNome])
+
   const programa = programas.find((item) => item.id === programaId) ?? null
   const contextoCompleto = estado.produto.trim() !== '' && estado.objetivo.trim() !== ''
   const regionalDisponivel = Boolean(programa?.aceita_regional && marca?.apto_regional)
@@ -44,9 +61,9 @@ export function InicioDaConsulta({ programas }: Props) {
       produto: estado.produto.trim(),
       objetivo: estado.objetivo.trim(),
       modalidade,
-      itens: [],
-      incluirDigital: false,
-      incluirRedesSociais: false,
+      itens: emNovaVersao ? estado.itens : [],
+      incluirDigital: emNovaVersao ? estado.incluirDigital : false,
+      incluirRedesSociais: emNovaVersao ? estado.incluirRedesSociais : false,
       datasConfirmadas: false,
     })
 
@@ -57,26 +74,38 @@ export function InicioDaConsulta({ programas }: Props) {
     <section className="overflow-hidden rounded-[var(--raio-janela)] border border-[var(--borda)] bg-[var(--superficie)] shadow-[var(--sombra-janela)]">
       <header className="flex items-center justify-between border-b border-[var(--borda)] px-7 py-5">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--roxo)]">Nova consulta</p>
+          <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--roxo)]">{emNovaVersao ? 'Nova versão da proposta' : 'Nova consulta'}</p>
           <h1 className="mt-1 text-[22px] font-bold text-[var(--texto)]">Cliente, marca e programa</h1>
         </div>
-        <span className="text-[12px] font-semibold text-[var(--texto-3)]">Início da consulta</span>
+        <span className="text-[12px] font-semibold text-[var(--texto-3)]">{emNovaVersao ? 'Revisão comercial' : 'Início da consulta'}</span>
       </header>
+
+      {emNovaVersao && (
+        <div className="border-b border-[#DDD6FE] bg-[#F8F6FF] px-7 py-4">
+          <p className="text-[12.5px] font-bold text-[var(--roxo)]">Nova versão preservando a proposta anterior</p>
+          <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--texto-2)]">
+            Anunciante, marca e programa permanecem fixos. Você pode revisar Produto, Objetivo, modalidade, complementos e datas. A versão anterior continuará disponível para auditoria.
+          </p>
+        </div>
+      )}
 
       <div className="grid min-h-[620px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="flex flex-col gap-8 p-7 lg:border-r lg:border-[var(--borda)]">
           <div>
-            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. Qual cliente ou marca deseja consultar?</h2>
-            <CampoDeBuscaDeMarca
-              aoEscolher={(novaMarca) => {
-                setMarca(novaMarca)
-                setProgramaId('')
-                atualizar({ produto: '', objetivo: '', modalidade: 'nacional' })
-              }}
-            />
+            <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">1. {emNovaVersao ? 'Anunciante e marca' : 'Qual cliente ou marca deseja consultar?'}</h2>
+
+            {!emNovaVersao && (
+              <CampoDeBuscaDeMarca
+                aoEscolher={(novaMarca) => {
+                  setMarca(novaMarca)
+                  setProgramaId('')
+                  atualizar({ produto: '', objetivo: '', modalidade: 'nacional' })
+                }}
+              />
+            )}
 
             {marca && (
-              <div className="mt-4 rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4">
+              <div className={`${emNovaVersao ? '' : 'mt-4'} rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] p-4`}>
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Anunciante selecionado</p>
@@ -116,11 +145,12 @@ export function InicioDaConsulta({ programas }: Props) {
             <h2 className="mb-3 text-[15px] font-bold text-[var(--texto)]">2. Escolha o programa</h2>
             <select
               value={programaId}
+              disabled={emNovaVersao}
               onChange={(evento) => {
                 setProgramaId(evento.target.value)
                 atualizar({ modalidade: 'nacional', itens: [] })
               }}
-              className="h-[44px] w-full max-w-[520px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5]"
+              className="h-[44px] w-full max-w-[520px] rounded-[var(--raio-campo)] border border-[var(--borda-forte)] bg-[var(--superficie-suave)] px-3 text-[14px] outline-none focus:border-[#A031F5] disabled:cursor-not-allowed disabled:opacity-70"
             >
               <option value="">Selecione um programa</option>
               {programas.map((item) => (
@@ -130,7 +160,7 @@ export function InicioDaConsulta({ programas }: Props) {
               ))}
             </select>
             <p className="mt-2 text-[11.5px] text-[var(--texto-3)]">
-              Somente programas ativos e liberados para proposta aparecem aqui.
+              {emNovaVersao ? 'O programa é mantido para preservar a família de versões.' : 'Somente programas ativos e liberados para proposta aparecem aqui.'}
             </p>
 
             {programa?.aceita_regional && (
@@ -203,7 +233,9 @@ export function InicioDaConsulta({ programas }: Props) {
           <div>
             <h2 className="text-[14px] font-bold text-[var(--texto)]">Resumo da consulta</h2>
             <p className="mt-1 text-[11.5px] leading-[1.5] text-[var(--texto-3)]">
-              O cliente vem da carteira do executivo. Quando houver uma marca conhecida, ela também acompanha a proposta. Setor e indústria alimentam as regras de concorrência do calendário.
+              {emNovaVersao
+                ? 'Esta revisão pertence à mesma oportunidade da proposta anterior. A nova emissão será registrada como uma versão seguinte.'
+                : 'O cliente vem da carteira do executivo. Quando houver uma marca conhecida, ela também acompanha a proposta. Setor e indústria alimentam as regras de concorrência do calendário.'}
             </p>
           </div>
 
@@ -233,7 +265,9 @@ export function InicioDaConsulta({ programas }: Props) {
 
           <div className="mt-auto">
             <div className="mb-3 rounded-[var(--raio-card)] bg-[var(--prazo-fundo)] px-4 py-3 text-[11.5px] leading-[1.5] text-[var(--texto-2)]">
-              O calendário considera vendas nacionais, ações regionais, concorrência, compras anteriores do anunciante, limite mensal, prazo, bloqueios e datas especiais.
+              {emNovaVersao
+                ? 'As datas copiadas serão revalidadas contra a disponibilidade atual antes da nova emissão. Nenhuma condição antiga é assumida como disponível.'
+                : 'O calendário considera vendas nacionais, ações regionais, concorrência, compras anteriores do anunciante, limite mensal, prazo, bloqueios e datas especiais.'}
             </div>
             <button
               type="button"
