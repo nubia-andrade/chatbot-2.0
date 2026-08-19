@@ -1,6 +1,3 @@
-import { exigirAcessoASecao } from '@/lib/autorizacao-secoes'
-
-export default async function LayoutHistorico({ children }: { children: React.ReactNode }) {
-  await exigirAcessoASecao('historico')
+export default function LayoutHistorico({ children }: { children: React.ReactNode }) {
   return children
 }
