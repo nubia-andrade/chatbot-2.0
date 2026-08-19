@@ -7,14 +7,6 @@ import { podeEditarPrograma } from '../dominio/perfis'
 import { restricaoQueBloqueia, type Restricao as RegraDeRestricao } from '../dominio/restricoes'
 import { lerPaginado } from '../dados/paginacao'
 
-/**
- * Cadastro de restrições de anunciante — Task 11.
- *
- * A permissão é conferida aqui (para o erro sair em português) e de novo no
- * banco pela policy "escrita consultor" de `restricoes_anunciante`
- * (`supabase/schema-entrega-2.sql`).
- */
-
 export type DadosDeRestricao = {
   anunciante: string | null
   setor: string | null
@@ -22,15 +14,15 @@ export type DadosDeRestricao = {
   motivo: string
 }
 
+export type RestricaoAplicadaNaConsulta = {
+  tipo: 'Anunciante' | 'Setor e indústria' | 'Segmentação SE'
+  alvo: string
+  motivo: string
+}
+
 const ERRO_SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.'
 const ERRO_SEM_PERMISSAO = 'Você não tem permissão para alterar restrições deste programa.'
 
-/**
- * Mesma regra do `check` de `restricoes_anunciante`: ao menos um entre
- * anunciante, setor e indústria precisa estar preenchido — validado aqui
- * ANTES de gravar, para o erro sair em português e com o formulário
- * preenchido, e não como uma constraint violada devolvida crua pelo banco.
- */
 function validar(dados: Partial<DadosDeRestricao>): string[] {
   const erros: string[] = []
 
@@ -42,21 +34,12 @@ function validar(dados: Partial<DadosDeRestricao>): string[] {
     dados.anunciante?.trim() || dados.setor?.trim() || dados.industria?.trim(),
   )
   if (!temAlvo) {
-    erros.push('Escolha um anunciante, um setor e indústria, ou uma categoria.')
+    erros.push('Escolha um anunciante, um setor e indústria, ou uma Segmentação SE.')
   }
 
   return erros
 }
 
-/**
- * Grava uma restrição nova — o formulário não edita, só cria.
- *
- * Devolve o `id` gerado pelo banco para a lista da tela poder oferecer
- * "Excluir" na restrição recém-criada sem recarregar a página. Sem ele, a
- * linha nova ficaria com um id inventado no navegador e o botão de exclusão
- * não acharia nada para apagar — justamente no momento em que a exclusão é
- * mais provável: logo depois de cadastrar errado.
- */
 export async function salvarRestricao(
   programaId: string,
   dados: Partial<DadosDeRestricao>,
@@ -87,8 +70,6 @@ export async function salvarRestricao(
     return { erros: ['Não foi possível gravar a restrição. Tente novamente.'], id: null }
   }
 
-  // INSERT barrado pelo RLS volta sem erro e sem linhas — sem conferir, a tela
-  // diria "salva" e a restrição não estaria bloqueando nada.
   if (!data || data.length === 0) {
     return {
       erros: ['O banco não deixou gravar. Confira sua permissão neste programa.'],
@@ -100,19 +81,6 @@ export async function salvarRestricao(
   return { erros: [], id: data[0].id }
 }
 
-/**
- * Remove uma restrição cadastrada.
- *
- * Existe porque a alternativa era pior: uma restrição criada por engano
- * bloqueia venda de verdade — o cliente some das datas oferecidas — e, sem
- * esta função, só sairia por acesso direto ao banco. Quem cadastrou não
- * consegue desfazer o próprio erro.
- *
- * Não usa `ConfirmacaoNomeada` (digitar o nome), reservada para a exclusão de
- * programa: apagar uma restrição não destrói dado nenhum além dela mesma e é
- * refazível em dez segundos pelo formulário ao lado. A confirmação em duas
- * etapas da tela é proporcional ao estrago.
- */
 export async function excluirRestricao(
   programaId: string,
   restricaoId: string,
@@ -132,9 +100,6 @@ export async function excluirRestricao(
     .eq('programa_id', programaId)
 
   if (error) return { erro: 'Não foi possível excluir a restrição. Tente novamente.' }
-
-  // DELETE barrado pelo RLS volta sem erro e sem linhas afetadas — sem
-  // conferir, a tela diria "excluída" com a restrição ainda bloqueando venda.
   if (!count) return { erro: 'O banco não deixou excluir. Confira sua permissão neste programa.' }
 
   revalidatePath(`/configuracoes/programas/${programaId}/restricoes`)
@@ -142,21 +107,68 @@ export async function excluirRestricao(
 }
 
 /**
- * Quantos clientes da carteira uma restrição, ainda não salva, afetaria —
- * o número que a tela mostra antes de habilitar "Salvar". É a diferença
- * entre bloquear uma marca (1 cliente) e bloquear um setor inteiro (pode
- * ser centenas) sem perceber.
- *
- * Roda a mesma regra de decisão de venda (`restricaoQueBloqueia`, Task 5)
- * contra a carteira inteira — não uma aproximação à parte, a regra de
- * verdade, para o número da prévia bater com o efeito real depois de salvo.
- *
- * A carteira tem 15.519 linhas: sem `lerPaginado` (Task de importação,
- * `src/lib/dados/paginacao.ts`), o PostgREST devolveria só as primeiras
- * 1000 e o alcance de uma restrição de setor sairia subestimado sem
- * nenhum aviso — o número mostrado pareceria pequeno e inofensivo quando
- * na verdade é muito maior.
+ * Valida a combinação Programa + Cliente assim que o executivo escolhe o
+ * cliente na Nova Consulta. Usa a mesma regra canônica do calendário, mas
+ * devolve somente a restrição mais específica e uma descrição pronta para a
+ * interface. Nenhuma regra fica duplicada no componente.
  */
+export async function verificarRestricaoDaConsulta(
+  programaId: string,
+  cliente: { nome: string; setor: string | null; industria: string | null },
+): Promise<{ restricao: RestricaoAplicadaNaConsulta | null; erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { restricao: null, erro: ERRO_SESSAO_EXPIRADA }
+  if (!programaId.trim()) return { restricao: null, erro: 'Selecione um programa antes do cliente.' }
+
+  const supabase = await criarClienteServidor()
+  const { data, error } = await supabase
+    .from('restricoes_anunciante')
+    .select('anunciante, setor, industria, motivo')
+    .eq('programa_id', programaId)
+
+  if (error) {
+    console.error('Falha ao validar restrições da Nova Consulta:', error.message)
+    return {
+      restricao: null,
+      erro: 'Não foi possível validar as restrições deste programa. Tente novamente.',
+    }
+  }
+
+  const encontrada = restricaoQueBloqueia((data ?? []) as RegraDeRestricao[], cliente)
+  if (!encontrada) return { restricao: null, erro: null }
+
+  if (encontrada.anunciante?.trim()) {
+    return {
+      restricao: {
+        tipo: 'Anunciante',
+        alvo: encontrada.anunciante.trim(),
+        motivo: encontrada.motivo,
+      },
+      erro: null,
+    }
+  }
+
+  if (encontrada.setor?.trim() && encontrada.industria?.trim()) {
+    return {
+      restricao: {
+        tipo: 'Setor e indústria',
+        alvo: `${encontrada.setor.trim()} · ${encontrada.industria.trim()}`,
+        motivo: encontrada.motivo,
+      },
+      erro: null,
+    }
+  }
+
+  return {
+    restricao: {
+      tipo: 'Segmentação SE',
+      alvo: encontrada.setor?.trim() || encontrada.industria?.trim() || 'Segmentação cadastrada',
+      motivo: encontrada.motivo,
+    },
+    erro: null,
+  }
+}
+
 export async function calcularAlcanceDaRestricao(
   dados: Partial<DadosDeRestricao>,
 ): Promise<{ alcance: number; totalDaCarteira: number; erro: string | null }> {
