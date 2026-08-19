@@ -1,4 +1,6 @@
 import { criarClienteServidor } from '../supabase/cliente-servidor'
+import { obterSessao } from '../sessao-servidor'
+import { temPerfil } from '../dominio/perfis'
 
 export type StatusEmailDaProposta = 'desativado' | 'nao_configurado' | 'pendente' | 'enviando' | 'enviado' | 'falha'
 
@@ -24,7 +26,6 @@ export type PropostaDaLista = {
 }
 
 type Linha = Omit<PropostaDaLista, 'pdf_url'> & { pdf_path: string | null }
-
 type LinhaAntiga = Omit<Linha, 'email_status' | 'email_erro' | 'email_enviado_em'>
 
 const CAMPOS_BASE = 'id, usuario_id, marca_nome, cliente_nome, programa_nome, modalidade, inclui_digital, inclui_redes_sociais, valor_total_comercial, valor_total_geral, status, erro, criado_em, enviado_em, pdf_path'
@@ -37,14 +38,26 @@ function statusEmailLegado(linha: LinhaAntiga): StatusEmailDaProposta {
 }
 
 export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
-  const supabase = await criarClienteServidor()
+  const sessao = await obterSessao()
+  if (!sessao) return []
 
-  let linhas: Linha[] = []
-  const consultaNova = await supabase
+  const supabase = await criarClienteServidor()
+  const podeAcompanharPrograma = temPerfil(sessao.perfis, 'consultor_programa') || temPerfil(sessao.perfis, 'proprietario')
+
+  let consultaNovaBuilder = supabase
     .from('propostas')
     .select(`${CAMPOS_BASE}, email_status, email_erro, email_enviado_em`)
     .order('criado_em', { ascending: false })
     .limit(100)
+
+  // Defesa em profundidade: perfis comerciais pedem explicitamente só as
+  // próprias propostas. O RLS do banco aplica a mesma restrição novamente.
+  if (!podeAcompanharPrograma) {
+    consultaNovaBuilder = consultaNovaBuilder.eq('usuario_id', sessao.usuarioId)
+  }
+
+  const consultaNova = await consultaNovaBuilder
+  let linhas: Linha[] = []
 
   if (!consultaNova.error) {
     linhas = (consultaNova.data ?? []) as unknown as Linha[]
@@ -56,12 +69,17 @@ export async function listarPropostasVisiveis(): Promise<PropostaDaLista[]> {
       return []
     }
 
-    const consultaAntiga = await supabase
+    let consultaAntigaBuilder = supabase
       .from('propostas')
       .select(CAMPOS_BASE)
       .order('criado_em', { ascending: false })
       .limit(100)
 
+    if (!podeAcompanharPrograma) {
+      consultaAntigaBuilder = consultaAntigaBuilder.eq('usuario_id', sessao.usuarioId)
+    }
+
+    const consultaAntiga = await consultaAntigaBuilder
     if (consultaAntiga.error) {
       console.error('Falha ao listar propostas:', consultaAntiga.error.message)
       return []
