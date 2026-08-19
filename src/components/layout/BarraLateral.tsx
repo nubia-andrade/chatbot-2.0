@@ -4,32 +4,23 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { sair } from '@/lib/autenticacao'
-import type { Perfil } from '@/lib/dominio/perfis'
+import type { Perfil, SecaoApp } from '@/lib/dominio/perfis'
 
 type Props = {
   nome: string
   perfis: Perfil[]
-  /**
-   * Já calculado no servidor (via `podeAdministrar` da Task 7) e recebido
-   * pronto aqui. Esconder "Configurações" para quem não administra é só
-   * conveniência de interface — quem protege de verdade o acesso aos dados
-   * de configuração é o RLS do banco (`supabase/schema-entrega-2.sql`). Uma
-   * pessoa sem permissão que force a URL não veria nada além do que a
-   * política do banco autorizar.
-   */
-  podeAdministrar: boolean
+  secoes: SecaoApp[]
 }
 
-type ItemMenu = { href: string; rotulo: string }
+type ItemMenu = { href: string; rotulo: string; secao: SecaoApp }
 
-const ITENS_BASE: ItemMenu[] = [
-  { href: '/inicio', rotulo: 'Início' },
-  { href: '/consulta', rotulo: 'Nova consulta' },
-  { href: '/propostas', rotulo: 'Propostas' },
-  { href: '/historico', rotulo: 'Histórico' },
+const ITENS_MENU: ItemMenu[] = [
+  { href: '/inicio', rotulo: 'Início', secao: 'inicio' },
+  { href: '/consulta', rotulo: 'Nova consulta', secao: 'consulta' },
+  { href: '/propostas', rotulo: 'Propostas', secao: 'propostas' },
+  { href: '/historico', rotulo: 'Histórico', secao: 'historico' },
+  { href: '/configuracoes', rotulo: 'Configurações', secao: 'configuracoes' },
 ]
-
-const ITEM_CONFIGURACOES: ItemMenu = { href: '/configuracoes', rotulo: 'Configurações' }
 
 const ROTULOS_PERFIL: Record<Perfil, string> = {
   executivo: 'Executiva comercial',
@@ -39,26 +30,18 @@ const ROTULOS_PERFIL: Record<Perfil, string> = {
 }
 
 /**
- * Barra lateral do shell do app — telas 1b a 1e do handoff.
+ * Barra lateral do shell do app.
  *
- * 224px, fundo branco, itens de navegação e o rodapé com quem está logado.
+ * O menu reflete a matriz de permissões carregada no servidor. Isso é uma
+ * conveniência de interface; as rotas e o RLS continuam fazendo a proteção
+ * efetiva caso alguém tente forçar uma URL manualmente.
  */
-export function BarraLateral({ nome, perfis, podeAdministrar }: Props) {
+export function BarraLateral({ nome, perfis, secoes }: Props) {
   const caminhoAtual = usePathname()
   const roteador = useRouter()
   const [saindo, setSaindo] = useState(false)
+  const itens = ITENS_MENU.filter((item) => secoes.includes(item.secao))
 
-  const itens = podeAdministrar ? [...ITENS_BASE, ITEM_CONFIGURACOES] : ITENS_BASE
-
-  /**
-   * Encerra a sessão. Existe porque estas máquinas são compartilhadas: sem
-   * uma forma de sair, a sessão de quem usou antes continua aberta para quem
-   * senta depois.
-   *
-   * `replace` em vez de `push` para que o botão "voltar" do navegador não
-   * traga de volta a tela autenticada, e `refresh()` para descartar o que o
-   * servidor já tinha renderizado com a sessão antiga.
-   */
   async function encerrarSessao() {
     if (saindo) return
     setSaindo(true)
