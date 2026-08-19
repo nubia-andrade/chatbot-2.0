@@ -16,22 +16,9 @@ const ESTILO_BASE =
   'inline-flex items-center rounded-full px-3 py-[7px] text-[12.5px] font-bold outline-none whitespace-nowrap'
 
 /**
- * As 7 pílulas do wizard — telas 1b a 1e do handoff.
- *
- * A cor nunca é o único sinal de estado: o passo concluído ganha o prefixo
- * "✓" (não só fundo/texto verdes) e o ativo ganha `aria-current="step"`
- * além do gradiente da marca.
- *
- * Proposta aparece sempre desabilitada, com o texto explicando o motivo —
- * mesma decisão que a Entrega 2 tomou com a aba "Modelo de propostas"
- * (`AbasDoPrograma.tsx`): mostrar em vez de esconder, para o executivo
- * saber que a funcionalidade existe.
- *
- * Passo concluído é clicável, para voltar. Passo à frente do pendente,
- * não — por isso os inativos (fundo `#F5F4F8`, texto `#B4AEC0`) não são
- * `<Link>`. Esse par de cores é o único do handoff abaixo de 4.5:1 de
- * contraste, mas o WCAG 1.4.3 isenta texto de componente desabilitado — e
- * estas pílulas não são clicáveis.
+ * Stepper do wizard. Antes da geração, etapas concluídas podem ser revisitadas.
+ * Depois que o PDF é gerado, a consulta vira um registro fechado: os passos
+ * anteriores continuam visíveis como contexto, mas deixam de ser links.
  */
 export function Stepper({ passoAtual, estado }: Props) {
   const pendente = primeiroPassoPendente(estado)
@@ -42,23 +29,8 @@ export function Stepper({ passoAtual, estado }: Props) {
     <nav aria-label="Etapas da consulta" className="flex flex-wrap gap-2">
       {PASSOS.map((passo, indice) => {
         const numero = indice + 1
-
-        if (passo.slug === 'proposta') {
-          return (
-            <span
-              key={passo.slug}
-              aria-disabled="true"
-              title="Disponível na próxima entrega"
-              className={`${ESTILO_BASE} cursor-not-allowed`}
-              style={{ background: '#F5F4F8', color: 'var(--placeholder)' }}
-            >
-              {numero}·{passo.rotulo}
-            </span>
-          )
-        }
-
         const ativo = indice === indexAtual
-        const concluido = !ativo && indice < indexPendente
+        const concluido = !ativo && (estado.finalizada ? indice < indexAtual : indice < indexPendente)
 
         if (ativo) {
           return (
@@ -69,6 +41,20 @@ export function Stepper({ passoAtual, estado }: Props) {
               style={{ background: 'var(--marca)', color: '#FFFFFF' }}
             >
               {numero}·{passo.rotulo}
+            </span>
+          )
+        }
+
+        if (concluido && estado.finalizada) {
+          return (
+            <span
+              key={passo.slug}
+              aria-disabled="true"
+              title="Consulta finalizada. Inicie uma nova consulta para alterar os dados."
+              className={`${ESTILO_BASE} cursor-not-allowed`}
+              style={{ background: 'var(--disponivel-fundo)', color: 'var(--disponivel)' }}
+            >
+              ✓ {passo.rotulo}
             </span>
           )
         }
