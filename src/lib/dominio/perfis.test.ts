@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   temPerfil,
   podeAdministrarProgramas,
+  podeAdministrarGovernancaGlobal,
   podeExcluirPrograma,
   podeConsultarRegional,
   podeEditarPrograma,
@@ -23,7 +24,6 @@ describe('temPerfil', () => {
 describe('seções por perfil', () => {
   it('executivo vê somente início, nova consulta e propostas por padrão', () => {
     expect(secoesPadraoDosPerfis(['executivo'])).toEqual(['inicio', 'consulta', 'propostas'])
-    expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'historico')).toBe(false)
     expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'configuracoes')).toBe(false)
   })
 
@@ -31,15 +31,15 @@ describe('seções por perfil', () => {
     expect(secoesPadraoDosPerfis(['executivo_regional'])).toEqual(['inicio', 'consulta', 'propostas'])
   })
 
-  it('perfis acumulados somam suas permissões', () => {
+  it('perfis acumulados somam suas permissões sem criar seção redundante de histórico', () => {
     expect(secoesPadraoDosPerfis(['executivo', 'consultor_programa'])).toEqual([
-      'inicio', 'consulta', 'propostas', 'historico', 'configuracoes',
+      'inicio', 'consulta', 'propostas', 'configuracoes',
     ])
   })
 
-  it('proprietário possui todas as seções', () => {
+  it('proprietário possui todas as seções atuais', () => {
     expect(secoesPadraoDosPerfis(['proprietario'])).toEqual([
-      'inicio', 'consulta', 'propostas', 'historico', 'configuracoes',
+      'inicio', 'consulta', 'propostas', 'configuracoes',
     ])
   })
 })
@@ -55,13 +55,19 @@ describe('podeConsultarRegional', () => {
   })
 })
 
-describe('podeAdministrarProgramas', () => {
-  it('vale para consultor e proprietário', () => {
+describe('administração', () => {
+  it('consultor e proprietário administram programas', () => {
     expect(podeAdministrarProgramas(['consultor_programa'])).toBe(true)
     expect(podeAdministrarProgramas(['proprietario'])).toBe(true)
   })
 
-  it('não vale para executivo', () => {
+  it('governança global é exclusiva do proprietário', () => {
+    expect(podeAdministrarGovernancaGlobal(['proprietario'])).toBe(true)
+    expect(podeAdministrarGovernancaGlobal(['consultor_programa'])).toBe(false)
+    expect(podeAdministrarGovernancaGlobal(['executivo'])).toBe(false)
+  })
+
+  it('executivo não administra programas', () => {
     expect(podeAdministrarProgramas(['executivo', 'executivo_regional'])).toBe(false)
   })
 })
