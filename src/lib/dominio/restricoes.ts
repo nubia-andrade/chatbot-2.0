@@ -4,7 +4,8 @@ export type Restricao = {
   anunciante: string | null
   setor: string | null
   industria: string | null
-  segmentacao_se: string | null
+  /** Campo próprio da Carteira; opcional apenas para compatibilidade com objetos legados. */
+  segmentacao_se?: string | null
   motivo: string
 }
 
@@ -12,7 +13,8 @@ export type Anunciante = {
   nome: string
   setor: string | null
   industria: string | null
-  segmentacao_se: string | null
+  /** Não participa da concorrência; é usado somente nas restrições cadastradas. */
+  segmentacao_se?: string | null
 }
 
 export type VendaNaData = {
@@ -23,12 +25,8 @@ export type VendaNaData = {
 
 /**
  * R13 — restrição cadastrada pelo consultor.
- *
- * A prioridade é estrutural e independe da ordem do banco:
- * anunciante específico > setor + indústria > Segmentação SE.
- *
- * Segmentação SE é uma classificação própria da Carteira (`clientes.segmentacao_se`)
- * e nunca deve ser inferida a partir de setor ou indústria.
+ * Prioridade: anunciante específico > setor + indústria > Segmentação SE.
+ * Segmentação SE é `clientes.segmentacao_se`, nunca uma inferência de setor/indústria.
  */
 export function restricaoQueBloqueia(
   restricoes: Restricao[],
@@ -64,9 +62,8 @@ export function restricaoQueBloqueia(
 }
 
 /**
- * R14 — a concorrência é CALCULADA a partir do que já está vendido na data.
- * Dois clientes concorrem quando compartilham setor e indústria. Segmentação
- * SE não participa da regra de concorrência.
+ * R14 — concorrência continua exclusivamente por setor + indústria.
+ * Segmentação SE não participa desta regra.
  */
 export function concorrenteNaData(
   vendas: VendaNaData[],
