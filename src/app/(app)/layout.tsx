@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { obterSessao, podeAdministrar } from '@/lib/sessao-servidor'
+import { obterSessao } from '@/lib/sessao-servidor'
 import { BarraLateral } from '@/components/layout/BarraLateral'
 
 /**
@@ -11,16 +11,7 @@ import { BarraLateral } from '@/components/layout/BarraLateral'
  */
 export const dynamic = 'force-dynamic'
 
-/**
- * Shell de todas as rotas autenticadas (grupo `(app)`).
- *
- * Guarda de rota: roda no servidor, antes de qualquer página do grupo ser
- * montada. Sem sessão válida — `obterSessao()` devolve null —, manda para
- * `/login` e não chega a renderizar nada daqui pra baixo.
- *
- * `redirect()` do Next.js lança (tipo de retorno `never`), então depois do
- * `if` o TypeScript já sabe que `sessao` não é nula.
- */
+/** Shell de todas as rotas autenticadas. */
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao()
 
@@ -33,7 +24,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <BarraLateral
         nome={sessao.nome}
         perfis={sessao.perfis}
-        podeAdministrar={podeAdministrar(sessao)}
+        secoes={sessao.secoes}
       />
       <main className="flex-1 overflow-auto p-10">{children}</main>
     </div>
