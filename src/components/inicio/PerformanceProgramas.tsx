@@ -22,6 +22,8 @@ type VisaoSelecionada = {
   recentes: PropostaRecente[]
 }
 
+type CriterioRanking = 'quantidade' | 'vendido'
+
 const TODOS = '__todos__'
 
 const STATUS: Record<StatusNegociacao, string> = {
@@ -152,17 +154,64 @@ function Metrica({ rotulo, valor, apoio }: { rotulo: string; valor: string; apoi
 }
 
 function RankingExecutivos({ ranking }: { ranking: ItemRankingExecutivo[] }) {
+  const [criterio, setCriterio] = useState<CriterioRanking>('quantidade')
+
+  const ordenados = useMemo(() => [...ranking].sort((a, b) => {
+    if (criterio === 'quantidade') {
+      const quantidade = b.metricas.propostas - a.metricas.propostas
+      if (quantidade !== 0) return quantidade
+      const ofertado = b.metricas.valorProposto - a.metricas.valorProposto
+      if (ofertado !== 0) return ofertado
+      const vendido = b.metricas.valorFechado - a.metricas.valorFechado
+      if (vendido !== 0) return vendido
+      return a.nome.localeCompare(b.nome, 'pt-BR')
+    }
+
+    const vendido = b.metricas.valorFechado - a.metricas.valorFechado
+    if (vendido !== 0) return vendido
+    const ofertado = b.metricas.valorProposto - a.metricas.valorProposto
+    if (ofertado !== 0) return ofertado
+    const quantidade = b.metricas.propostas - a.metricas.propostas
+    if (quantidade !== 0) return quantidade
+    return a.nome.localeCompare(b.nome, 'pt-BR')
+  }).slice(0, 5), [ranking, criterio])
+
   return (
     <section className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] p-4">
-      <div>
-        <h3 className="text-[13px] font-bold text-[var(--texto)]">Ranking de executivos</h3>
-        <p className="mt-0.5 text-[9.5px] text-[var(--texto-3)]">Mês atual · vendido, depois ofertado</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[13px] font-bold text-[var(--texto)]">Ranking de executivos</h3>
+          <p className="mt-0.5 text-[9.5px] text-[var(--texto-3)]">
+            {criterio === 'quantidade'
+              ? 'Mês atual · maiores usuários por propostas geradas'
+              : 'Mês atual · maior valor vendido'}
+          </p>
+        </div>
+
+        <div className="inline-flex rounded-[8px] border border-[var(--borda)] bg-[var(--superficie-suave)] p-0.5" aria-label="Critério do ranking">
+          <button
+            type="button"
+            onClick={() => setCriterio('quantidade')}
+            aria-pressed={criterio === 'quantidade'}
+            className={`rounded-[6px] px-2 py-1 text-[9px] font-bold transition ${criterio === 'quantidade' ? 'bg-white text-[var(--roxo)] shadow-sm' : 'text-[var(--texto-3)] hover:text-[var(--texto-2)]'}`}
+          >
+            Mais propostas
+          </button>
+          <button
+            type="button"
+            onClick={() => setCriterio('vendido')}
+            aria-pressed={criterio === 'vendido'}
+            className={`rounded-[6px] px-2 py-1 text-[9px] font-bold transition ${criterio === 'vendido' ? 'bg-white text-[var(--roxo)] shadow-sm' : 'text-[var(--texto-3)] hover:text-[var(--texto-2)]'}`}
+          >
+            Mais vendido
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 divide-y divide-[var(--borda)]">
-        {ranking.length === 0 ? (
+        {ordenados.length === 0 ? (
           <Vazio texto="Ainda não há propostas neste recorte." />
-        ) : ranking.slice(0, 5).map((item, indice) => (
+        ) : ordenados.map((item, indice) => (
           <div key={item.usuarioId} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 py-2.5">
             <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[9.5px] font-bold ${indice === 0 ? 'bg-[#F3E8FF] text-[var(--roxo)]' : 'bg-[var(--superficie-suave)] text-[var(--texto-3)]'}`}>
               {indice + 1}
@@ -170,13 +219,25 @@ function RankingExecutivos({ ranking }: { ranking: ItemRankingExecutivo[] }) {
             <div className="min-w-0">
               <p className="truncate text-[11px] font-bold text-[var(--texto)]">{item.nome}</p>
               <p className="mt-0.5 text-[9.5px] text-[var(--texto-3)]">
-                {item.metricas.propostas} proposta{item.metricas.propostas === 1 ? '' : 's'} · ofertado {moeda(item.metricas.valorProposto)}
+                {criterio === 'quantidade'
+                  ? `Ofertado ${moeda(item.metricas.valorProposto)} · vendido ${moeda(item.metricas.valorFechado)}`
+                  : `${item.metricas.propostas} proposta${item.metricas.propostas === 1 ? '' : 's'} · ofertado ${moeda(item.metricas.valorProposto)}`}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] uppercase text-[var(--texto-3)]">Vendido</p>
-              <p className="mt-0.5 text-[11px] font-bold text-[var(--texto)]">{moeda(item.metricas.valorFechado)}</p>
-              <p className="mt-0.5 text-[9px] font-semibold text-[var(--roxo)]">{item.metricas.conversao === null ? '—' : `${item.metricas.conversao}% conv.`}</p>
+              {criterio === 'quantidade' ? (
+                <>
+                  <p className="text-[9px] uppercase text-[var(--texto-3)]">Propostas</p>
+                  <p className="mt-0.5 text-[15px] font-bold text-[var(--texto)]">{item.metricas.propostas}</p>
+                  <p className="mt-0.5 text-[9px] font-semibold text-[var(--roxo)]">{item.metricas.conversao === null ? '—' : `${item.metricas.conversao}% conv.`}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[9px] uppercase text-[var(--texto-3)]">Vendido</p>
+                  <p className="mt-0.5 text-[11px] font-bold text-[var(--texto)]">{moeda(item.metricas.valorFechado)}</p>
+                  <p className="mt-0.5 text-[9px] font-semibold text-[var(--roxo)]">{item.metricas.conversao === null ? '—' : `${item.metricas.conversao}% conv.`}</p>
+                </>
+              )}
             </div>
           </div>
         ))}
