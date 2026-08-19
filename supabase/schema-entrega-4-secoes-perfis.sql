@@ -17,7 +17,7 @@ create table if not exists perfil_secao (
   constraint perfil_secao_perfil_check
     check (perfil in ('executivo', 'executivo_regional', 'consultor_programa', 'proprietario')),
   constraint perfil_secao_secao_check
-    check (secao in ('inicio', 'consulta', 'propostas', 'historico', 'configuracoes'))
+    check (secao in ('inicio', 'consulta', 'propostas', 'configuracoes'))
 );
 
 alter table perfil_secao enable row level security;
@@ -38,25 +38,21 @@ insert into perfil_secao (perfil, secao, permitido) values
   ('executivo', 'inicio', true),
   ('executivo', 'consulta', true),
   ('executivo', 'propostas', true),
-  ('executivo', 'historico', false),
   ('executivo', 'configuracoes', false),
 
   ('executivo_regional', 'inicio', true),
   ('executivo_regional', 'consulta', true),
   ('executivo_regional', 'propostas', true),
-  ('executivo_regional', 'historico', false),
   ('executivo_regional', 'configuracoes', false),
 
   ('consultor_programa', 'inicio', true),
   ('consultor_programa', 'consulta', false),
   ('consultor_programa', 'propostas', true),
-  ('consultor_programa', 'historico', true),
   ('consultor_programa', 'configuracoes', true),
 
   ('proprietario', 'inicio', true),
   ('proprietario', 'consulta', true),
   ('proprietario', 'propostas', true),
-  ('proprietario', 'historico', true),
   ('proprietario', 'configuracoes', true)
 on conflict (perfil, secao) do nothing;
 
@@ -82,11 +78,11 @@ begin
 
   -- Segurança estrutural: Proprietário nunca pode perder acesso ao sistema.
   if p_perfil = 'proprietario' then
-    p_secoes := array['inicio', 'consulta', 'propostas', 'historico', 'configuracoes']::text[];
+    p_secoes := array['inicio', 'consulta', 'propostas', 'configuracoes']::text[];
   end if;
 
   foreach v_secao in array coalesce(p_secoes, '{}'::text[]) loop
-    if v_secao not in ('inicio', 'consulta', 'propostas', 'historico', 'configuracoes') then
+    if v_secao not in ('inicio', 'consulta', 'propostas', 'configuracoes') then
       raise exception 'Seção inválida: %', v_secao;
     end if;
   end loop;
@@ -103,7 +99,7 @@ begin
     s.secao = any(p_secoes),
     auth.uid(),
     now()
-  from unnest(array['inicio', 'consulta', 'propostas', 'historico', 'configuracoes']::text[]) as s(secao)
+  from unnest(array['inicio', 'consulta', 'propostas', 'configuracoes']::text[]) as s(secao)
   on conflict (perfil, secao) do update
     set permitido = excluded.permitido,
         atualizado_por = excluded.atualizado_por,
