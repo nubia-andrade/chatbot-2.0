@@ -17,18 +17,7 @@ export type Sessao = {
   secoes: SecaoApp[]
 }
 
-/**
- * Quem está logado, lido no servidor antes da página ser montada.
- *
- * Usa `getUser()`, e não `getSession()`: `getUser()` confere o token com o
- * servidor do Supabase, enquanto `getSession()` confia no cookie, que o
- * navegador pode ter adulterado.
- *
- * Devolve null para quem não está autenticado. Sem cadastro em `usuario` ou
- * `perfil_usuario` a pessoa ainda é considerada logada (autenticação e
- * autorização são passos distintos), com o perfil mais restrito por
- * padrão — nunca o mais permissivo.
- */
+/** Quem está logado, lido no servidor antes da página ser montada. */
 export async function obterSessao(): Promise<Sessao | null> {
   const supabase = await criarClienteServidor()
   const { data } = await supabase.auth.getUser()
@@ -36,11 +25,7 @@ export async function obterSessao(): Promise<Sessao | null> {
   if (!usuarioAutenticado) return null
 
   const [{ data: usuario }, { data: linhasDePerfil }] = await Promise.all([
-    supabase
-      .from('usuario')
-      .select('nome, cargo')
-      .eq('usuario_id', usuarioAutenticado.id)
-      .maybeSingle(),
+    supabase.from('usuario').select('nome, cargo').eq('usuario_id', usuarioAutenticado.id).maybeSingle(),
     supabase.from('perfil_usuario').select('perfil').eq('usuario_id', usuarioAutenticado.id),
   ])
 
@@ -48,9 +33,7 @@ export async function obterSessao(): Promise<Sessao | null> {
   const perfis = perfisLidos.length > 0 ? perfisLidos : ['executivo' as Perfil]
   const programasVinculados = await listarProgramasVinculados(usuarioAutenticado.id)
 
-  // A matriz no banco é configurável pela Proprietária. Enquanto a migration
-  // ainda não tiver sido aplicada, usa os padrões do domínio para não impedir
-  // o login nem a navegação durante a atualização do ambiente.
+  // Enquanto a migration ainda não tiver sido aplicada, usa os padrões do domínio.
   let secoes = secoesPadraoDosPerfis(perfis)
   const { data: permissoes, error: erroPermissoes } = await supabase
     .from('perfil_secao')
@@ -59,14 +42,12 @@ export async function obterSessao(): Promise<Sessao | null> {
     .eq('permitido', true)
 
   if (!erroPermissoes && permissoes) {
+    const valoresValidos: SecaoApp[] = ['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes']
     const permitidas = new Set<SecaoApp>(['inicio'])
     for (const linha of permissoes) {
-      if (linha.secao === 'inicio' || linha.secao === 'consulta' || linha.secao === 'propostas' || linha.secao === 'configuracoes') {
-        permitidas.add(linha.secao as SecaoApp)
-      }
+      if (valoresValidos.includes(linha.secao as SecaoApp)) permitidas.add(linha.secao as SecaoApp)
     }
-    secoes = ['inicio', 'consulta', 'propostas', 'configuracoes']
-      .filter((secao): secao is SecaoApp => permitidas.has(secao as SecaoApp))
+    secoes = valoresValidos.filter((secao) => permitidas.has(secao))
   }
 
   return {
