@@ -25,12 +25,14 @@ export type EstadoDaConsulta = {
   incluirRedesSociais: boolean
   /** Mantido por compatibilidade com sessões já abertas; não é mais gate de navegação. */
   datasConfirmadas: boolean
+  /** Quando preenchido, a próxima emissão será uma nova versão desta proposta. */
+  propostaAnteriorId: string | null
   /** Depois que o PDF é gerado, a consulta vira um registro fechado e não pode ser reeditada. */
   finalizada: boolean
   propostaId: string | null
 }
 
-const CHAVE_SESSAO = 'chatbot2:consulta'
+export const CHAVE_SESSAO_CONSULTA = 'chatbot2:consulta'
 
 function estadoInicial(): EstadoDaConsulta {
   const agora = new Date()
@@ -49,6 +51,7 @@ function estadoInicial(): EstadoDaConsulta {
     incluirDigital: false,
     incluirRedesSociais: false,
     datasConfirmadas: false,
+    propostaAnteriorId: null,
     finalizada: false,
     propostaId: null,
   }
@@ -71,7 +74,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const bruto = sessionStorage.getItem(CHAVE_SESSAO)
+      const bruto = sessionStorage.getItem(CHAVE_SESSAO_CONSULTA)
       if (bruto) {
         const salvo = JSON.parse(bruto) as Partial<EstadoDaConsulta>
         setEstado((atual) => ({ ...atual, ...salvo }))
@@ -86,7 +89,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hidratado) return
     try {
-      sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(estado))
+      sessionStorage.setItem(CHAVE_SESSAO_CONSULTA, JSON.stringify(estado))
     } catch {
       // Gravação é melhor esforço; não pode derrubar a tela.
     }
@@ -94,8 +97,6 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
 
   function atualizar(parcial: Partial<EstadoDaConsulta>) {
     setEstado((atual) => {
-      // Depois da geração, a proposta é imutável nesta jornada. A única saída
-      // para editar dados é iniciar uma nova consulta, que chama `limpar()`.
       if (atual.finalizada) return atual
       const proximo = { ...atual, ...parcial }
       if ('itens' in parcial) proximo.datasConfirmadas = false
@@ -114,7 +115,7 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
   function limpar() {
     setEstado(estadoInicial())
     try {
-      sessionStorage.removeItem(CHAVE_SESSAO)
+      sessionStorage.removeItem(CHAVE_SESSAO_CONSULTA)
     } catch {
       // idem
     }
