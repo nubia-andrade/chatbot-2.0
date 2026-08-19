@@ -82,11 +82,13 @@ export function PainelDePropostas({ propostas, usuarioId, proprietario }: Props)
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--borda)] pt-3"><p className="text-[10.5px] text-[var(--texto-3)]">{filtrados.length} oportunidade{filtrados.length === 1 ? '' : 's'} · 10 por página · versões agrupadas</p>{(busca || status !== 'todos' || programa !== 'todos' || modalidade !== 'todas' || periodo !== 'todos') && <button type="button" onClick={limparFiltros} className="text-[10.5px] font-bold text-[var(--roxo)]">Limpar filtros</button>}</div>
       </section>
 
+      {totalPaginas > 1 && (
+        <Paginacao pagina={paginaSegura} total={totalPaginas} totalItens={filtrados.length} aoMudar={setPagina} />
+      )}
+
       {filtrados.length === 0 ? (
         <div className="rounded-[var(--raio-card)] border border-dashed border-[var(--borda-forte)] bg-[var(--superficie)] p-10 text-center"><p className="text-[14px] font-bold text-[var(--texto)]">Nenhuma proposta neste recorte</p><p className="mt-1 text-[12px] text-[var(--texto-3)]">Altere os filtros ou gere uma nova proposta.</p></div>
       ) : paginados.map((grupo) => <CardGrupo key={grupo.id} grupo={grupo} usuarioId={usuarioId} proprietario={proprietario} />)}
-
-      {totalPaginas > 1 && <Paginacao pagina={paginaSegura} total={totalPaginas} totalItens={filtrados.length} aoMudar={setPagina} />}
     </div>
   )
 }
