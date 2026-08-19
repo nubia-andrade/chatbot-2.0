@@ -74,15 +74,33 @@ describe('validarPrograma', () => {
     expect(erros).toEqual([])
   })
 
-  it('não exige custos digitais mesmo quando disponível para proposta', () => {
+  it('dispensa preço digital quando o programa não oferece Digital', () => {
     const erros = validarPrograma(
       programa({
-        disponivel_para_proposta: true,
+        contem_digital: false,
         custo_midia_digital: null,
         custo_producao_digital: null,
       }),
     )
     expect(erros).toEqual([])
+  })
+
+  it('exige preço de mídia digital maior que zero quando o programa oferece Digital', () => {
+    expect(validarPrograma(programa({ contem_digital: true, custo_midia_digital: null })))
+      .toContain('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
+    expect(validarPrograma(programa({ contem_digital: true, custo_midia_digital: 0 })))
+      .toContain('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
+    expect(validarPrograma(programa({ contem_digital: true, custo_midia_digital: 25000 })))
+      .not.toContain('Informe um valor de mídia digital maior que zero para programas que oferecem Digital.')
+  })
+
+  it('exige preço de Redes Sociais maior que zero quando o programa oferece Redes Sociais', () => {
+    expect(validarPrograma(programa({ redes_sociais: true, custo_midia_redes_sociais: null })))
+      .toContain('Informe um valor de Redes Sociais maior que zero para programas que oferecem Redes Sociais.')
+    expect(validarPrograma(programa({ redes_sociais: true, custo_midia_redes_sociais: 0 })))
+      .toContain('Informe um valor de Redes Sociais maior que zero para programas que oferecem Redes Sociais.')
+    expect(validarPrograma(programa({ redes_sociais: true, custo_midia_redes_sociais: 10000 })))
+      .not.toContain('Informe um valor de Redes Sociais maior que zero para programas que oferecem Redes Sociais.')
   })
 
   // R10/R11 — bloco regional, condicional a `aceita_regional`
