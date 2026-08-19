@@ -2,14 +2,16 @@ import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { obterSessao } from '../sessao-servidor'
 import { temPerfil } from '../dominio/perfis'
 import {
+  calcularEvolucaoMensal,
   calcularMetricasPerformance,
   selecionarVersoesAtuais,
   type LinhaParaPerformance,
   type MetricasPerformance,
+  type PontoEvolucaoMensal,
 } from '../dominio/performance-propostas'
 import type { StatusNegociacao } from './propostas'
 
-export type { MetricasPerformance } from '../dominio/performance-propostas'
+export type { MetricasPerformance, PontoEvolucaoMensal } from '../dominio/performance-propostas'
 
 type LinhaPerformance = LinhaParaPerformance & {
   usuario_id: string
@@ -40,10 +42,12 @@ export type PerformanceInicio = {
   schemaDisponivel: boolean
   executivo: {
     metricasMes: MetricasPerformance
+    evolucao12Meses: PontoEvolucaoMensal[]
     recentes: PropostaRecente[]
   } | null
   programas: {
     metricasMes: MetricasPerformance
+    evolucao12Meses: PontoEvolucaoMensal[]
     porPrograma: PerformancePrograma[]
     recentes: PropostaRecente[]
   } | null
@@ -133,10 +137,12 @@ export async function carregarPerformanceInicio(): Promise<PerformanceInicio> {
     schemaDisponivel: dadosExecutivo.schemaDisponivel && dadosProgramas.schemaDisponivel,
     executivo: temPapelExecutivo ? {
       metricasMes: calcularMetricasPerformance(mesExecutivo),
+      evolucao12Meses: calcularEvolucaoMensal(atuaisExecutivo),
       recentes: recentes(atuaisExecutivo),
     } : null,
     programas: temPapelConsultor || proprietario ? {
       metricasMes: calcularMetricasPerformance(mesProgramas),
+      evolucao12Meses: calcularEvolucaoMensal(atuaisProgramas),
       porPrograma: [...grupos.values()]
         .map((linhas) => ({
           programaId: linhas[0]?.programa_id ?? null,
