@@ -11,6 +11,7 @@ export type MarcaDaCarteira = {
   cnpj: string | null
   setor: string | null
   industria: string | null
+  segmentacao_se: string | null
   apto_regional: boolean
 }
 
@@ -39,12 +40,7 @@ export async function buscarMarcas(
   return ((data ?? []) as LinhaDaBuscaDeMarca[]).map(normalizarLinha)
 }
 
-/**
- * Depois que o CLIENTE é escolhido, a etapa seguinte não deve depender do
- * texto do nome do anunciante. Esta leitura retorna todas as marcas ligadas
- * ao cliente por Take ou por governança manual, mesmo que os nomes sejam
- * completamente diferentes entre si.
- */
+/** Retorna todas as marcas vinculadas ao cliente selecionado. */
 export async function listarMarcasDoCliente(clienteId: string): Promise<MarcaDaCarteira[]> {
   const supabase = criarClienteNavegador()
   const { data, error } = await supabase.rpc('marcas_do_cliente', {
