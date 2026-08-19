@@ -4,8 +4,10 @@ import {
   buscarRelacionamentosMarcas,
   listarAnunciantesTakePendentes,
 } from '@/lib/dados/marcas-take'
+import { listarVinculosManuaisDeMarca } from '@/lib/dados/marcas-manuais'
 import { PainelDeMarcasPendentes } from '@/components/configuracoes/PainelDeMarcasPendentes'
 import { PainelDeRelacionamentosDeMarcas } from '@/components/configuracoes/PainelDeRelacionamentosDeMarcas'
+import { PainelDeMarcaManual } from '@/components/configuracoes/PainelDeMarcaManual'
 
 export default async function PaginaMarcasEAnunciantes() {
   const sessao = await obterSessao()
@@ -21,9 +23,10 @@ export default async function PaginaMarcasEAnunciantes() {
     )
   }
 
-  const [pendentes, relacionamentos] = await Promise.all([
+  const [pendentes, relacionamentos, manuais] = await Promise.all([
     listarAnunciantesTakePendentes(),
     buscarRelacionamentosMarcas('', 50),
+    listarVinculosManuaisDeMarca(),
   ])
 
   return (
@@ -31,13 +34,15 @@ export default async function PaginaMarcasEAnunciantes() {
       <header>
         <p className="text-[11px] font-bold uppercase tracking-[.1em] text-[var(--roxo)]">Governança de dados</p>
         <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]">Marcas e anunciantes</h1>
-        <p className="mt-2 max-w-[820px] text-[13px] leading-[1.55] text-[var(--texto-3)]">
-          Consulte e corrija como cada marca do Globo Take se relaciona com o anunciante oficial da carteira. Relacionamentos automáticos continuam sendo o padrão, mas uma correção manual pode ser aplicada a uma marca específica sem afetar as demais marcas do mesmo anunciante.
+        <p className="mt-2 max-w-[900px] text-[13px] leading-[1.55] text-[var(--texto-3)]">
+          Gerencie tanto os relacionamentos aprendidos pelo Globo Take quanto marcas cadastradas manualmente. Uma marca manual pode ser usada imediatamente em uma Nova Consulta, mesmo antes de aparecer na API.
         </p>
       </header>
 
+      <PainelDeMarcaManual iniciais={manuais} />
+
       <div className="rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie-suave)] px-4 py-3 text-[12px] leading-[1.5] text-[var(--texto-2)]">
-        A Nova Consulta sempre usa o anunciante efetivo exibido nesta página: primeiro uma correção manual da marca, quando existir; caso contrário, o relacionamento padrão do anunciante vindo do Globo Take.
+        A Nova Consulta usa primeiro o vínculo manual explícito da marca, quando existir. Para marcas observadas no Globo Take, usa a correção específica da relação e, na ausência dela, o relacionamento padrão do anunciante da API.
       </div>
 
       <PainelDeRelacionamentosDeMarcas iniciais={relacionamentos} />
