@@ -4,6 +4,7 @@ export type Restricao = {
   anunciante: string | null
   setor: string | null
   industria: string | null
+  segmentacao_se: string | null
   motivo: string
 }
 
@@ -11,6 +12,7 @@ export type Anunciante = {
   nome: string
   setor: string | null
   industria: string | null
+  segmentacao_se: string | null
 }
 
 export type VendaNaData = {
@@ -20,13 +22,13 @@ export type VendaNaData = {
 }
 
 /**
- * R13 — a restrição CADASTRADA pelo consultor: o que ninguém consegue deduzir,
- * como o apresentador não fazer bebidas alcoólicas.
+ * R13 — restrição cadastrada pelo consultor.
  *
- * A prioridade é estrutural e NÃO depende da ordem em que o banco devolve as
- * linhas: anunciante específico > setor + indústria > Segmentação SE (setor
- * ou indústria isolados). Assim, quando mais de uma regra casa com o mesmo
- * cliente, a interface consegue explicar sempre a restrição mais específica.
+ * A prioridade é estrutural e independe da ordem do banco:
+ * anunciante específico > setor + indústria > Segmentação SE.
+ *
+ * Segmentação SE é uma classificação própria da Carteira (`clientes.segmentacao_se`)
+ * e nunca deve ser inferida a partir de setor ou indústria.
  */
 export function restricaoQueBloqueia(
   restricoes: Restricao[],
@@ -35,6 +37,7 @@ export function restricaoQueBloqueia(
   const nome = normalizar(cliente.nome)
   const setor = normalizar(cliente.setor)
   const industria = normalizar(cliente.industria)
+  const segmentacaoSe = normalizar(cliente.segmentacao_se)
 
   const porAnunciante = restricoes.find((restricao) => {
     const rAnunciante = normalizar(restricao.anunciante)
@@ -50,23 +53,20 @@ export function restricaoQueBloqueia(
   })
   if (porSetorEIndustria) return porSetorEIndustria
 
-  const porSegmentacao = restricoes.find((restricao) => {
+  const porSegmentacaoSe = restricoes.find((restricao) => {
     if (normalizar(restricao.anunciante) !== '') return false
-    const rSetor = normalizar(restricao.setor)
-    const rIndustria = normalizar(restricao.industria)
-    const apenasSetor = rSetor !== '' && rIndustria === '' && rSetor === setor
-    const apenasIndustria = rSetor === '' && rIndustria !== '' && rIndustria === industria
-    return apenasSetor || apenasIndustria
+    if (normalizar(restricao.setor) !== '' || normalizar(restricao.industria) !== '') return false
+    const rSegmentacaoSe = normalizar(restricao.segmentacao_se)
+    return rSegmentacaoSe !== '' && rSegmentacaoSe === segmentacaoSe
   })
 
-  return porSegmentacao ?? null
+  return porSegmentacaoSe ?? null
 }
 
 /**
  * R14 — a concorrência é CALCULADA a partir do que já está vendido na data.
- * Dois clientes concorrem quando compartilham setor e indústria. Cliente sem
- * classificação não gera bloqueio: acusar concorrência sem base impediria
- * venda legítima.
+ * Dois clientes concorrem quando compartilham setor e indústria. Segmentação
+ * SE não participa da regra de concorrência.
  */
 export function concorrenteNaData(
   vendas: VendaNaData[],
