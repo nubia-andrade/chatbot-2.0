@@ -18,11 +18,16 @@ export async function salvarConfiguracaoEmailPrograma(params: {
     return { erro: 'Você não pode configurar o e-mail deste programa.' }
   }
 
+  const responsaveis = [...new Set(params.responsaveis.filter(Boolean))]
+  if (params.ativo && responsaveis.length === 0) {
+    return { erro: 'Selecione pelo menos um responsável em cópia antes de ativar o disparo automático.' }
+  }
+
   const supabase = await criarClienteServidor()
   const { error } = await supabase.rpc('salvar_email_programa', {
     p_programa_id: params.programaId,
     p_ativo: params.ativo,
-    p_responsaveis: [...new Set(params.responsaveis)],
+    p_responsaveis: responsaveis,
   })
 
   if (error) {
@@ -35,5 +40,6 @@ export async function salvarConfiguracaoEmailPrograma(params: {
   }
 
   revalidatePath(`/configuracoes/programas/${params.programaId}/email`)
+  revalidatePath('/configuracoes/emails')
   return { erro: null }
 }
