@@ -60,8 +60,12 @@ export async function obterSessao(): Promise<Sessao | null> {
 
   if (!erroPermissoes && permissoes) {
     const permitidas = new Set<SecaoApp>(['inicio'])
-    for (const linha of permissoes) permitidas.add(linha.secao as SecaoApp)
-    secoes = ['inicio', 'consulta', 'propostas', 'historico', 'configuracoes']
+    for (const linha of permissoes) {
+      if (linha.secao === 'inicio' || linha.secao === 'consulta' || linha.secao === 'propostas' || linha.secao === 'configuracoes') {
+        permitidas.add(linha.secao as SecaoApp)
+      }
+    }
+    secoes = ['inicio', 'consulta', 'propostas', 'configuracoes']
       .filter((secao): secao is SecaoApp => permitidas.has(secao as SecaoApp))
   }
 
