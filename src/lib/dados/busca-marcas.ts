@@ -20,16 +20,7 @@ type LinhaDaBuscaDeMarca = Omit<MarcaDaCarteira, 'apto_regional'> & {
 
 const LIMITE_PADRAO = 20
 
-/**
- * Busca o alvo comercial da consulta por CLIENTE/ANUNCIANTE ou MARCA.
- *
- * O RPC `buscar_marcas` também aplica a carteira do executivo logado. Para
- * proprietário/consultor, a função libera a carteira completa. Termo vazio é
- * válido: permite abrir o campo e enxergar imediatamente clientes da carteira.
- *
- * Clientes que ainda não possuem marca aprendida no Globo Take continuam
- * selecionáveis, com `marca_id` e `marca_nome` nulos.
- */
+/** Busca textual por cliente/anunciante ou marca dentro da carteira permitida. */
 export async function buscarMarcas(
   termo: string,
   limite: number = LIMITE_PADRAO,
@@ -45,8 +36,32 @@ export async function buscarMarcas(
     return []
   }
 
-  return ((data ?? []) as LinhaDaBuscaDeMarca[]).map((linha) => ({
+  return ((data ?? []) as LinhaDaBuscaDeMarca[]).map(normalizarLinha)
+}
+
+/**
+ * Depois que o CLIENTE é escolhido, a etapa seguinte não deve depender do
+ * texto do nome do anunciante. Esta leitura retorna todas as marcas ligadas
+ * ao cliente por Take ou por governança manual, mesmo que os nomes sejam
+ * completamente diferentes entre si.
+ */
+export async function listarMarcasDoCliente(clienteId: string): Promise<MarcaDaCarteira[]> {
+  const supabase = criarClienteNavegador()
+  const { data, error } = await supabase.rpc('marcas_do_cliente', {
+    p_cliente_id: clienteId,
+  })
+
+  if (error) {
+    console.error('Falha ao listar marcas do cliente:', error.message)
+    return []
+  }
+
+  return ((data ?? []) as LinhaDaBuscaDeMarca[]).map(normalizarLinha)
+}
+
+function normalizarLinha(linha: LinhaDaBuscaDeMarca): MarcaDaCarteira {
+  return {
     ...linha,
     apto_regional: Boolean(linha.apto_regional),
-  }))
+  }
 }
