@@ -1,4 +1,5 @@
 import type { ItemParaResumoFinanceiro } from '../dominio/resumo-financeiro'
+import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '../dominio/exibicao-marca-cliente'
 
 function escaparHtml(valor: string): string {
   return valor
@@ -64,11 +65,12 @@ export type DadosDoEmailDaProposta = {
 }
 
 export function assuntoDoEmailDaProposta(dados: DadosDoEmailDaProposta): string {
-  return `Proposta comercial · ${dados.marcaNome ?? dados.clienteNome} · ${dados.programaNome}`
+  return `Proposta comercial · ${nomePrincipalDaProposta(dados.marcaNome, dados.clienteNome)} · ${dados.programaNome}`
 }
 
 export function montarEmailDaProposta(dados: DadosDoEmailDaProposta): string {
-  const marca = dados.marcaNome?.trim() || null
+  const marca = nomePrincipalDaProposta(dados.marcaNome, dados.clienteNome)
+  const exibirCliente = deveExibirClienteComMarca(dados.marcaNome, dados.clienteNome)
   const datas = datasDaProposta(dados.itens)
   const pracas = dados.modalidade === 'regional' ? pracasDaProposta(dados.itens) : ''
   const modalidade = dados.modalidade === 'regional' ? 'Regional' : 'Nacional'
@@ -105,8 +107,8 @@ export function montarEmailDaProposta(dados: DadosDoEmailDaProposta): string {
                 <tr>
                   <td style="padding:22px 22px 8px 22px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                      ${linhaResumo('Anunciante', dados.clienteNome)}
-                      ${marca ? linhaResumo('Marca', marca) : ''}
+                      ${linhaResumo('Marca', marca)}
+                      ${exibirCliente ? linhaResumo('Anunciante', dados.clienteNome) : ''}
                       ${linhaResumo('Produto', dados.produto)}
                       ${linhaResumo('Programa', dados.programaNome)}
                       ${linhaResumo('Modalidade', modalidade)}
