@@ -40,6 +40,22 @@ describe('template de aprovação', () => {
     expect(html).not.toContain('https://storage.example/proposta-assinada.pdf')
   })
 
+  it('mantém anunciante quando ele é diferente da marca', () => {
+    const html = montarEmailSolicitacaoAprovacao(dados())
+    expect(html).toContain('NUTELLA')
+    expect(html).toContain('FERRERO DO BRASIL')
+    expect(html).toContain('Anunciante')
+  })
+
+  it('omite anunciante quando marca e cliente são equivalentes', () => {
+    const html = montarEmailSolicitacaoAprovacao(dados({
+      marcaNome: 'SHOPEE BRASIL',
+      clienteNome: 'shopee brasil',
+    }))
+    expect(html).toContain('SHOPEE BRASIL')
+    expect(html).not.toContain('Anunciante')
+  })
+
   it('aprovação positiva entrega o link seguro do PDF ao executivo', () => {
     const entrada = dados()
     const html = montarEmailPropostaAprovada(entrada)
