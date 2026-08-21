@@ -1,3 +1,5 @@
+import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '../dominio/exibicao-marca-cliente'
+
 type ItemData = { data: string; pracas?: string[] }
 
 export type DadosEmailAprovacao = {
@@ -60,6 +62,8 @@ function estrutura(params: {
   destaque?: string | null
 }): string {
   const p = pracas(params.dados.itens)
+  const marca = nomePrincipalDaProposta(params.dados.marcaNome, params.dados.clienteNome)
+  const exibirCliente = deveExibirClienteComMarca(params.dados.marcaNome, params.dados.clienteNome)
   return `<!doctype html><html><body style="margin:0;background:#F4F2F8;font-family:Arial,Helvetica,sans-serif;color:#221D2B">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F4F2F8;padding:28px 12px"><tr><td align="center">
     <table role="presentation" width="620" cellspacing="0" cellpadding="0" style="max-width:620px;width:100%;background:#fff;border-radius:20px;overflow:hidden">
@@ -73,8 +77,8 @@ function estrutura(params: {
         <div style="background:#F8F6FC;border:1px solid #ECE7F3;border-radius:14px;padding:16px 18px">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
             ${linha('Executivo', params.dados.executivoNome)}
-            ${linha('Anunciante', params.dados.clienteNome)}
-            ${params.dados.marcaNome ? linha('Marca', params.dados.marcaNome) : ''}
+            ${linha('Marca', marca)}
+            ${exibirCliente ? linha('Anunciante', params.dados.clienteNome) : ''}
             ${linha('Produto', params.dados.produto)}
             ${linha('Programa', params.dados.programaNome)}
             ${linha('Modalidade', params.dados.modalidade === 'regional' ? 'Regional' : 'Nacional')}
@@ -95,8 +99,12 @@ function estrutura(params: {
   </td></tr></table></body></html>`
 }
 
+function assuntoBase(prefixo: string, d: DadosEmailAprovacao): string {
+  return `${prefixo} · ${d.programaNome} · ${nomePrincipalDaProposta(d.marcaNome, d.clienteNome)}`
+}
+
 export function assuntoSolicitacaoAprovacao(d: DadosEmailAprovacao): string {
-  return `Aprovação pendente · ${d.programaNome} · ${d.marcaNome ?? d.clienteNome}`
+  return assuntoBase('Aprovação pendente', d)
 }
 
 export function montarEmailSolicitacaoAprovacao(d: DadosEmailAprovacao): string {
@@ -112,7 +120,7 @@ export function montarEmailSolicitacaoAprovacao(d: DadosEmailAprovacao): string 
 }
 
 export function assuntoPropostaAprovada(d: DadosEmailAprovacao): string {
-  return `Proposta aprovada · ${d.programaNome} · ${d.marcaNome ?? d.clienteNome}`
+  return assuntoBase('Proposta aprovada', d)
 }
 
 export function montarEmailPropostaAprovada(d: DadosEmailAprovacao): string {
@@ -128,7 +136,7 @@ export function montarEmailPropostaAprovada(d: DadosEmailAprovacao): string {
 }
 
 export function assuntoPropostaRejeitada(d: DadosEmailAprovacao): string {
-  return `Ajuste solicitado · ${d.programaNome} · ${d.marcaNome ?? d.clienteNome}`
+  return assuntoBase('Ajuste solicitado', d)
 }
 
 export function montarEmailPropostaRejeitada(d: DadosEmailAprovacao): string {
