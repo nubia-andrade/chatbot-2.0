@@ -18,15 +18,27 @@ function dados(overrides: Partial<DadosDoEmailDaProposta> = {}): DadosDoEmailDaP
 }
 
 describe('template de e-mail da proposta', () => {
-  it('destaca programa, marca, anunciante, praças e total comercial', () => {
+  it('destaca programa, marca, anunciante, praças e total comercial quando marca e cliente diferem', () => {
     const html = montarEmailDaProposta(dados())
 
     expect(html).toContain('Encontro')
     expect(html).toContain('OXFORD PORCELANAS')
     expect(html).toContain('OXFORD')
+    expect(html).toContain('Anunciante')
     expect(html).toContain('SP · RJ · BH')
     expect(html).toMatch(/R\$\s83\.000,00/)
     expect(html).toContain('Abrir proposta')
+  })
+
+  it('omite anunciante quando marca e cliente são equivalentes', () => {
+    const html = montarEmailDaProposta(dados({
+      marcaNome: 'SHOPEE BRASIL',
+      clienteNome: 'shopee brasil',
+    }))
+
+    expect(html).toContain('Marca')
+    expect(html).toContain('SHOPEE BRASIL')
+    expect(html).not.toContain('Anunciante')
   })
 
   it('usa somente link e não inclui produção ou direitos no corpo', () => {
