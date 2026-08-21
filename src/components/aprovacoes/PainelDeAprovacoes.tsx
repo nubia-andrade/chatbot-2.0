@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { decidirAprovacao } from '@/lib/acoes/aprovacoes'
 import type { PropostaParaAprovacao } from '@/lib/dados/aprovacoes'
+import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '@/lib/dominio/exibicao-marca-cliente'
 
 type Filtro = 'pendentes' | 'decididas' | 'todas'
 
@@ -75,6 +76,8 @@ function CardAprovacao({ proposta: p }: { proposta: PropostaParaAprovacao }) {
   const [erro, setErro] = useState<string | null>(null)
   const [processando, iniciar] = useTransition()
   const pendente = p.aprovacao_status === 'pendente'
+  const marca = nomePrincipalDaProposta(p.marca_nome, p.cliente_nome)
+  const exibirCliente = deveExibirClienteComMarca(p.marca_nome, p.cliente_nome)
 
   function decidir(decisao: 'aprovar' | 'rejeitar') {
     if (decisao === 'rejeitar' && !justificativa.trim()) return setErro('Informe a justificativa antes de rejeitar.')
@@ -96,8 +99,8 @@ function CardAprovacao({ proposta: p }: { proposta: PropostaParaAprovacao }) {
             <span className={`rounded-full px-2.5 py-1 text-[9.5px] font-bold ${p.aprovacao_status === 'pendente' ? 'bg-[#FFF4E5] text-[#8A5700]' : p.aprovacao_status === 'aprovada' ? 'bg-[var(--disponivel-fundo)] text-[var(--disponivel-texto)]' : 'bg-[var(--concorrencia-fundo)] text-[var(--concorrencia-texto)]'}`}>{p.aprovacao_status === 'pendente' ? 'Pendente' : p.aprovacao_status === 'aprovada' ? 'Aprovada' : 'Rejeitada'}</span>
             <span className="text-[10px] font-bold uppercase tracking-[.06em] text-[var(--roxo)]">{p.programa_nome}</span>
           </div>
-          <h2 className="mt-2 text-[17px] font-bold text-[var(--texto)]">{p.marca_nome ?? p.cliente_nome}</h2>
-          <p className="mt-1 text-[11px] text-[var(--texto-3)]">{p.cliente_nome} · {p.modalidade === 'regional' ? 'Regional' : 'Nacional'} · enviada por <strong>{p.executivo_nome ?? 'Executivo'}</strong> em {dataHora(p.criado_em)}</p>
+          <h2 className="mt-2 text-[17px] font-bold text-[var(--texto)]">{marca}</h2>
+          <p className="mt-1 text-[11px] text-[var(--texto-3)]">{exibirCliente && <>{p.cliente_nome} · </>}{p.modalidade === 'regional' ? 'Regional' : 'Nacional'} · enviada por <strong>{p.executivo_nome ?? 'Executivo'}</strong> em {dataHora(p.criado_em)}</p>
         </div>
         <div className="text-right"><p className="text-[9.5px] uppercase text-[var(--texto-3)]">Total comercial</p><p className="mt-1 text-[19px] font-extrabold text-[var(--texto)]">{moeda(p.valor_total_comercial)}</p></div>
       </div>
