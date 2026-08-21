@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { PropostaDaLista, StatusEmailDaProposta, StatusNegociacao, StatusAprovacaoDaProposta } from '@/lib/dados/propostas'
+import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '@/lib/dominio/exibicao-marca-cliente'
 import { BotaoReenviarEmail } from '@/components/propostas/BotaoReenviarEmail'
 import { PainelNegociacaoProposta } from '@/components/propostas/PainelNegociacaoProposta'
 import { BotaoNovaVersao } from '@/components/propostas/BotaoNovaVersao'
@@ -104,6 +105,8 @@ function Paginacao({ pagina, total, totalItens, aoMudar }: { pagina: number; tot
 
 function CardGrupo({ grupo, usuarioId, proprietario }: { grupo: Grupo; usuarioId: string | null; proprietario: boolean }) {
   const p = grupo.atual
+  const marca = nomePrincipalDaProposta(p.marca_nome, p.cliente_nome)
+  const exibirCliente = deveExibirClienteComMarca(p.marca_nome, p.cliente_nome)
   const pdfDisponivel = Boolean(p.pdf_url)
   const autor = Boolean(usuarioId && p.usuario_id === usuarioId)
   const liberadaComercialmente = p.aprovacao_status === 'nao_requerida' || p.aprovacao_status === 'aprovada'
@@ -115,7 +118,7 @@ function CardGrupo({ grupo, usuarioId, proprietario }: { grupo: Grupo; usuarioId
     <details className="group rounded-[var(--raio-card)] border border-[var(--borda)] bg-[var(--superficie)] open:shadow-[var(--sombra-janela)]">
       <summary className="cursor-pointer list-none p-4 sm:p-5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_190px] sm:items-center">
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[14px] font-bold text-[var(--texto)]">{p.marca_nome ?? p.cliente_nome} · {p.programa_nome}</h2><span className="rounded-full border border-[#DDD6FE] bg-[#F8F6FF] px-2 py-0.5 text-[9px] font-bold text-[var(--roxo)]">v{p.versao}</span>{grupo.versoes.length > 1 && <span className="text-[9.5px] text-[var(--texto-3)]">{grupo.versoes.length - 1} anterior{grupo.versoes.length - 1 === 1 ? '' : 'es'}</span>}</div><p className="mt-1 truncate text-[10.5px] text-[var(--texto-3)]">{p.cliente_nome} · {p.modalidade === 'regional' ? 'Regional' : 'Nacional'} · {dataHora(p.criado_em)}</p></div>
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[14px] font-bold text-[var(--texto)]">{marca} · {p.programa_nome}</h2><span className="rounded-full border border-[#DDD6FE] bg-[#F8F6FF] px-2 py-0.5 text-[9px] font-bold text-[var(--roxo)]">v{p.versao}</span>{grupo.versoes.length > 1 && <span className="text-[9.5px] text-[var(--texto-3)]">{grupo.versoes.length - 1} anterior{grupo.versoes.length - 1 === 1 ? '' : 'es'}</span>}</div><p className="mt-1 truncate text-[10.5px] text-[var(--texto-3)]">{exibirCliente && <>{p.cliente_nome} · </>}{p.modalidade === 'regional' ? 'Regional' : 'Nacional'} · {dataHora(p.criado_em)}</p></div>
           <div className="sm:text-right"><p className="text-[9.5px] uppercase text-[var(--texto-3)]">Total comercial</p><p className="mt-0.5 text-[14px] font-bold text-[var(--texto)]">{moeda(p.valor_total_comercial)}</p></div>
           <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">{p.aprovacao_status !== 'nao_requerida' && <span className={`rounded-full px-2.5 py-1 text-[9.5px] font-bold ${classeAprovacao(p.aprovacao_status)}`}>{APROVACAO[p.aprovacao_status]}</span>}<span className={`rounded-full px-2.5 py-1 text-[9.5px] font-bold ${classeStatus(p.negociacao_status)}`}>{STATUS[p.negociacao_status]}</span><span className="text-[11px] font-bold text-[var(--roxo)] group-open:hidden">Detalhes ↓</span><span className="hidden text-[11px] font-bold text-[var(--roxo)] group-open:inline">Fechar ↑</span></div>
         </div>
