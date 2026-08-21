@@ -22,6 +22,7 @@ const ROSA = rgb(0.96, 0.04, 0.42)
 const TEXTO = rgb(0.22, 0.19, 0.23)
 const CINZA = rgb(0.57, 0.55, 0.59)
 const LINHA = rgb(0.88, 0.87, 0.89)
+const BRANCO = rgb(1, 1, 1)
 
 const X_ESQUERDA = 88
 const LARGURA_ESQUERDA = 310
@@ -208,6 +209,50 @@ function escreverBloco(params: {
   })
 
   return params.y - visiveis.length * entrelinhas
+}
+
+async function adicionarCapasDaProposta(params: {
+  pdf: PDFDocument
+  fontes: FontesDaProposta
+  slides: SlideDoModeloDeProposta[]
+  marcaNome: string | null
+  clienteNome: string
+}) {
+  const marca = params.marcaNome?.trim() || params.clienteNome.trim()
+  const cliente = params.clienteNome.trim()
+
+  for (const [indice, slide] of params.slides.entries()) {
+    const pagina = await adicionarSlideImagem(params.pdf, slide)
+    if (indice !== 0) continue
+
+    // Posição baseada no template 16:9 aprovado: bloco textual no terço
+    // esquerdo, preservando a fotografia e os elementos gráficos da capa.
+    const depoisMarca = escreverBloco({
+      pagina,
+      texto: marca,
+      fonte: params.fontes.texto,
+      tamanho: 32,
+      x: 20,
+      y: 330,
+      largura: 475,
+      entrelinhas: 38,
+      maxLinhas: 2,
+      cor: BRANCO,
+    })
+
+    escreverBloco({
+      pagina,
+      texto: cliente,
+      fonte: params.fontes.texto,
+      tamanho: 14,
+      x: 20,
+      y: Math.min(286, depoisMarca - 10),
+      largura: 475,
+      entrelinhas: 18,
+      maxLinhas: 2,
+      cor: BRANCO,
+    })
+  }
 }
 
 function rotulo(pagina: PDFPage, fonte: PDFFont, texto: string, x: number, y: number) {
@@ -576,7 +621,13 @@ export async function gerarPdfDaProposta(params: {
   const fontes = await carregarFontesDaProposta(pdf)
   const slides = params.slides ?? []
 
-  await adicionarSlides(pdf, slidesDaSecao(slides, 'capa'))
+  await adicionarCapasDaProposta({
+    pdf,
+    fontes,
+    slides: slidesDaSecao(slides, 'capa'),
+    marcaNome: params.marcaNome,
+    clienteNome: params.clienteNome,
+  })
   await adicionarSlides(pdf, slidesDaSecao(slides, 'conteudo'))
 
   if (params.resumo.incluir_digital) {
