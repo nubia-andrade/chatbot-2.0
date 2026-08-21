@@ -11,6 +11,7 @@ import {
 import type { ResumoFinanceiroDaProposta } from '../dominio/resumo-financeiro'
 import { PRACAS } from '../dominio/regional'
 import { descreverAcaoDaProposta } from '../dominio/texto-proposta'
+import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '../dominio/exibicao-marca-cliente'
 import {
   slidesDaSecao,
   type SlideDoModeloDeProposta,
@@ -218,8 +219,9 @@ async function adicionarCapasDaProposta(params: {
   marcaNome: string | null
   clienteNome: string
 }) {
-  const marca = params.marcaNome?.trim() || params.clienteNome.trim()
+  const marca = nomePrincipalDaProposta(params.marcaNome, params.clienteNome)
   const cliente = params.clienteNome.trim()
+  const exibirCliente = deveExibirClienteComMarca(params.marcaNome, params.clienteNome)
 
   for (const [indice, slide] of params.slides.entries()) {
     const pagina = await adicionarSlideImagem(params.pdf, slide)
@@ -240,18 +242,20 @@ async function adicionarCapasDaProposta(params: {
       cor: BRANCO,
     })
 
-    escreverBloco({
-      pagina,
-      texto: cliente,
-      fonte: params.fontes.texto,
-      tamanho: 14,
-      x: 20,
-      y: Math.min(286, depoisMarca - 10),
-      largura: 475,
-      entrelinhas: 18,
-      maxLinhas: 2,
-      cor: BRANCO,
-    })
+    if (exibirCliente) {
+      escreverBloco({
+        pagina,
+        texto: cliente,
+        fonte: params.fontes.texto,
+        tamanho: 14,
+        x: 20,
+        y: Math.min(286, depoisMarca - 10),
+        largura: 475,
+        entrelinhas: 18,
+        maxLinhas: 2,
+        cor: BRANCO,
+      })
+    }
   }
 }
 
@@ -492,12 +496,9 @@ async function adicionarPropostaComercial(params: {
   resumo: ResumoFinanceiroDaProposta
 }) {
   const pagina = await novaPaginaDeValor(params.pdf, params.fundo)
+  const marca = nomePrincipalDaProposta(params.marcaNome, params.clienteNome)
   const anunciante = params.clienteNome.trim()
-  const marca = params.marcaNome?.trim() || null
-  const exibirMarca = Boolean(
-    marca
-    && marca.localeCompare(anunciante, 'pt-BR', { sensitivity: 'base' }) !== 0,
-  )
+  const exibirCliente = deveExibirClienteComMarca(params.marcaNome, params.clienteNome)
   const textoAcao = descreverAcaoDaProposta({
     programaNome: params.programaNome,
     modalidade: params.modalidade,
@@ -510,35 +511,35 @@ async function adicionarPropostaComercial(params: {
     incluirRedesSociais: params.resumo.incluir_redes_sociais,
   })
 
-  // Coluna esquerda: anunciante oficial + marca comercial, quando forem distintos.
-  // Produto continua salvo no snapshot da proposta, mas não é impresso.
-  rotulo(pagina, params.fontes.textoNegrito, 'Anunciante', X_ESQUERDA, 438)
+  // Marca é o identificador comercial principal. O anunciante oficial só é
+  // repetido quando acrescenta informação, evitando redundância no slide.
+  rotulo(pagina, params.fontes.textoNegrito, 'Marca', X_ESQUERDA, 438)
   escreverBloco({
     pagina,
-    texto: anunciante,
-    fonte: exibirMarca ? params.fontes.textoNegrito : params.fontes.tituloNegrito,
-    tamanho: exibirMarca ? 13.8 : 21,
+    texto: marca,
+    fonte: params.fontes.tituloNegrito,
+    tamanho: 21,
     x: X_ESQUERDA,
     y: 416,
     largura: LARGURA_ESQUERDA,
-    entrelinhas: exibirMarca ? 17 : 24,
+    entrelinhas: 24,
     maxLinhas: 2,
     cor: ROSA,
   })
 
   let yConteudo = 348
 
-  if (exibirMarca && marca) {
-    rotulo(pagina, params.fontes.textoNegrito, 'Marca', X_ESQUERDA, 382)
+  if (exibirCliente) {
+    rotulo(pagina, params.fontes.textoNegrito, 'Anunciante', X_ESQUERDA, 382)
     escreverBloco({
       pagina,
-      texto: marca,
-      fonte: params.fontes.tituloNegrito,
-      tamanho: 21,
+      texto: anunciante,
+      fonte: params.fontes.textoNegrito,
+      tamanho: 13.8,
       x: X_ESQUERDA,
       y: 358,
       largura: LARGURA_ESQUERDA,
-      entrelinhas: 24,
+      entrelinhas: 17,
       maxLinhas: 2,
       cor: ROSA,
     })
@@ -559,7 +560,7 @@ async function adicionarPropostaComercial(params: {
     cor: ROSA,
   })
 
-  const limiteObjetivo = exibirMarca ? 194 : 244
+  const limiteObjetivo = exibirCliente ? 194 : 244
   const yObjetivo = Math.min(limiteObjetivo, depoisConteudo - 18)
   rotulo(pagina, params.fontes.textoNegrito, 'Objetivo', X_ESQUERDA, yObjetivo)
   escreverBloco({
@@ -666,7 +667,7 @@ export async function gerarPdfDaProposta(params: {
     }
   }
 
-  pdf.setTitle(`Proposta - ${params.marcaNome ?? params.clienteNome} - ${params.programaNome}`)
+  pdf.setTitle(`Proposta - ${nomePrincipalDaProposta(params.marcaNome, params.clienteNome)} - ${params.programaNome}`)
   pdf.setSubject(params.modoTeste ? 'Prévia do modelo de proposta' : 'Proposta comercial')
   pdf.setCreator('Chatbot 2.0')
 
