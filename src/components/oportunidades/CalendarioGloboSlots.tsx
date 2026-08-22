@@ -26,8 +26,26 @@ function slotVisual(livres: number) {
   if (livres === 1) return { bg: '#ffe9e2', fg: '#c23a20', borda: '#ff5a3c', texto: '1 slot' }
   return { bg: '#fff', fg: '#14161a', borda: '#14161a', texto: `${livres} slots` }
 }
-function mesmaData(iso: string, ano: number, mes: number, dia: number) {
-  return iso === `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+function isoDoDia(ano: number, mes: number, dia: number) {
+  return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+function inicioDe(evento: OportunidadePublicada) {
+  return evento.tipoExibicao === 'periodo' ? evento.dataInicio ?? evento.dataISO : evento.dataISO
+}
+function fimDe(evento: OportunidadePublicada) {
+  return evento.tipoExibicao === 'periodo' ? evento.dataFim ?? evento.dataISO : evento.dataISO
+}
+function ocorreEm(evento: OportunidadePublicada, data: string) {
+  return data >= inicioDe(evento) && data <= fimDe(evento)
+}
+function dataPtCurta(iso: string) {
+  const [, mes, dia] = iso.split('-').map(Number)
+  return `${String(dia).padStart(2, '0')} ${MESES[mes - 1].slice(0, 3).toUpperCase()}`
+}
+function rotuloExibicao(evento: OportunidadePublicada) {
+  return evento.tipoExibicao === 'periodo'
+    ? `${dataPtCurta(inicioDe(evento))} – ${dataPtCurta(fimDe(evento))}`
+    : dataPtCurta(evento.dataISO)
 }
 
 export function CalendarioGloboSlots({ oportunidades }: { oportunidades: OportunidadePublicada[] }) {
@@ -41,11 +59,12 @@ export function CalendarioGloboSlots({ oportunidades }: { oportunidades: Oportun
   const mes = mesAtual.getMonth()
   const totalDias = new Date(ano, mes + 1, 0).getDate()
   const primeiroDia = new Date(ano, mes, 1).getDay()
-  const eventosDoMes = useMemo(() => oportunidades.filter((evento) => {
-    const [a, m] = evento.dataISO.split('-').map(Number)
-    return a === ano && m === mes + 1
-  }), [oportunidades, ano, mes])
-  const agenda = eventosDoMes.filter((evento) => mesmaData(evento.dataISO, ano, mes, diaSelecionado))
+  const inicioMes = isoDoDia(ano, mes, 1)
+  const fimMes = isoDoDia(ano, mes, totalDias)
+
+  const eventosDoMes = useMemo(() => oportunidades.filter((evento) => inicioDe(evento) <= fimMes && fimDe(evento) >= inicioMes), [oportunidades, inicioMes, fimMes])
+  const dataSelecionada = isoDoDia(ano, mes, Math.min(diaSelecionado, totalDias))
+  const agenda = eventosDoMes.filter((evento) => ocorreEm(evento, dataSelecionada))
 
   function trocarMes(delta: number) {
     setMesAtual(new Date(ano, mes + delta, 1))
@@ -71,7 +90,7 @@ export function CalendarioGloboSlots({ oportunidades }: { oportunidades: Oportun
           <div><h2 className="vitrine-pop text-[18px] font-bold">Agenda do mês</h2><p className="mt-1 text-[12px] font-semibold text-[#9aa0a8]">{eventosDoMes.length} oportunidades publicadas</p></div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {eventosDoMes.length === 0 && <p className="col-span-full py-10 text-center text-[13px] text-[#9aa0a8]">Nenhuma oportunidade ativa neste mês.</p>}
-            {[...eventosDoMes].sort((a, b) => a.dataISO.localeCompare(b.dataISO)).map((evento) => <AgendaItem key={evento.id} evento={evento} aoAbrir={() => router.push(`/oportunidades?evento=${evento.id}`)} />)}
+            {[...eventosDoMes].sort((a, b) => inicioDe(a).localeCompare(inicioDe(b))).map((evento) => <AgendaItem key={evento.id} evento={evento} aoAbrir={() => router.push(`/oportunidades?evento=${evento.id}`)} />)}
           </div>
         </section>
       ) : (
@@ -81,7 +100,8 @@ export function CalendarioGloboSlots({ oportunidades }: { oportunidades: Oportun
             <div className="grid grid-cols-7 gap-2">
               {celulas.map((dia, indice) => {
                 if (dia === null) return <div key={`v-${indice}`} className="aspect-square" />
-                const doDia = eventosDoMes.filter((evento) => mesmaData(evento.dataISO, ano, mes, dia))
+                const data = isoDoDia(ano, mes, dia)
+                const doDia = eventosDoMes.filter((evento) => ocorreEm(evento, data))
                 const selecionado = dia === diaSelecionado
                 return <button type="button" key={dia} onClick={() => setDiaSelecionado(dia)} className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-[12px] border-[1.5px] transition-transform active:scale-95" style={{ borderColor: selecionado ? '#14161a' : doDia.length ? '#eceef1' : '#f3f4f6', background: selecionado ? '#14161a' : '#fff' }}><span className="vitrine-pop text-[14px] font-bold" style={{ color: selecionado ? '#fff' : doDia.length ? '#14161a' : '#c1c5cc' }}>{dia}</span><span className="flex h-1.5 gap-[3px]">{doDia.slice(0, 3).map((evento) => <i key={evento.id} className="h-1.5 w-1.5 rounded-full" style={{ background: temaPara(evento.programaId).cor }} />)}</span></button>
               })}
@@ -95,10 +115,9 @@ export function CalendarioGloboSlots({ oportunidades }: { oportunidades: Oportun
 }
 
 function AgendaItem({ evento, aoAbrir }: { evento: OportunidadePublicada; aoAbrir: () => void }) {
-  const slot = slotVisual(evento.slotsLivres)
   const tema = temaPara(evento.programaId)
-  const [, mes, dia] = evento.dataISO.split('-').map(Number)
-  return <button type="button" onClick={aoAbrir} className="vitrine-card flex items-center gap-3 rounded-[16px] bg-white p-[11px] text-left shadow-[0_5px_18px_-14px_rgba(20,22,26,.4)]"><span className="h-[58px] w-[58px] shrink-0 rounded-[12px] bg-cover bg-center" style={{ background: evento.imagem ? undefined : tema.gradiente, backgroundImage: evento.imagem ? `url(${evento.imagem})` : undefined }} /><span className="min-w-0 flex-1"><span className="vitrine-pop block text-[14px] font-bold leading-[1.2]">{evento.titulo}</span><span className="mt-1 block text-[12px] font-semibold text-[#9aa0a8]">{String(dia).padStart(2, '0')} {MESES[mes - 1].slice(0, 3).toUpperCase()} · {evento.programaNome} · {evento.categoriaNome}</span></span><span className="vitrine-pop rounded-[9px] border-[1.5px] px-[9px] py-[5px] text-[10.5px] font-bold" style={{ background: slot.bg, color: slot.fg, borderColor: slot.borda }}>{slot.texto}</span></button>
+  const slot = slotVisual(evento.slotsLivres)
+  return <button type="button" onClick={aoAbrir} className="vitrine-card flex items-center gap-3 rounded-[16px] bg-white p-[11px] text-left shadow-[0_5px_18px_-14px_rgba(20,22,26,.4)]"><span className="h-[58px] w-[58px] shrink-0 rounded-[12px] bg-cover bg-center" style={{ background: evento.imagem ? undefined : tema.gradiente, backgroundImage: evento.imagem ? `url(${evento.imagem})` : undefined }} /><span className="min-w-0 flex-1"><span className="vitrine-pop block text-[14px] font-bold leading-[1.2]">{evento.titulo}</span><span className="mt-1 block text-[12px] font-semibold text-[#9aa0a8]">{rotuloExibicao(evento)} · {evento.programaNome} · {evento.formatoNome}</span></span>{evento.inventarioAplicavel ? <span className="vitrine-pop rounded-[9px] border-[1.5px] px-[9px] py-[5px] text-[10.5px] font-bold" style={{ background: slot.bg, color: slot.fg, borderColor: slot.borda }}>{slot.texto}</span> : <span className="vitrine-pop rounded-[9px] border border-[#d7dae0] bg-[#f7f8fa] px-[9px] py-[5px] text-[10.5px] font-bold text-[#5a606a]">período</span>}</button>
 }
 function tituloDia(ano: number, mes: number, dia: number) {
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(ano, mes, dia)).replace('.', '')
