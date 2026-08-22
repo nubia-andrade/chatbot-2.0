@@ -1,85 +1,143 @@
 @import "tailwindcss";
 
 :root {
-  --marca: linear-gradient(135deg, #FF2D55 0%, #A031F5 52%, #2D6BFF 100%);
+  /* Design system Globo Slots — derivado do handoff Hi-Fi de Oportunidades. */
+  --marca: #14161A;
   --tile-a: linear-gradient(160deg, #FFD23F, #FF5E3A);
   --tile-b: linear-gradient(160deg, #12D8FA, #2D6BFF);
   --tile-c: linear-gradient(160deg, #F857A6, #7A2FF2);
 
-  --roxo: #7A2FF2;
-  --roxo-hover: #5E22C4;
-  --texto: #1A1626;
-  --texto-2: #6B6577;
-  --texto-3: #8A8497;
-  --placeholder: #B4AEC0;
+  --roxo: #14161A;
+  --roxo-hover: #000000;
+  --texto: #14161A;
+  --texto-2: #5A606A;
+  --texto-3: #8A909A;
+  --placeholder: #9AA0A8;
 
-  --canvas: #E7E5EE;
+  --canvas: #ECEEF1;
   --superficie: #FFFFFF;
-  --superficie-suave: #FAF9FC;
-  --borda: #ECEAF1;
-  --borda-forte: #E2DFEA;
+  --superficie-suave: #F7F8F9;
+  --borda: #ECEEF1;
+  --borda-forte: #D7DAE0;
 
   --disponivel: #16A34A;
   --disponivel-fundo: #EAF7EF;
+  --disponivel-texto: #166534;
   --concorrencia: #E11D48;
   --concorrencia-fundo: #FDECEF;
+  --concorrencia-texto: #BE123C;
   --prazo: #F59E0B;
   --prazo-fundo: #FEF4E6;
-  /*
-   * Âmbar escuro para TEXTO sobre `--prazo-fundo` — `--prazo` (#F59E0B) em
-   * cima de `--prazo-fundo` (#FEF4E6) dá contraste ≈1,97:1, abaixo do
-   * mínimo de 4,5:1 (achado Important da revisão da Task 10, no aviso
-   * "cliente sem setor/indústria" de `/consulta/setor`). `--prazo-texto`
-   * (#92400E) sobre `--prazo-fundo` dá ≈6,52:1 — calculado pela fórmula do
-   * WCAG 2.1 (luminância relativa de cada cor, depois
-   * (L-clara + 0,05) / (L-escura + 0,05)). Só para texto; `--prazo` continua
-   * valendo para preenchimento/borda, que não têm a mesma exigência.
-   */
   --prazo-texto: #92400E;
   --reservado: #64748B;
   --reservado-fundo: #EEF1F5;
   --esgotado: #1E1B2E;
   --esgotado-fundo: #E9E7EE;
-  /*
-   * Task 12 (calendário de disponibilidade) precisou do mesmo tratamento do
-   * `--prazo-texto` acima para outros dois estados. `--disponivel` (#16A34A)
-   * como TEXTO sobre branco dá ≈3,30:1 e sobre `--disponivel-fundo` dá
-   * ≈2,99:1; `--concorrencia` (#E11D48) sobre `--concorrencia-fundo` dá
-   * ≈4,12:1 — os três abaixo do mínimo de 4,5:1. `--disponivel-texto`
-   * (#166534, verde-800) dá ≈7,13:1 sobre branco e ≈6,47:1 sobre
-   * `--disponivel-fundo`; `--concorrencia-texto` (#BE123C, rose-700) dá
-   * ≈6,29:1 sobre branco e ≈5,51:1 sobre `--concorrencia-fundo`. Cálculo pela
-   * fórmula do WCAG 2.1, mesma do comentário de `--prazo-texto`. `--esgotado`
-   * (#1E1B2E) já é escuro o bastante para servir de texto sem variante própria
-   * (≈16,78:1 sobre branco, ≈13,69:1 sobre `--esgotado-fundo`) — cobre tanto
-   * "bloqueado" quanto "esgotado", que compartilham a mesma cor no handoff.
-   */
-  --disponivel-texto: #166534;
-  --concorrencia-texto: #BE123C;
 
-  --raio-janela: 16px;
-  --raio-card: 12px;
-  --raio-campo: 11px;
-  --sombra-janela: 0 18px 50px rgba(60, 30, 110, .14);
-  --sombra-botao: 0 12px 26px rgba(122, 47, 242, .3);
+  --raio-janela: 20px;
+  --raio-card: 16px;
+  --raio-campo: 12px;
+  --sombra-janela: 0 18px 44px -24px rgba(20, 22, 26, .28);
+  --sombra-botao: 0 14px 28px -18px rgba(20, 22, 26, .55);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
+  margin: 0;
   background: var(--canvas);
   color: var(--texto);
   font-family: var(--fonte-corpo), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #ffd9cf;
 }
 
 .vitrine-pop {
-  font-family: var(--fonte-vitrine-titulo), var(--fonte-corpo), system-ui, sans-serif;
+  font-family: var(--fonte-titulo), var(--fonte-corpo), system-ui, sans-serif;
 }
 
-/* Flutuação suave dos tiles decorativos da tela de login (handoff #t1). */
+.vitrine-navlink {
+  position: relative;
+  padding: 6px 2px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+  transition: color .15s ease;
+}
+
+.vitrine-navlink:hover,
+.vitrine-navlink.on {
+  color: #14161a;
+}
+
+.vitrine-navlink.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 3px;
+  border-radius: 999px;
+  background: #14161a;
+}
+
+.vitrine-card {
+  transition: transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s ease;
+}
+
+.vitrine-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 22px 40px -18px rgba(20,22,26,.35);
+}
+
+.vitrine-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #d7dae0;
+  border-radius: 999px;
+  background: #fff;
+  padding: 7px 15px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color .15s ease, color .15s ease, transform .1s ease;
+}
+
+.vitrine-chip:hover {
+  border-color: #14161a;
+  color: #14161a;
+}
+
+.vitrine-chip:active {
+  transform: scale(.96);
+}
+
+.vitrine-input {
+  width: 100%;
+  border: 1.5px solid #d7dae0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+  color: #14161a;
+  font-family: var(--fonte-corpo), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.vitrine-input:focus {
+  border-color: #14161a;
+  box-shadow: 0 0 0 3px rgba(20,22,26,.08);
+}
+
 @keyframes floaty {
-  0%, 100% {
-    transform: translateY(0) rotate(var(--r, 0deg));
-  }
-  50% {
-    transform: translateY(-14px) rotate(var(--r, 0deg));
-  }
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-14px) rotate(var(--r, 0deg)); }
 }
