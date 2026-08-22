@@ -262,23 +262,23 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
   }
 
   return (
-    <div className="relative mx-auto max-w-[1180px] px-5 pb-[70px] pt-[34px] sm:px-7">
-      <div className="vitrine-pop pointer-events-none absolute right-[14px] top-[6px] hidden select-none text-[150px] font-extrabold leading-[.8] tracking-[-6px] text-[rgba(20,22,26,.035)] lg:block">2026</div>
-      <section className="relative">
-        <p className="text-[13px] font-semibold uppercase tracking-[2px] text-[#ff5a3c]">Oportunidades de ação</p>
-        <h1 className="vitrine-pop mt-2 text-[38px] font-extrabold leading-[1.02] tracking-[-1.5px] sm:text-[44px]">Descubra onde sua<br />marca pode entrar</h1>
-        <p className="mt-3 max-w-[560px] text-[15px] leading-[1.5] text-[#6b7280]">Ações comemorativas, sazonais e participações de talentos dos programas Globo. Veja os slots livres e transforme uma oportunidade em consulta.</p>
+    <div className="relative mx-auto max-w-[1180px] px-5 pb-[56px] pt-[20px] sm:px-7 sm:pt-[22px]">
+      <div className="vitrine-pop pointer-events-none absolute right-[14px] top-0 hidden select-none text-[124px] font-extrabold leading-[.8] tracking-[-5px] text-[rgba(20,22,26,.032)] lg:block">2026</div>
+      <section className="relative max-w-[680px]">
+        <p className="text-[11px] font-bold uppercase tracking-[1.8px] text-[#ff5a3c]">Oportunidades de ação</p>
+        <h1 className="vitrine-pop mt-1.5 text-[31px] font-extrabold leading-[1.03] tracking-[-1.2px] sm:text-[36px]">Descubra onde sua<br />marca pode entrar</h1>
+        <p className="mt-2 max-w-[620px] text-[13.5px] leading-[1.45] text-[#6b7280]">Ações comemorativas, sazonais e participações de talentos dos programas Globo. Veja os slots livres e transforme uma oportunidade em consulta.</p>
       </section>
 
-      <div className="relative mb-[22px] mt-7 flex flex-wrap items-center gap-[9px]">
+      <div className="relative mb-[18px] mt-5 flex flex-wrap items-center gap-[8px]">
         <Filtro ativo={filtro === 'todas'} onClick={() => setFiltro('todas')}>Todas</Filtro>
         <Filtro ativo={filtro === 'datas'} onClick={() => setFiltro('datas')}>Datas comemorativas</Filtro>
         <Filtro ativo={filtro === 'talentos'} onClick={() => setFiltro('talentos')}>Talentos</Filtro>
         <Filtro ativo={filtro === 'sazonais'} onClick={() => setFiltro('sazonais')}>Sazonais</Filtro>
-        <span className="ml-auto text-[13px] font-semibold text-[#6b7280]">ordenar: mais slots ▾</span>
+        <span className="ml-auto text-[12px] font-semibold text-[#6b7280]">ordenar: mais slots ▾</span>
       </div>
 
-      <div className="relative grid grid-cols-1 gap-[22px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="relative grid grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtradas.map((oportunidade) => (
           <Card key={oportunidade.id} oportunidade={oportunidade} curtida={Boolean(curtidas[oportunidade.id])} aoAbrir={() => abrir(oportunidade)} aoCurtir={() => alternarCurtida(oportunidade.id)} />
         ))}
@@ -289,14 +289,14 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
 
 function Card({ oportunidade, curtida, aoAbrir, aoCurtir, preview = false }: { oportunidade: Oportunidade; curtida: boolean; aoAbrir: () => void; aoCurtir: () => void; preview?: boolean }) {
   return (
-    <article onClick={preview ? undefined : aoAbrir} className={`${preview ? '' : 'vitrine-card cursor-pointer'} overflow-hidden rounded-[20px] bg-white shadow-[0_6px_20px_-12px_rgba(20,22,26,.3)]`}>
+    <article onClick={preview ? undefined : aoAbrir} className={`${preview ? '' : 'vitrine-card cursor-pointer'} overflow-hidden rounded-[16px] bg-white shadow-[0_6px_18px_-13px_rgba(20,22,26,.28)]`}>
       <Imagem oportunidade={oportunidade} />
-      <div className="p-[14px] pb-[15px]">
-        <h2 className="vitrine-pop text-[15px] font-bold leading-[1.2] tracking-[-.3px]">{oportunidade.titulo}</h2>
-        <p className="mt-[5px] text-[12.5px] font-medium text-[#9aa0a8]">{oportunidade.slotsLivres} de {oportunidade.slotsTotal} {oportunidade.slotsTotal === 1 ? 'livre' : 'livres'}</p>
-        <div className="mt-[13px] flex items-center gap-2">
-          <button type="button" onClick={(e) => { e.stopPropagation(); if (!preview) aoCurtir() }} className="rounded-full border-[1.5px] px-3 py-1.5 text-[12.5px] font-bold" style={{ borderColor: curtida ? '#14161a' : '#d7dae0', background: curtida ? '#14161a' : '#fff', color: curtida ? '#fff' : '#14161a' }}>♥ {oportunidade.likes + (curtida ? 1 : 0)}</button>
-          <span className="ml-auto text-[12px] font-semibold text-[#c1c5cc]">{oportunidade.tag}</span>
+      <div className="p-[12px] pb-[13px]">
+        <h2 className="vitrine-pop text-[14px] font-bold leading-[1.18] tracking-[-.25px]">{oportunidade.titulo}</h2>
+        <p className="mt-[4px] text-[11.5px] font-medium text-[#9aa0a8]">{oportunidade.slotsLivres} de {oportunidade.slotsTotal} {oportunidade.slotsTotal === 1 ? 'livre' : 'livres'}</p>
+        <div className="mt-[9px] flex items-center gap-2">
+          <button type="button" onClick={(e) => { e.stopPropagation(); if (!preview) aoCurtir() }} className="rounded-full border-[1.5px] px-[10px] py-[5px] text-[11.5px] font-bold" style={{ borderColor: curtida ? '#14161a' : '#d7dae0', background: curtida ? '#14161a' : '#fff', color: curtida ? '#fff' : '#14161a' }}>♥ {oportunidade.likes + (curtida ? 1 : 0)}</button>
+          <span className="ml-auto text-[11.5px] font-semibold text-[#b7bcc4]">{oportunidade.tag}</span>
         </div>
       </div>
     </article>
@@ -306,16 +306,16 @@ function Card({ oportunidade, curtida, aoAbrir, aoCurtir, preview = false }: { o
 function Imagem({ oportunidade, detalhe = false }: { oportunidade: Oportunidade; detalhe?: boolean }) {
   const slot = slotVisual(oportunidade.slotsLivres)
   return (
-    <div className={`relative overflow-hidden bg-cover bg-center ${detalhe ? 'aspect-[3/4] rounded-[22px] shadow-[0_26px_50px_-24px_rgba(20,22,26,.5)]' : 'aspect-[3/4]'}`} style={{ background: oportunidade.imagem ? undefined : oportunidade.gradiente, backgroundImage: oportunidade.imagem ? `url(${oportunidade.imagem})` : undefined }}>
-      {!oportunidade.imagem && <div className="absolute inset-0 flex items-center justify-center font-mono text-[11px] text-white/70">imagem do programa</div>}
-      <div className="vitrine-pop absolute left-[11px] top-[11px] flex items-center gap-1.5 rounded-[9px] bg-[rgba(20,22,26,.55)] px-[9px] py-[5px] text-[11px] font-bold text-white backdrop-blur-sm"><span className="h-[7px] w-[7px] rounded-full" style={{ background: oportunidade.cor }} />{dataCurta(oportunidade.dataISO)} · {oportunidade.programaNome}</div>
-      {!detalhe && <div className="vitrine-pop absolute bottom-[11px] right-[11px] rounded-[9px] border-[1.5px] px-[9px] py-[5px] text-[10.5px] font-bold" style={{ background: slot.bg, color: slot.fg, borderColor: slot.borda }}>{slot.texto}</div>}
+    <div className={`relative overflow-hidden bg-cover bg-center ${detalhe ? 'aspect-[3/4] rounded-[22px] shadow-[0_26px_50px_-24px_rgba(20,22,26,.5)]' : 'aspect-[6/5]'}`} style={{ background: oportunidade.imagem ? undefined : oportunidade.gradiente, backgroundImage: oportunidade.imagem ? `url(${oportunidade.imagem})` : undefined }}>
+      {!oportunidade.imagem && <div className="absolute inset-0 flex items-center justify-center font-mono text-[10px] text-white/70">imagem do programa</div>}
+      <div className="vitrine-pop absolute left-[9px] top-[9px] flex items-center gap-1.5 rounded-[8px] bg-[rgba(20,22,26,.55)] px-[8px] py-[4px] text-[10px] font-bold text-white backdrop-blur-sm"><span className="h-[6px] w-[6px] rounded-full" style={{ background: oportunidade.cor }} />{dataCurta(oportunidade.dataISO)} · {oportunidade.programaNome}</div>
+      {!detalhe && <div className="vitrine-pop absolute bottom-[9px] right-[9px] rounded-[8px] border-[1.5px] px-[8px] py-[4px] text-[10px] font-bold" style={{ background: slot.bg, color: slot.fg, borderColor: slot.borda }}>{slot.texto}</div>}
     </div>
   )
 }
 
 function Filtro({ ativo, children, onClick }: { ativo: boolean; children: React.ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`rounded-full border-[1.5px] px-[15px] py-[7px] text-[13px] font-semibold ${ativo ? 'border-[#14161a] bg-[#14161a] text-white' : 'border-[#d7dae0] bg-white text-[#6b7280] hover:border-[#14161a] hover:text-[#14161a]'}`}>{children}</button>
+  return <button type="button" onClick={onClick} className={`rounded-full border-[1.5px] px-[14px] py-[6px] text-[12px] font-semibold ${ativo ? 'border-[#14161a] bg-[#14161a] text-white' : 'border-[#d7dae0] bg-white text-[#6b7280] hover:border-[#14161a] hover:text-[#14161a]'}`}>{children}</button>
 }
 
 function Campo({ titulo, apoio, children }: { titulo: string; apoio?: string; children: React.ReactNode }) {
