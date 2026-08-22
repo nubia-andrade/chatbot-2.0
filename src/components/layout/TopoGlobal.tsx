@@ -61,11 +61,11 @@ export function TopoGlobal({ nome, perfis, secoes }: Props) {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[rgba(20,22,26,.07)] bg-[rgba(236,238,241,.88)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-7 gap-y-2 px-5 py-3 sm:px-7">
+    <header className="sticky top-0 z-50 border-b border-[rgba(20,22,26,.07)] bg-[rgba(236,238,241,.92)] backdrop-blur-xl">
+      <div className="mx-auto flex min-h-[58px] max-w-[1440px] flex-wrap items-center gap-x-5 px-5 sm:px-7 lg:flex-nowrap">
         <MarcaGloboSlots compacta />
 
-        <nav className="order-3 flex w-full gap-5 overflow-x-auto pb-1 sm:order-none sm:w-auto sm:flex-1 sm:gap-6 sm:pb-0" aria-label="Navegação principal">
+        <nav className="vitrine-nav-scroll order-3 flex w-full min-w-0 gap-5 overflow-x-auto lg:order-none lg:w-auto lg:flex-1 lg:overflow-visible xl:gap-6" aria-label="Navegação principal">
           {itens.map((item) => {
             const selecionado = ativo(item.href)
             return (
@@ -80,11 +80,11 @@ export function TopoGlobal({ nome, perfis, secoes }: Props) {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2.5 sm:gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2.5">
           {podePublicar && (
             <Link
               href="/oportunidades/postar"
-              className="vitrine-pop hidden rounded-full bg-[#14161a] px-[17px] py-[10px] text-[13px] font-bold text-white transition-transform active:scale-95 md:inline-flex"
+              className="vitrine-pop hidden rounded-full bg-[#14161a] px-[15px] py-[9px] text-[12px] font-bold text-white transition-transform active:scale-95 md:inline-flex"
             >
               + Publicar oportunidade
             </Link>
@@ -96,13 +96,13 @@ export function TopoGlobal({ nome, perfis, secoes }: Props) {
               onClick={() => setMenuAberto((valor) => !valor)}
               aria-expanded={menuAberto}
               aria-label="Abrir menu da conta"
-              className="vitrine-pop flex h-[38px] w-[38px] items-center justify-center rounded-full bg-gradient-to-br from-[#7c3aed] to-[#1e90ff] text-[12px] font-bold text-white transition-transform active:scale-95"
+              className="vitrine-pop flex h-[36px] w-[36px] items-center justify-center rounded-full bg-gradient-to-br from-[#7c3aed] to-[#1e90ff] text-[11.5px] font-bold text-white transition-transform active:scale-95"
             >
               {iniciais(nome)}
             </button>
 
             {menuAberto && (
-              <div className="absolute right-0 top-[48px] w-[250px] overflow-hidden rounded-[16px] border border-[#e4e6ea] bg-white shadow-[0_22px_50px_-20px_rgba(20,22,26,.35)]">
+              <div className="absolute right-0 top-[46px] w-[250px] overflow-hidden rounded-[16px] border border-[#e4e6ea] bg-white shadow-[0_22px_50px_-20px_rgba(20,22,26,.35)]">
                 <div className="border-b border-[#eceef1] px-4 py-3.5">
                   <p className="truncate text-[13px] font-bold text-[#14161a]">{nome}</p>
                   <p className="mt-0.5 truncate text-[10.5px] font-semibold text-[#9aa0a8]">
