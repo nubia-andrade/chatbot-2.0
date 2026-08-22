@@ -33,6 +33,12 @@ const GRUPOS: Grupo[] = [
         somenteProprietario: true,
       },
       {
+        href: '/configuracoes/formatos-oportunidades',
+        titulo: 'Formatos de oportunidades',
+        descricao: 'Lista comercial de formatos de ação disponível no cadastro das oportunidades.',
+        somenteProprietario: true,
+      },
+      {
         href: '/configuracoes/marcas',
         titulo: 'Marcas e anunciantes',
         descricao: 'Vínculos, cadastros manuais e pendências entre marcas e anunciantes oficiais.',
