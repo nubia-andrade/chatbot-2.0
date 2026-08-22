@@ -1,73 +1,28 @@
-/**
- * O lado colorido da tela de login (52% da largura no desktop).
- *
- * Só apresentação — sem estado nem interação. Reproduz a seção #1a do
- * handoff: gradiente de marca, três tiles flutuantes e a promessa do
- * produto em três passos.
- */
+import { MarcaGloboSlots } from '@/components/layout/MarcaGloboSlots'
+
+/** Apresentação da marca Globo Slots no login. */
 export function PainelApresentacao() {
   return (
-    <div
-      className="relative flex min-h-[280px] flex-col justify-between gap-10 overflow-hidden p-8 sm:p-12 lg:min-h-[640px]"
-      style={{ background: 'var(--marca)' }}
-    >
-      {/*
-        A inclinação de cada tile viaja pela custom property `--r`, lida pelo
-        keyframe `floaty` (ver globals.css). `transform` é a propriedade
-        animada — se a rotação fosse fixada ali por fora, a animação a
-        sobrescreveria a cada quadro e todos os tiles cairiam para 0deg.
-      */}
-      <div
-        aria-hidden
-        className="absolute -right-6 top-14 h-[120px] w-[120px] rounded-[28px]"
-        style={{
-          background: 'var(--tile-a)',
-          animation: 'floaty 7s ease-in-out infinite',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, .22)',
-          ['--r' as string]: '9deg',
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute right-24 top-[230px] h-[120px] w-[120px] rounded-[28px]"
-        style={{
-          background: 'var(--tile-b)',
-          animation: 'floaty 8s ease-in-out .6s infinite',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, .22)',
-          ['--r' as string]: '-7deg',
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute right-2 top-[380px] h-[120px] w-[120px] rounded-[28px]"
-        style={{
-          background: 'var(--tile-c)',
-          animation: 'floaty 6.4s ease-in-out .3s infinite',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, .22)',
-          ['--r' as string]: '6deg',
-        }}
-      />
+    <div className="relative flex min-h-[300px] flex-col justify-between overflow-hidden bg-[#14161a] p-8 sm:p-12 lg:min-h-[640px]">
+      <div className="vitrine-pop pointer-events-none absolute -right-5 top-14 select-none text-[160px] font-extrabold leading-none tracking-[-8px] text-white/[.035]">2026</div>
+      <div className="pointer-events-none absolute -bottom-20 -right-16 h-[340px] w-[340px] rounded-full bg-[radial-gradient(circle,rgba(255,90,60,.34),rgba(124,58,237,.12)_45%,transparent_70%)]" />
 
-      <div
-        className="relative z-10 text-[18px] font-extrabold tracking-[.5px] text-white"
-        style={{ fontFamily: 'var(--fonte-titulo)' }}
-      >
-        chatbot <span className="opacity-70">2.0</span>
+      <div className="relative z-10">
+        <MarcaGloboSlots inversa href="/login" />
       </div>
 
-      <div className="relative z-10 max-w-[400px]">
-        <h1
-          className="text-[32px] font-extrabold leading-[1.08] tracking-[-1px] text-white sm:text-[44px]"
-          style={{ fontFamily: 'var(--fonte-titulo)' }}
-        >
-          Posso vender?
-          <br />
-          Quando? Quanto?
+      <div className="relative z-10 max-w-[430px]">
+        <p className="mb-3 text-[12px] font-bold uppercase tracking-[2px] text-[#ff795f]">Oportunidades comerciais Globo</p>
+        <h1 className="vitrine-pop text-[34px] font-extrabold leading-[1.04] tracking-[-1.4px] text-white sm:text-[46px]">
+          Descubra onde sua marca pode entrar.
         </h1>
+        <p className="mt-5 max-w-[370px] text-[14px] leading-[1.6] text-white/60">
+          Encontre oportunidades, consulte slots disponíveis e transforme uma ação em proposta comercial.
+        </p>
       </div>
 
-      <p className="relative z-10 text-[12px] font-semibold text-white/75">
-        Disponibilidade → Proposta → PDF
+      <p className="relative z-10 text-[12px] font-semibold text-white/55">
+        Oportunidades → Disponibilidade → Proposta
       </p>
     </div>
   )
