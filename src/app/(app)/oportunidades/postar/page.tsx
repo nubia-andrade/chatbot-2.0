@@ -31,6 +31,8 @@ export default async function PaginaPostarOportunidade() {
       formatos={formatos}
       oportunidadesIniciais={[]}
       modoInicial="postar"
+      podeEditarTudo={proprietario}
+      programasEditaveis={sessao.programasVinculados}
     />
   )
 }
