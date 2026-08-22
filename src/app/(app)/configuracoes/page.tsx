@@ -27,6 +27,12 @@ const GRUPOS: Grupo[] = [
     descricao: 'Dados globais que afetam o aplicativo inteiro. Disponível somente para Proprietário.',
     secoes: [
       {
+        href: '/configuracoes/categorias-oportunidades',
+        titulo: 'Categorias de oportunidades',
+        descricao: 'Lista controlada usada para classificar publicações e filtros da área de Oportunidades.',
+        somenteProprietario: true,
+      },
+      {
         href: '/configuracoes/marcas',
         titulo: 'Marcas e anunciantes',
         descricao: 'Vínculos, cadastros manuais e pendências entre marcas e anunciantes oficiais.',
