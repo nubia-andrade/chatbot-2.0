@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { consultarInventarioDaOportunidade, publicarOportunidade } from '@/lib/acoes/oportunidades'
+import { consultarInventarioDaOportunidade, editarOportunidade, publicarOportunidade } from '@/lib/acoes/oportunidades'
 import type { InventarioDaOportunidade } from '@/lib/dados/inventario-oportunidades'
 import type {
   CategoriaDeOportunidade,
@@ -20,6 +20,8 @@ type Props = {
   formatos: FormatoDeOportunidade[]
   oportunidadesIniciais: OportunidadePublicada[]
   modoInicial?: 'feed' | 'postar'
+  podeEditarTudo?: boolean
+  programasEditaveis?: string[]
 }
 type Tela = 'feed' | 'detalhe' | 'postar'
 
@@ -66,13 +68,17 @@ function numeroDigitado(valor: string): number | null {
   const numero = Number(normalizado)
   return Number.isFinite(numero) && numero >= 0 ? numero : null
 }
+function valorParaCampo(valor: number | null) {
+  if (valor === null) return ''
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor)
+}
 function slotVisual(livres: number) {
   if (livres <= 0) return { bg: '#eef0f2', fg: '#8a909a', borda: '#dfe2e7', texto: 'esgotado' }
   if (livres === 1) return { bg: '#ffe9e2', fg: '#c23a20', borda: '#ff5a3c', texto: '1 slot' }
   return { bg: '#fff', fg: '#14161a', borda: '#14161a', texto: `${livres} slots` }
 }
 
-export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, formatos, oportunidadesIniciais, modoInicial = 'feed' }: Props) {
+export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, formatos, oportunidadesIniciais, modoInicial = 'feed', podeEditarTudo = false, programasEditaveis = [] }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const eventoNaUrl = searchParams.get('evento')
@@ -80,11 +86,12 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
   const [tela, setTela] = useState<Tela>(modoInicial)
   const [filtro, setFiltro] = useState<string>('todas')
   const [selecionada, setSelecionada] = useState<OportunidadePublicada | null>(null)
+  const [editando, setEditando] = useState<OportunidadePublicada | null>(null)
   const [curtidas, setCurtidas] = useState<Record<string, boolean>>({})
   const [arquivoImagem, setArquivoImagem] = useState<File | null>(null)
   const [inventario, setInventario] = useState<InventarioDaOportunidade>(inventarioVazio)
   const [consultandoInventario, setConsultandoInventario] = useState(false)
-  const [publicando, setPublicando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
   const [erroPublicacao, setErroPublicacao] = useState<string | null>(null)
   const [post, setPost] = useState({
     programaId: programas[0]?.id ?? '',
@@ -144,6 +151,32 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
   const categoriaDoPost = categorias.find((categoria) => categoria.id === post.categoriaId) ?? categorias[0]
   const formatoDoPost = formatos.find((formato) => formato.id === post.formatoId) ?? formatos[0]
 
+  function podeEditar(oportunidade: OportunidadePublicada) {
+    return podeEditarTudo || programasEditaveis.includes(oportunidade.programaId)
+  }
+
+  function preencherFormulario(oportunidade: OportunidadePublicada) {
+    setArquivoImagem(null)
+    setPost({
+      programaId: oportunidade.programaId,
+      categoriaId: oportunidade.categoriaId,
+      formatoId: oportunidade.formatoId ?? formatos[0]?.id ?? '',
+      tipoExibicao: oportunidade.tipoExibicao,
+      dataEvento: oportunidade.tipoExibicao === 'data_unica' ? oportunidade.dataISO : hoje,
+      dataInicio: oportunidade.dataInicio ?? oportunidade.dataISO ?? hoje,
+      dataFim: oportunidade.dataFim ?? oportunidade.dataInicio ?? oportunidade.dataISO ?? hoje,
+      expiraEm: oportunidade.expiraEm,
+      prazoEnvioPi: oportunidade.prazoEnvioPi ?? hoje,
+      valorAcao: valorParaCampo(oportunidade.valorAcao),
+      direitosConexos: valorParaCampo(oportunidade.direitosConexos),
+      custoProducaoTipo: oportunidade.custoProducaoTipo,
+      custoProducao: valorParaCampo(oportunidade.custoProducao),
+      titulo: oportunidade.titulo,
+      descricao: oportunidade.descricao,
+      imagem: oportunidade.imagem,
+    })
+  }
+
   function abrir(oportunidade: OportunidadePublicada) {
     setSelecionada(oportunidade)
     setTela('detalhe')
@@ -153,7 +186,25 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
   function voltarAoFeed() {
     setTela('feed')
     setSelecionada(null)
+    setEditando(null)
     window.history.replaceState(null, '', '/oportunidades')
+  }
+  function iniciarEdicao(oportunidade: OportunidadePublicada) {
+    if (!podeEditar(oportunidade)) return
+    preencherFormulario(oportunidade)
+    setEditando(oportunidade)
+    setSelecionada(oportunidade)
+    setTela('postar')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  function cancelarFormulario() {
+    if (editando) {
+      setTela('detalhe')
+      setSelecionada(editando)
+      setEditando(null)
+      return
+    }
+    router.push('/oportunidades')
   }
   function alternarCurtida(id: string) {
     setCurtidas((atual) => ({ ...atual, [id]: !atual[id] }))
@@ -167,8 +218,8 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
     leitor.readAsDataURL(arquivo)
   }
 
-  async function publicar() {
-    if (publicando) return
+  async function salvar() {
+    if (salvando) return
     setErroPublicacao(null)
     const temDatas = post.tipoExibicao === 'data_unica'
       ? Boolean(post.dataEvento)
@@ -177,7 +228,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
       setErroPublicacao('Preencha os campos obrigatórios da oportunidade.')
       return
     }
-    if (post.tipoExibicao === 'data_unica' && inventario.slotsLivres <= 0) {
+    if (!editando && post.tipoExibicao === 'data_unica' && inventario.slotsLivres <= 0) {
       setErroPublicacao('Esta data está sem slots livres. Escolha outra data.')
       return
     }
@@ -190,8 +241,9 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
       return
     }
 
-    setPublicando(true)
+    setSalvando(true)
     const formulario = new FormData()
+    if (editando) formulario.set('id', editando.id)
     formulario.set('programaId', post.programaId)
     formulario.set('categoriaId', post.categoriaId)
     formulario.set('formatoId', post.formatoId)
@@ -209,20 +261,21 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
     formulario.set('descricao', post.descricao.trim())
     if (arquivoImagem) formulario.set('imagem', arquivoImagem)
 
-    const resultado = await publicarOportunidade(formulario)
+    const resultado = editando ? await editarOportunidade(formulario) : await publicarOportunidade(formulario)
     if (!resultado.ok) {
-      setErroPublicacao(resultado.erro ?? 'Não foi possível publicar a oportunidade.')
-      setPublicando(false)
+      setErroPublicacao(resultado.erro ?? 'Não foi possível salvar a oportunidade.')
+      setSalvando(false)
       return
     }
-    router.push('/oportunidades')
+    setEditando(null)
+    router.push(`/oportunidades${resultado.id ? `?evento=${encodeURIComponent(resultado.id)}` : ''}`)
     router.refresh()
   }
 
   if (tela === 'postar') {
     const periodo = post.tipoExibicao === 'periodo'
     const preview: OportunidadePublicada = {
-      id: 'preview',
+      id: editando?.id ?? 'preview',
       programaId: programaDoPost?.id ?? '',
       programaNome: programaDoPost?.nome ?? 'Programa',
       categoriaId: categoriaDoPost?.id ?? '',
@@ -246,6 +299,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
       descricao: post.descricao || 'A descrição curta da oportunidade aparecerá aqui.',
       imagem: post.imagem,
       autor: nomeUsuario,
+      criadoPor: editando?.criadoPor ?? '',
       inventarioAplicavel: !periodo,
       slotsLivres: periodo ? 0 : inventario.slotsLivres,
       slotsTotal: periodo ? 0 : inventario.slotsTotal,
@@ -255,9 +309,9 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
 
     return (
       <div className="mx-auto max-w-[1040px] px-5 pb-[70px] pt-6 sm:px-7">
-        <button type="button" onClick={() => router.push('/oportunidades')} className="mb-4 text-[13px] font-semibold text-[#6b7280]">← Cancelar</button>
-        <h1 className="vitrine-pop text-[30px] font-extrabold tracking-[-1px]">Publicar oportunidade</h1>
-        <p className="mt-1 text-[13px] text-[#6b7280]">Cadastre a oportunidade com as informações que o time comercial precisa para avaliar e gerar uma consulta.</p>
+        <button type="button" onClick={cancelarFormulario} className="mb-4 text-[13px] font-semibold text-[#6b7280]">← {editando ? 'Cancelar edição' : 'Cancelar'}</button>
+        <h1 className="vitrine-pop text-[30px] font-extrabold tracking-[-1px]">{editando ? 'Editar oportunidade' : 'Publicar oportunidade'}</h1>
+        <p className="mt-1 text-[13px] text-[#6b7280]">{editando ? 'Atualize as informações do card sem recriar a oportunidade do zero.' : 'Cadastre a oportunidade com as informações que o time comercial precisa para avaliar e gerar uma consulta.'}</p>
 
         <div className="mt-6 grid items-start gap-8 lg:grid-cols-[1.5fr_.72fr]">
           <div className="flex flex-col gap-6">
@@ -347,14 +401,14 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
             <Bloco titulo="Conteúdo do card">
               <Campo titulo="Título / chamada"><input type="text" maxLength={160} value={post.titulo} onChange={(e) => setPost((a) => ({ ...a, titulo: e.target.value }))} placeholder="Ex.: São João especial no Encontro" className="vitrine-input" /></Campo>
               <Campo titulo="Sobre a oportunidade">
-                <textarea maxLength={300} rows={4} value={post.descricao} onChange={(e) => setPost((a) => ({ ...a, descricao: e.target.value }))} placeholder="Explique brevemente a oportunidade, contexto e por que ela é relevante para as marcas." className="vitrine-input min-h-[108px] resize-y" />
-                <p className="mt-1.5 text-right text-[11px] font-semibold text-[#9aa0a8]">{post.descricao.length}/300</p>
+                <textarea maxLength={600} rows={5} value={post.descricao} onChange={(e) => setPost((a) => ({ ...a, descricao: e.target.value }))} placeholder="Explique brevemente a oportunidade, contexto e por que ela é relevante para as marcas." className="vitrine-input min-h-[128px] resize-y" />
+                <p className="mt-1.5 text-right text-[11px] font-semibold text-[#9aa0a8]">{post.descricao.length}/600</p>
               </Campo>
             </Bloco>
 
             {erroPublicacao && <p className="rounded-[12px] bg-[#fdecef] px-4 py-3 text-[12px] font-semibold text-[#be123c]">{erroPublicacao}</p>}
-            <button type="button" onClick={publicar} disabled={publicando || consultandoInventario || !post.titulo.trim() || !post.descricao.trim() || !post.formatoId || (post.tipoExibicao === 'data_unica' && inventario.slotsLivres <= 0)} className="vitrine-pop rounded-[14px] bg-[#14161a] p-[15px] text-[15px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
-              {publicando ? 'Publicando…' : 'Publicar em Oportunidades'}
+            <button type="button" onClick={salvar} disabled={salvando || consultandoInventario || !post.titulo.trim() || !post.descricao.trim() || !post.formatoId || (!editando && post.tipoExibicao === 'data_unica' && inventario.slotsLivres <= 0)} className="vitrine-pop rounded-[14px] bg-[#14161a] p-[15px] text-[15px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+              {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Publicar em Oportunidades'}
             </button>
           </div>
 
@@ -375,7 +429,10 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
       : `/consulta?programa=${encodeURIComponent(selecionada.programaId)}&de=${selecionada.dataInicio ?? ''}&ate=${selecionada.dataFim ?? ''}`
     return (
       <div className="mx-auto max-w-[980px] px-5 pb-[70px] pt-6 sm:px-7">
-        <button type="button" onClick={voltarAoFeed} className="mb-[16px] text-[13px] font-semibold text-[#6b7280]">← Voltar às oportunidades</button>
+        <div className="mb-[16px] flex items-center justify-between gap-3">
+          <button type="button" onClick={voltarAoFeed} className="text-[13px] font-semibold text-[#6b7280]">← Voltar às oportunidades</button>
+          {podeEditar(selecionada) && <button type="button" onClick={() => iniciarEdicao(selecionada)} className="rounded-full border border-[#cfd3d9] bg-white px-4 py-2 text-[12px] font-bold text-[#14161a] hover:border-[#14161a]">Editar oportunidade</button>}
+        </div>
         <div className="grid items-start gap-[32px] md:grid-cols-[.78fr_1.22fr]">
           <Imagem oportunidade={selecionada} detalhe />
           <div className="pt-1">
@@ -385,7 +442,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
               <span className="vitrine-chip">{selecionada.formatoNome}</span>
             </div>
             <h1 className="vitrine-pop mt-4 text-[33px] font-extrabold leading-[1.05] tracking-[-1px]">{selecionada.titulo}</h1>
-            <p className="mt-[13px] text-[15px] leading-[1.55] text-[#5a606a]">{selecionada.descricao}</p>
+            <p className="mt-[13px] whitespace-pre-line text-[15px] leading-[1.55] text-[#5a606a]">{selecionada.descricao}</p>
 
             <div className="my-[20px] grid gap-x-5 gap-y-4 rounded-[16px] bg-white px-5 py-[18px] shadow-[0_6px_20px_-14px_rgba(20,22,26,.4)] sm:grid-cols-2">
               <Info rotulo="Formato" valor={selecionada.formatoNome} />
