@@ -18,12 +18,7 @@ export type DadosEmailAprovacao = {
 }
 
 function escapar(valor: string): string {
-  return valor
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+  return valor.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
 }
 
 function moeda(valor: number): string {
@@ -48,7 +43,7 @@ function pracas(itens: ItemData[]): string | null {
 }
 
 function linha(rotulo: string, valor: string): string {
-  return `<tr><td style="padding:8px 0;color:#777082;font-size:12px;width:145px;vertical-align:top">${escapar(rotulo)}</td><td style="padding:8px 0;color:#221D2B;font-size:13px;font-weight:600;vertical-align:top">${escapar(valor)}</td></tr>`
+  return `<tr><td style="padding:8px 0;color:#8a909a;font-size:12px;width:145px;vertical-align:top">${escapar(rotulo)}</td><td style="padding:8px 0;color:#14161a;font-size:13px;font-weight:600;vertical-align:top">${escapar(valor)}</td></tr>`
 }
 
 function estrutura(params: {
@@ -64,37 +59,24 @@ function estrutura(params: {
   const p = pracas(params.dados.itens)
   const marca = nomePrincipalDaProposta(params.dados.marcaNome, params.dados.clienteNome)
   const exibirCliente = deveExibirClienteComMarca(params.dados.marcaNome, params.dados.clienteNome)
-  return `<!doctype html><html><body style="margin:0;background:#F4F2F8;font-family:Arial,Helvetica,sans-serif;color:#221D2B">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F4F2F8;padding:28px 12px"><tr><td align="center">
-    <table role="presentation" width="620" cellspacing="0" cellpadding="0" style="max-width:620px;width:100%;background:#fff;border-radius:20px;overflow:hidden">
-      <tr><td style="height:10px;background:linear-gradient(90deg,#FF195F,#9B2CF3,#436CFF)"></td></tr>
+  return `<!doctype html><html><body style="margin:0;background:#eceef1;font-family:Arial,Helvetica,sans-serif;color:#14161a">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eceef1;padding:28px 12px"><tr><td align="center">
+    <table role="presentation" width="620" cellspacing="0" cellpadding="0" style="max-width:620px;width:100%;background:#fff;border-radius:20px;overflow:hidden;border:1px solid #e2e4e8">
+      <tr><td style="height:9px;background:#14161a"></td></tr>
       <tr><td style="padding:30px 34px 10px">
-        <div style="font-size:12px;font-weight:700;color:#8C2EF4;letter-spacing:.08em;text-transform:uppercase">Globo · ${escapar(params.etiqueta)}</div>
-        <h1 style="margin:10px 0 8px;font-size:26px;line-height:1.15">${escapar(params.titulo)}</h1>
-        <p style="margin:0;color:#777082;font-size:14px;line-height:1.55">${escapar(params.introducao)}</p>
+        <div style="font-size:12px;font-weight:700;color:#ff5a3c;letter-spacing:.08em;text-transform:uppercase">Globo Slots · ${escapar(params.etiqueta)}</div>
+        <h1 style="margin:10px 0 8px;font-size:26px;line-height:1.15;color:#14161a">${escapar(params.titulo)}</h1>
+        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.55">${escapar(params.introducao)}</p>
       </td></tr>
       <tr><td style="padding:16px 34px">
-        <div style="background:#F8F6FC;border:1px solid #ECE7F3;border-radius:14px;padding:16px 18px">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-            ${linha('Executivo', params.dados.executivoNome)}
-            ${linha('Marca', marca)}
-            ${exibirCliente ? linha('Anunciante', params.dados.clienteNome) : ''}
-            ${linha('Produto', params.dados.produto)}
-            ${linha('Programa', params.dados.programaNome)}
-            ${linha('Modalidade', params.dados.modalidade === 'regional' ? 'Regional' : 'Nacional')}
-            ${p ? linha('Praças', p) : ''}
-            ${linha('Exibição', resumoDatas(params.dados.itens))}
-            ${linha('Objetivo', params.dados.objetivo)}
-          </table>
-          <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E4DEEC">
-            <div style="font-size:11px;color:#777082;text-transform:uppercase;font-weight:700">Total comercial</div>
-            <div style="margin-top:4px;font-size:22px;font-weight:800;color:#F51668">${escapar(moeda(params.dados.totalComercial))}</div>
-          </div>
+        <div style="background:#f8f9fa;border:1px solid #eceef1;border-radius:14px;padding:16px 18px">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${linha('Executivo', params.dados.executivoNome)}${linha('Marca', marca)}${exibirCliente ? linha('Anunciante', params.dados.clienteNome) : ''}${linha('Produto', params.dados.produto)}${linha('Programa', params.dados.programaNome)}${linha('Modalidade', params.dados.modalidade === 'regional' ? 'Regional' : 'Nacional')}${p ? linha('Praças', p) : ''}${linha('Exibição', resumoDatas(params.dados.itens))}${linha('Objetivo', params.dados.objetivo)}</table>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid #e2e4e8"><div style="font-size:11px;color:#8a909a;text-transform:uppercase;font-weight:700">Total comercial</div><div style="margin-top:4px;font-size:22px;font-weight:800;color:#ff5a3c">${escapar(moeda(params.dados.totalComercial))}</div></div>
         </div>
-        ${params.destaque ? `<div style="margin-top:14px;background:#FFF5F7;border:1px solid #FFD4E1;border-radius:12px;padding:14px 16px"><div style="font-size:11px;font-weight:700;color:#C51952;text-transform:uppercase">Justificativa</div><div style="margin-top:5px;font-size:13px;line-height:1.5">${escapar(params.destaque)}</div></div>` : ''}
+        ${params.destaque ? `<div style="margin-top:14px;background:#fff5f7;border:1px solid #ffd4e1;border-radius:12px;padding:14px 16px"><div style="font-size:11px;font-weight:700;color:#c51952;text-transform:uppercase">Justificativa</div><div style="margin-top:5px;font-size:13px;line-height:1.5">${escapar(params.destaque)}</div></div>` : ''}
       </td></tr>
-      ${params.chamada && params.link ? `<tr><td align="center" style="padding:5px 34px 25px"><a href="${escapar(params.link)}" style="display:inline-block;background:linear-gradient(90deg,#EF2170,#6250FF);color:white;text-decoration:none;font-weight:700;font-size:14px;padding:13px 24px;border-radius:12px">${escapar(params.chamada)}</a></td></tr>` : ''}
-      <tr><td style="padding:18px 34px 26px;border-top:1px solid #F0ECF4;color:#958E9E;font-size:11px;line-height:1.45">${escapar(params.rodape)}</td></tr>
+      ${params.chamada && params.link ? `<tr><td align="center" style="padding:5px 34px 25px"><a href="${escapar(params.link)}" style="display:inline-block;background:#14161a;color:white;text-decoration:none;font-weight:700;font-size:14px;padding:13px 24px;border-radius:12px">${escapar(params.chamada)}</a></td></tr>` : ''}
+      <tr><td style="padding:18px 34px 26px;border-top:1px solid #eceef1;color:#9aa0a8;font-size:11px;line-height:1.45">${escapar(params.rodape)}</td></tr>
     </table>
   </td></tr></table></body></html>`
 }
@@ -111,11 +93,11 @@ export function montarEmailSolicitacaoAprovacao(d: DadosEmailAprovacao): string 
   return estrutura({
     etiqueta: 'Aprovação de proposta',
     titulo: 'Nova proposta aguardando sua aprovação',
-    introducao: `${d.executivoNome} concluiu uma consulta de ${d.programaNome}. Revise os dados e aprove ou rejeite a proposta no Chatbot 2.0.`,
+    introducao: `${d.executivoNome} concluiu uma consulta de ${d.programaNome}. Revise os dados e aprove ou rejeite a proposta no Globo Slots.`,
     dados: d,
     chamada: 'Revisar proposta',
     link: d.linkAprovacoes,
-    rodape: 'Esta mensagem é uma notificação interna do fluxo de aprovação do Chatbot 2.0.',
+    rodape: 'Esta mensagem é uma notificação interna do fluxo de aprovação do Globo Slots.',
   })
 }
 
