@@ -23,7 +23,7 @@ create unique index if not exists oportunidade_categorias_nome_unico_idx
 insert into oportunidade_categorias (nome, slug, ordem)
 values
   ('Datas comemorativas', 'datas-comemorativas', 10),
-  ('Talentos', 'talentos', 20),
+  ('Talento', 'talento', 20),
   ('Sazonais', 'sazonais', 30)
 on conflict (slug) do update
 set nome = excluded.nome,
