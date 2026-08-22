@@ -1,31 +1,5 @@
 import { redirect } from 'next/navigation'
-import { VitrineHiFi } from '@/components/vitrine/VitrineHiFi'
-import { listarProgramas } from '@/lib/dados/programas'
-import { obterSessao } from '@/lib/sessao-servidor'
-import { temPerfil } from '@/lib/dominio/perfis'
 
-export default async function PaginaVitrine() {
-  const [sessao, programas] = await Promise.all([
-    obterSessao(),
-    listarProgramas(),
-  ])
-
-  if (!sessao) redirect('/login')
-
-  const proprietario = temPerfil(sessao.perfis, 'proprietario')
-  const consultor = temPerfil(sessao.perfis, 'consultor_programa')
-  const podePostar = proprietario || consultor
-
-  const programasVisiveis = programas
-    .filter((programa) => programa.estado !== 'inativo')
-    .filter((programa) => proprietario || !consultor || sessao.programasVinculados.includes(programa.id))
-    .map((programa) => ({ id: programa.id, nome: programa.nome }))
-
-  return (
-    <VitrineHiFi
-      nomeUsuario={sessao.nome}
-      podePostar={podePostar}
-      programas={programasVisiveis}
-    />
-  )
+export default function PaginaVitrineLegada() {
+  redirect('/oportunidades')
 }
