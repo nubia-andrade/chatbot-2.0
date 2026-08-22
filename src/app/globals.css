@@ -70,6 +70,10 @@ body {
   font-family: var(--fonte-corpo), system-ui, sans-serif;
 }
 
+.vitrine-pop {
+  font-family: var(--fonte-vitrine-titulo), var(--fonte-corpo), system-ui, sans-serif;
+}
+
 /* Flutuação suave dos tiles decorativos da tela de login (handoff #t1). */
 @keyframes floaty {
   0%, 100% {
