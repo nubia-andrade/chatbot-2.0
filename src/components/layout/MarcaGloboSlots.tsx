@@ -12,7 +12,7 @@ export function MarcaGloboSlots({ inversa = false, compacta = false, href = '/op
   return (
     <Link href={href} className="inline-flex shrink-0 items-center gap-2.5" aria-label="Globo Slots">
       <img
-        src="/logo-globo-slots.sgv"
+        src="/logo-globo-slots.svg"
         alt=""
         aria-hidden
         className={compacta ? 'h-7 w-11 object-contain' : 'h-9 w-14 object-contain'}
