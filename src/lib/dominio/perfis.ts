@@ -7,7 +7,7 @@ export type Perfil =
 export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'aprovacoes' | 'configuracoes'
 
 export const SECOES_DO_APP: { valor: SecaoApp; rotulo: string }[] = [
-  { valor: 'inicio', rotulo: 'Início' },
+  { valor: 'inicio', rotulo: 'Desempenho' },
   { valor: 'consulta', rotulo: 'Nova consulta' },
   { valor: 'propostas', rotulo: 'Propostas' },
   { valor: 'aprovacoes', rotulo: 'Aprovações' },
@@ -46,8 +46,6 @@ export function podeAdministrarGovernancaGlobal(perfis: Perfil[]): boolean {
   return temPerfil(perfis, 'proprietario')
 }
 
-// Excluir programa leva junto datas bloqueadas, restrições, preços e ações
-// regionais. É a única ação irreversível da entrega.
 export function podeExcluirPrograma(perfis: Perfil[]): boolean {
   return temPerfil(perfis, 'proprietario')
 }
@@ -57,22 +55,14 @@ export function podeConsultarRegional(perfis: Perfil[]): boolean {
 }
 
 /** Consultor edita só os programas a que está vinculado; proprietário, todos. */
-export function podeEditarPrograma(
-  perfis: Perfil[],
-  programasVinculados: string[],
-  programaId: string,
-): boolean {
+export function podeEditarPrograma(perfis: Perfil[], programasVinculados: string[], programaId: string): boolean {
   if (temPerfil(perfis, 'proprietario')) return true
   if (!temPerfil(perfis, 'consultor_programa')) return false
   return programasVinculados.includes(programaId)
 }
 
 /** A decisão de aprovação é restrita ao consultor vinculado ao programa ou proprietário. */
-export function podeAprovarPrograma(
-  perfis: Perfil[],
-  programasVinculados: string[],
-  programaId: string,
-): boolean {
+export function podeAprovarPrograma(perfis: Perfil[], programasVinculados: string[], programaId: string): boolean {
   if (temPerfil(perfis, 'proprietario')) return true
   return temPerfil(perfis, 'consultor_programa') && programasVinculados.includes(programaId)
 }
