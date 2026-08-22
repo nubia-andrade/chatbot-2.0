@@ -14,44 +14,31 @@ export type InventarioDaOportunidade = {
   erro: string | null
 }
 
-type Acao = {
-  programa: string
-  formato: string | null
-  anunciante: string | null
-  marca: string | null
-}
+type Acao = { programa: string; formato: string | null; anunciante: string | null; marca: string | null }
 type Alias = { id: string; nome_normalizado: string; cliente_id: string | null }
 type Marca = { id: string; nome_normalizado: string }
 type Relacao = { anunciante_take_id: string; marca_id: string; cliente_id_override: string | null }
-
 type Cliente = { id: string; nome: string; setor: string | null }
 
-const vazio = (erro: string): InventarioDaOportunidade => ({
-  slotsTotal: 0,
-  slotsOcupados: 0,
-  slotsLivres: 0,
-  setoresCompradores: [],
-  erro,
-})
+const vazio = (erro: string): InventarioDaOportunidade => ({ slotsTotal: 0, slotsOcupados: 0, slotsLivres: 0, setoresCompradores: [], erro })
 
 /** Inventário nacional real da data, independente de um cliente específico. */
-export async function carregarInventarioDaOportunidade(
-  programaId: string,
-  dataISO: string,
-): Promise<InventarioDaOportunidade> {
+export async function carregarInventarioDaOportunidade(programaId: string, dataISO: string): Promise<InventarioDaOportunidade> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) return vazio('Escolha uma data válida.')
 
   const programa = await obterPrograma(programaId)
   if (!programa) return vazio('Programa não encontrado.')
 
+  const diaDaSemana = new Date(`${dataISO}T00:00:00Z`).getUTCDay()
+  if (!programa.dias_da_semana.includes(diaDaSemana)) {
+    return vazio('O programa não é exibido nesta data. Escolha um dia válido de exibição.')
+  }
+
   const supabase = await criarClienteServidor()
   const [apelidos, formatos, respostaAcoes, acoesRegionais] = await Promise.all([
     listarApelidos(programaId),
     supabase.from('formatos').select('formato, categoria'),
-    supabase
-      .from('acoes_vendidas')
-      .select('programa, formato, anunciante, marca')
-      .eq('data_de_exibicao', dataISO),
+    supabase.from('acoes_vendidas').select('programa, formato, anunciante, marca').eq('data_de_exibicao', dataISO),
     regionalConsomeSlotNacional() ? listarAcoesRegionais(programaId, dataISO, dataISO) : Promise.resolve([]),
   ])
 
@@ -72,9 +59,8 @@ export async function carregarInventarioDaOportunidade(
   // Uma ação regional pode ter várias praças, mas consome somente UM slot
   // nacional por cliente/data, conforme a regra canônica do produto.
   const compradoresRegionais = [...new Set(acoesRegionais.map((acao) => normalizarNome(acao.cliente_nome)).filter(Boolean))]
-  const ocupacaoRegional = compradoresRegionais.length
   const slotsTotal = Math.max(0, Math.floor(programa.slots ?? 0))
-  const slotsOcupados = acoes.length + ocupacaoRegional
+  const slotsOcupados = acoes.length + compradoresRegionais.length
   const slotsLivres = Math.max(0, slotsTotal - slotsOcupados)
 
   if (acoes.length === 0 && compradoresRegionais.length === 0) {
@@ -83,14 +69,9 @@ export async function carregarInventarioDaOportunidade(
 
   const nomes = [...new Set(acoes.map((acao) => normalizarNome(acao.anunciante)).filter(Boolean))]
   const marcasNorm = [...new Set(acoes.map((acao) => normalizarNome(acao.marca)).filter(Boolean))]
-
   const [aliasesResp, marcasResp] = await Promise.all([
-    nomes.length
-      ? supabase.from('anunciantes_take').select('id, nome_normalizado, cliente_id').in('nome_normalizado', nomes)
-      : Promise.resolve({ data: [], error: null }),
-    marcasNorm.length
-      ? supabase.from('marcas').select('id, nome_normalizado').in('nome_normalizado', marcasNorm)
-      : Promise.resolve({ data: [], error: null }),
+    nomes.length ? supabase.from('anunciantes_take').select('id, nome_normalizado, cliente_id').in('nome_normalizado', nomes) : Promise.resolve({ data: [], error: null }),
+    marcasNorm.length ? supabase.from('marcas').select('id, nome_normalizado').in('nome_normalizado', marcasNorm) : Promise.resolve({ data: [], error: null }),
   ])
 
   const aliases = aliasesResp.error ? [] : (aliasesResp.data ?? []) as Alias[]
@@ -99,13 +80,8 @@ export async function carregarInventarioDaOportunidade(
   const marcaPorNome = new Map(marcas.map((item) => [item.nome_normalizado, item]))
   const aliasIds = aliases.map((item) => item.id)
   const marcaIds = marcas.map((item) => item.id)
-
   const relacoesResp = aliasIds.length && marcaIds.length
-    ? await supabase
-        .from('anunciante_take_marcas')
-        .select('anunciante_take_id, marca_id, cliente_id_override')
-        .in('anunciante_take_id', aliasIds)
-        .in('marca_id', marcaIds)
+    ? await supabase.from('anunciante_take_marcas').select('anunciante_take_id, marca_id, cliente_id_override').in('anunciante_take_id', aliasIds).in('marca_id', marcaIds)
     : { data: [], error: null }
 
   const override = new Map<string, string>()
@@ -124,13 +100,10 @@ export async function carregarInventarioDaOportunidade(
     if (clienteId) clienteIds.add(clienteId)
   }
 
-  // Para regionais, o registro já guarda o nome oficial informado no app.
-  // A resolução pelo nome normalizado permite recuperar o setor da Carteira.
   const clientesResp = await supabase.from('clientes').select('id, nome, setor')
   const clientes = clientesResp.error ? [] : (clientesResp.data ?? []) as Cliente[]
   const clientePorId = new Map(clientes.map((cliente) => [cliente.id, cliente]))
   const clientePorNome = new Map(clientes.map((cliente) => [normalizarNome(cliente.nome), cliente]))
-
   const setores = new Set<string>()
   for (const id of clienteIds) {
     const setor = clientePorId.get(id)?.setor?.trim()
@@ -141,11 +114,5 @@ export async function carregarInventarioDaOportunidade(
     if (setor) setores.add(setor)
   }
 
-  return {
-    slotsTotal,
-    slotsOcupados,
-    slotsLivres,
-    setoresCompradores: [...setores].sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    erro: null,
-  }
+  return { slotsTotal, slotsOcupados, slotsLivres, setoresCompradores: [...setores].sort((a, b) => a.localeCompare(b, 'pt-BR')), erro: null }
 }
