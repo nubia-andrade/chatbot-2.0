@@ -46,6 +46,7 @@ export type OportunidadePublicada = {
   descricao: string
   imagem: string | null
   autor: string
+  criadoPor: string
   inventarioAplicavel: boolean
   slotsLivres: number
   slotsTotal: number
@@ -72,6 +73,7 @@ type LinhaOportunidade = {
   titulo: string
   descricao: string
   imagem_url: string | null
+  criado_por: string
   criado_por_nome: string
   programas: { nome: string; mnemonico: string } | { nome: string; mnemonico: string }[] | null
   oportunidade_categorias: { nome: string; slug: string } | { nome: string; slug: string }[] | null
@@ -123,7 +125,7 @@ export async function listarOportunidadesAtivas(): Promise<OportunidadePublicada
   const hoje = new Date().toISOString().slice(0, 10)
   const { data, error } = await supabase
     .from('oportunidades')
-    .select('id, programa_id, categoria_id, formato_id, tipo_exibicao, data_evento, data_inicio, data_fim, expira_em, prazo_envio_pi, sigla, valor_acao, direitos_conexos, custo_producao_tipo, custo_producao, titulo, descricao, imagem_url, criado_por_nome, programas(nome, mnemonico), oportunidade_categorias(nome, slug), oportunidade_formatos(nome, slug)')
+    .select('id, programa_id, categoria_id, formato_id, tipo_exibicao, data_evento, data_inicio, data_fim, expira_em, prazo_envio_pi, sigla, valor_acao, direitos_conexos, custo_producao_tipo, custo_producao, titulo, descricao, imagem_url, criado_por, criado_por_nome, programas(nome, mnemonico), oportunidade_categorias(nome, slug), oportunidade_formatos(nome, slug)')
     .eq('ativo', true)
     .gte('expira_em', hoje)
     .order('data_evento')
@@ -174,6 +176,7 @@ export async function listarOportunidadesAtivas(): Promise<OportunidadePublicada
       descricao: linha.descricao,
       imagem: linha.imagem_url,
       autor: linha.criado_por_nome,
+      criadoPor: linha.criado_por,
       inventarioAplicavel,
       slotsLivres: inventario.slotsLivres,
       slotsTotal: inventario.slotsTotal,
