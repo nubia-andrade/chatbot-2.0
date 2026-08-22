@@ -89,6 +89,7 @@ export async function publicarOportunidade(formulario: FormData): Promise<{ ok: 
 
   if (expiraEm < hoje) return { ok: false, erro: 'A data de expiração não pode estar no passado.' }
   if (expiraEm > ultimaExibicao) return { ok: false, erro: 'A oportunidade deve expirar até, no máximo, a última data de exibição.' }
+  if (prazoEnvioPi < hoje) return { ok: false, erro: 'O prazo de envio da PI não pode estar no passado.' }
   if (prazoEnvioPi > primeiraExibicao) return { ok: false, erro: 'O prazo de envio da PI deve ser anterior ou igual à primeira exibição.' }
 
   const supabase = await criarClienteServidor()
