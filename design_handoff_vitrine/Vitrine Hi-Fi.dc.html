@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eceef1;font-family:'Manrope',system-ui,sans-serif;color:#14161a;-webkit-font-smoothing:antialiased}
+a{color:#1e6bff;text-decoration:none}a:hover{color:#0b4fd6}
+::selection{background:#ffd9cf}
+@keyframes floaty{0%{transform:translateY(0)}100%{transform:translateY(-6px)}}
+.pop{font-family:'Poppins',sans-serif}
+.card-lift{transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
+.card-lift:hover{transform:translateY(-6px);box-shadow:0 22px 40px -18px rgba(20,22,26,.35)}
+.navlink{position:relative;cursor:pointer;padding:6px 2px;font-weight:600;font-size:14px;color:#6b7280;transition:color .15s}
+.navlink:hover{color:#14161a}
+.navlink.on{color:#14161a}
+.navlink.on:after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:3px;border-radius:3px;background:#14161a}
+.chip{cursor:pointer;border:1.5px solid #d7dae0;background:#fff;border-radius:999px;padding:7px 15px;font-weight:600;font-size:13px;color:#6b7280;transition:all .15s}
+.chip:hover{border-color:#14161a;color:#14161a}
+.chip.on{background:#14161a;border-color:#14161a;color:#fff}
+.press{cursor:pointer;transition:transform .1s}.press:active{transform:scale(.96)}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column">
+
+  <!-- TOP NAV -->
+  <div style="position:sticky;top:0;z-index:40;background:rgba(236,238,241,.82);backdrop-filter:blur(12px);border-bottom:1px solid rgba(20,22,26,.07)">
+    <div style="max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:28px;padding:14px 28px">
+      <div class="pop press" style="font-weight:800;font-size:22px;letter-spacing:-.5px;cursor:pointer" onClick="{{ goVitrine }}">vitrine<span style="color:#ff5a3c">.</span></div>
+      <div style="display:flex;gap:26px;margin-left:8px">
+        <div class="navlink {{ tabVitrine }}" onClick="{{ goVitrine }}">Vitrine</div>
+        <div class="navlink {{ tabCalendar }}" onClick="{{ goCalendar }}">Calendário</div>
+        <div class="navlink {{ tabDates }}" onClick="{{ goCalendar }}">Datas especiais</div>
+        <div class="navlink" style="color:#9aa0a8">Minhas ações</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+        <button class="pop press" onClick="{{ goPost }}" style="border:none;background:#14161a;color:#fff;font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:7px">+ Postar ação</button>
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#1e90ff);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;font-family:'Poppins'">MS</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1">
+
+  <!-- ============ VITRINE ============ -->
+  <sc-if value="{{ isVitrine }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:1180px;margin:0 auto;padding:34px 28px 70px;position:relative">
+    <div class="pop" style="position:absolute;top:6px;right:14px;font-weight:800;font-size:150px;line-height:.8;color:rgba(20,22,26,.035);pointer-events:none;letter-spacing:-6px">2026</div>
+    <div style="position:relative">
+      <div style="font-weight:600;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#ff5a3c">Oportunidades de ação</div>
+      <h1 class="pop" style="margin:8px 0 0;font-weight:800;font-size:44px;letter-spacing:-1.5px;line-height:1.02">A vitrine dos<br>programas do chat</h1>
+      <p style="margin:12px 0 0;max-width:520px;color:#6b7280;font-size:15px;line-height:1.5">Consultores postam ações comemorativas, sazonais e participações de talentos. Curta, veja os slots livres e gere sua consulta.</p>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:9px;margin:28px 0 22px;position:relative;flex-wrap:wrap">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+        <div class="chip {{ f.on }}" onClick="{{ f.onClick }}">{{ f.label }}</div>
+      </sc-for>
+      <div style="margin-left:auto;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer">ordenar: mais slots ▾</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:22px;position:relative">
+      <sc-for list="{{ opps }}" as="card" hint-placeholder-count="8">
+        <div class="card-lift" style="background:#fff;border-radius:20px;overflow:hidden;cursor:pointer;box-shadow:0 6px 20px -12px rgba(20,22,26,.3)" onClick="{{ card.onOpen }}">
+          <div style="position:relative;aspect-ratio:3/4;background:{{ card.grad }}">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);font-family:ui-monospace,Menlo,monospace;font-size:11px">imagem do programa</div>
+            <div class="pop" style="position:absolute;top:11px;left:11px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);color:#fff;font-weight:700;font-size:11px;padding:5px 9px;border-radius:9px;display:flex;gap:6px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:{{ card.color }}"></span>{{ card.date }} · {{ card.program }}</div>
+            <div class="pop" style="position:absolute;bottom:11px;right:11px;font-weight:700;font-size:10.5px;padding:5px 9px;border-radius:9px;background:{{ card.slotBg }};color:{{ card.slotFg }};border:1.5px solid {{ card.slotBorder }}">{{ card.slotBadge }}</div>
+          </div>
+          <div style="padding:14px 14px 15px">
+            <div class="pop" style="font-weight:700;font-size:15px;line-height:1.2;letter-spacing:-.3px">{{ card.title }}</div>
+            <div style="margin-top:5px;font-size:12.5px;color:#9aa0a8;font-weight:500">{{ card.slotsLabel }}</div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:13px">
+              <button class="press" onClick="{{ card.onLike }}" style="border:1.5px solid {{ card.likeBorder }};background:{{ card.likeBg }};color:{{ card.likeFg }};font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px">♥ {{ card.likes }}</button>
+              <div style="margin-left:auto;font-size:12px;font-weight:600;color:#c1c5cc">{{ card.tag }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ DETALHE ============ -->
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:920px;margin:0 auto;padding:22px 28px 70px">
+    <div class="press" onClick="{{ goVitrine }}" style="display:inline-flex;align-items:center;gap:7px;color:#6b7280;font-weight:600;font-size:14px;cursor:pointer;margin-bottom:18px">← Voltar à vitrine</div>
+    <div style="display:grid;grid-template-columns:.9fr 1.1fr;gap:34px;align-items:start">
+      <div style="position:relative;aspect-ratio:3/4;border-radius:22px;overflow:hidden;background:{{ current.grad }};box-shadow:0 26px 50px -24px rgba(20,22,26,.5)">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.7);font-family:ui-monospace,Menlo,monospace;font-size:12px">imagem do programa</div>
+        <div class="pop" style="position:absolute;top:14px;left:14px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);color:#fff;font-weight:700;font-size:12px;padding:6px 11px;border-radius:10px;display:flex;gap:7px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background:{{ current.color }}"></span>{{ current.date }} · {{ current.program }}</div>
+      </div>
+      <div style="padding-top:6px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="pop" style="font-weight:700;font-size:12px;color:#fff;background:{{ current.color }};padding:5px 11px;border-radius:999px">{{ current.program }}</div>
+          <div class="chip" style="pointer-events:none">Sazonal</div>
+        </div>
+        <h1 class="pop" style="margin:16px 0 0;font-weight:800;font-size:34px;letter-spacing:-1px;line-height:1.05">{{ current.title }}</h1>
+        <p style="margin:14px 0 0;color:#5a606a;font-size:15.5px;line-height:1.6">Ação de mídia alinhada à data comemorativa. Insira o cliente na narrativa do programa com material exclusivo — merchandising, chamada e presença de talento conforme disponibilidade de slots.</p>
+
+        <div style="display:flex;align-items:center;gap:22px;margin:22px 0;padding:18px 20px;background:#fff;border-radius:16px;box-shadow:0 6px 20px -14px rgba(20,22,26,.4)">
+          <div>
+            <div class="pop" style="font-weight:800;font-size:28px;color:{{ current.color }};line-height:1">{{ current.slotsFree }}</div>
+            <div style="font-size:12px;font-weight:600;color:#9aa0a8;margin-top:2px">slots livres</div>
+          </div>
+          <div style="width:1px;height:38px;background:#eceef1"></div>
+          <div>
+            <div class="pop" style="font-weight:800;font-size:28px;line-height:1">{{ current.likes }}</div>
+            <div style="font-size:12px;font-weight:600;color:#9aa0a8;margin-top:2px">curtidas</div>
+          </div>
+          <button class="press" onClick="{{ current.onLike }}" style="margin-left:auto;border:1.5px solid {{ current.likeBorder }};background:{{ current.likeBg }};color:{{ current.likeFg }};font-weight:700;font-size:14px;padding:11px 18px;border-radius:999px;cursor:pointer">♥ Curtir</button>
+        </div>
+
+        <button class="pop press" style="width:100%;border:none;background:#14161a;color:#fff;font-weight:700;font-size:16px;padding:16px;border-radius:14px;cursor:pointer">Gerar consulta →</button>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:9px;color:#9aa0a8;font-size:13px;font-weight:500"><span style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#f5a623,#ff5a3c)"></span>Postado por Marina Souza · Consultora · há 2 dias</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ CALENDÁRIO ============ -->
+  <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:1180px;margin:0 auto;padding:34px 28px 70px;position:relative">
+    <div class="pop" style="position:absolute;top:0;right:14px;font-weight:800;font-size:120px;line-height:.8;color:rgba(20,22,26,.035);pointer-events:none;letter-spacing:-5px">maio</div>
+    <div style="display:flex;align-items:center;gap:14px;position:relative">
+      <h1 class="pop" style="margin:0;font-weight:800;font-size:32px;letter-spacing:-1px">Maio 2026</h1>
+      <div style="display:flex;gap:6px;margin-left:6px"><div class="chip press" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center">‹</div><div class="chip press" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center">›</div></div>
+      <div style="margin-left:auto;display:flex;gap:8px;background:#fff;border-radius:999px;padding:4px">
+        <div class="chip {{ calGridOn }}" style="border:none" onClick="{{ setCalGrid }}">Grade</div>
+        <div class="chip {{ calAgendaOn }}" style="border:none" onClick="{{ setCalAgenda }}">Agenda</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:26px;margin-top:24px;align-items:start;position:relative">
+      <!-- month grid -->
+      <div style="background:#fff;border-radius:20px;padding:20px;box-shadow:0 6px 22px -16px rgba(20,22,26,.4)">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:10px">
+          <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><div style="text-align:center;font-size:11px;font-weight:700;color:#c1c5cc;letter-spacing:1px">{{ w }}</div></sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+          <sc-for list="{{ days }}" as="d" hint-placeholder-count="35">
+            <div class="press" onClick="{{ d.onClick }}" style="aspect-ratio:1;border-radius:12px;border:1.5px solid {{ d.border }};background:{{ d.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:{{ d.cursor }};opacity:{{ d.opacity }}">
+              <div class="pop" style="font-weight:700;font-size:14px;color:{{ d.numColor }}">{{ d.num }}</div>
+              <div style="display:flex;gap:3px;height:6px">
+                <sc-for list="{{ d.dots }}" as="dot" hint-placeholder-count="0"><span style="width:6px;height:6px;border-radius:50%;background:{{ dot }}"></span></sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <!-- agenda -->
+      <div>
+        <div class="pop" style="font-weight:700;font-size:18px">{{ agendaTitle }}</div>
+        <div style="font-size:13px;color:#9aa0a8;font-weight:600;margin-top:2px">{{ agendaSub }}</div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+          <sc-for list="{{ agenda }}" as="a" hint-placeholder-count="3">
+            <div class="card-lift" style="display:flex;gap:13px;align-items:center;background:#fff;border-radius:16px;padding:11px;cursor:pointer;box-shadow:0 5px 18px -14px rgba(20,22,26,.4)" onClick="{{ a.onOpen }}">
+              <div style="width:58px;height:58px;border-radius:12px;flex:none;background:{{ a.grad }}"></div>
+              <div style="flex:1;min-width:0">
+                <div class="pop" style="font-weight:700;font-size:14px;line-height:1.2">{{ a.title }}</div>
+                <div style="font-size:12px;color:#9aa0a8;font-weight:600;margin-top:3px">{{ a.slotsLabel }}</div>
+              </div>
+              <div class="pop" style="font-weight:700;font-size:10.5px;padding:5px 9px;border-radius:9px;background:{{ a.slotBg }};color:{{ a.slotFg }};border:1.5px solid {{ a.slotBorder }}">{{ a.slotBadge }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ POSTAR ============ -->
+  <sc-if value="{{ isPost }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:960px;margin:0 auto;padding:28px 28px 70px">
+    <div class="press" onClick="{{ goVitrine }}" style="display:inline-flex;align-items:center;gap:7px;color:#6b7280;font-weight:600;font-size:14px;cursor:pointer;margin-bottom:16px">← Cancelar</div>
+    <h1 class="pop" style="margin:0 0 24px;font-weight:800;font-size:32px;letter-spacing:-1px">Postar nova oportunidade</h1>
+    <div style="display:grid;grid-template-columns:1.3fr .7fr;gap:38px;align-items:start">
+      <!-- form -->
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div>
+          <div class="pop" style="font-weight:700;font-size:13px;margin-bottom:8px">Imagem <span style="color:#9aa0a8;font-weight:600">(pequena / média · máx 1200px)</span></div>
+          <label style="display:block;cursor:pointer">
+            <input type="file" accept="image/*" onChange="{{ onFile }}" style="display:none">
+            <div style="border:2px dashed #c8ccd4;border-radius:16px;background:#fff;aspect-ratio:16/7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#9aa0a8;background-image:{{ post.dropImg }};background-size:cover;background-position:center">
+              <div class="pop" style="font-weight:700;font-size:14px;color:{{ post.dropFg }}">{{ post.dropText }}</div>
+              <div style="font-size:12px;color:{{ post.dropFg }}">arraste ou clique para enviar</div>
+            </div>
+          </label>
+        </div>
+        <div>
+          <div class="pop" style="font-weight:700;font-size:13px;margin-bottom:8px">Programa</div>
+          <select onChange="{{ onProgram }}" style="width:100%;border:1.5px solid #d7dae0;border-radius:12px;padding:13px 14px;font-family:'Manrope';font-weight:600;font-size:14px;background:#fff;color:#14161a">
+            <sc-for list="{{ programs }}" as="p" hint-placeholder-count="6"><option value="{{ p.idx }}">{{ p.name }}</option></sc-for>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div class="pop" style="font-weight:700;font-size:13px;margin-bottom:8px">Data do evento</div>
+            <input type="date" value="2026-05-10" onChange="{{ onDate }}" style="width:100%;border:1.5px solid #d7dae0;border-radius:12px;padding:12px 14px;font-family:'Manrope';font-weight:600;font-size:14px;background:#fff;color:#14161a">
+          </div>
+          <div>
+            <div class="pop" style="font-weight:700;font-size:13px;margin-bottom:8px">Slots disponíveis</div>
+            <input type="number" value="5" min="1" onChange="{{ onSlots }}" style="width:100%;border:1.5px solid #d7dae0;border-radius:12px;padding:12px 14px;font-family:'Manrope';font-weight:600;font-size:14px;background:#fff;color:#14161a">
+          </div>
+        </div>
+        <div>
+          <div class="pop" style="font-weight:700;font-size:13px;margin-bottom:8px">Título / chamada</div>
+          <input type="text" value="Ação especial Dia das Mães" onChange="{{ onTitle }}" onInput="{{ onTitle }}" style="width:100%;border:1.5px solid #d7dae0;border-radius:12px;padding:13px 14px;font-family:'Manrope';font-weight:600;font-size:14px;background:#fff;color:#14161a">
+        </div>
+        <button class="pop press" style="border:none;background:#14161a;color:#fff;font-weight:700;font-size:15px;padding:15px;border-radius:14px;cursor:pointer">Publicar na vitrine</button>
+      </div>
+      <!-- live preview -->
+      <div style="position:sticky;top:90px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9aa0a8;margin-bottom:12px">Prévia do card</div>
+        <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px -22px rgba(20,22,26,.5)">
+          <div style="position:relative;aspect-ratio:3/4;background:{{ post.grad }};background-image:{{ post.dropImg }};background-size:cover;background-position:center">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-family:ui-monospace,Menlo,monospace;font-size:11px;opacity:{{ post.phOpacity }}">imagem</div>
+            <div class="pop" style="position:absolute;top:11px;left:11px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);color:#fff;font-weight:700;font-size:11px;padding:5px 9px;border-radius:9px;display:flex;gap:6px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:{{ post.color }}"></span>{{ post.date }} · {{ post.program }}</div>
+            <div class="pop" style="position:absolute;bottom:11px;right:11px;font-weight:700;font-size:10.5px;padding:5px 9px;border-radius:9px;background:#fff;color:#14161a;border:1.5px solid #14161a">{{ post.slots }} slots</div>
+          </div>
+          <div style="padding:14px">
+            <div class="pop" style="font-weight:700;font-size:15px;line-height:1.2">{{ post.title }}</div>
+            <div style="margin-top:5px;font-size:12.5px;color:#9aa0a8;font-weight:500">{{ post.slots }} de {{ post.slots }} livres</div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:13px">
+              <span style="border:1.5px solid #d7dae0;color:#9aa0a8;font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:999px">♥ 0</span>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#9aa0a8;margin-top:12px;line-height:1.5">O selo com <b>data</b> e <b>programa</b> é aplicado automaticamente ao publicar.</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  PROGRAMS = [
+    { name: "Novelas",        color: "#ff5a3c", grad: "linear-gradient(150deg,#ff8a3c,#ff3d6e)" },
+    { name: "Big Brother",    color: "#7c3aed", grad: "linear-gradient(150deg,#8b5cf6,#4f46e5)" },
+    { name: "SporTV",         color: "#1e90ff", grad: "linear-gradient(150deg,#22d3ee,#2563eb)" },
+    { name: "Domingão",       color: "#f5a623", grad: "linear-gradient(150deg,#fbbf24,#f97316)" },
+    { name: "Estreias",       color: "#10b981", grad: "linear-gradient(150deg,#34d399,#059669)" },
+    { name: "Especiais",      color: "#ec4899", grad: "linear-gradient(150deg,#f472b6,#db2777)" },
+  ];
+  MONTHS = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+
+  DATA = [
+    { id:0, prog:0, date:"10 MAI", day:10, title:"Ação especial Dia das Mães", likes:24, slots:3, total:5, tag:"Sazonal" },
+    { id:1, prog:1, date:"29 NOV", day:29, title:"Esquenta Black Friday no BBB", likes:61, slots:1, total:6, tag:"Comercial" },
+    { id:2, prog:2, date:"04 JUN", day:4,  title:"Participação de talento no intervalo", likes:12, slots:0, total:4, tag:"Talento" },
+    { id:3, prog:3, date:"12 JUN", day:12, title:"Dia dos Namorados no palco", likes:8,  slots:7, total:10, tag:"Sazonal" },
+    { id:4, prog:4, date:"15 AGO", day:15, title:"Estreia da nova temporada", likes:33, slots:2, total:5, tag:"Lançamento" },
+    { id:5, prog:5, date:"30 SET", day:30, title:"Especial de aniversário", likes:19, slots:4, total:8, tag:"Institucional" },
+    { id:6, prog:0, date:"10 MAI", day:10, title:"Homenagem às mães na novela", likes:41, slots:2, total:4, tag:"Sazonal" },
+    { id:7, prog:2, date:"07 SET", day:7,  title:"Cobertura especial de corrida", likes:27, slots:5, total:8, tag:"Evento" },
+  ];
+
+  state = {
+    view: "vitrine",
+    detailId: 0,
+    filter: 0,
+    likes: {},        // id -> bool
+    calMode: "grid",
+    selDay: 10,
+    post: { prog:0, dateISO:"2026-05-10", slots:5, title:"Ação especial Dia das Mães", img:null },
+  };
+
+  slotStyle(free, total) {
+    if (free === 0) return { bg:"#eef0f2", fg:"#8a909a", border:"#dfe2e7", badge:"esgotado" };
+    if (free === 1) return { bg:"#ffe9e2", fg:"#c23a20", border:"#ff5a3c", badge:"1 slot" };
+    return { bg:"#ffffff", fg:"#14161a", border:"#14161a", badge:free + " slots" };
+  }
+
+  likeStyle(on) {
+    return on
+      ? { bg:"#14161a", fg:"#fff", border:"#14161a" }
+      : { bg:"#fff", fg:"#14161a", border:"#d7dae0" };
+  }
+
+  cardVM(o) {
+    const p = this.PROGRAMS[o.prog];
+    const liked = !!this.state.likes[o.id];
+    const free = o.slots;
+    const ss = this.slotStyle(free, o.total);
+    const ls = this.likeStyle(liked);
+    return {
+      id:o.id, program:p.name, color:p.color, grad:p.grad, date:o.date, title:o.title, tag:o.tag,
+      likes: o.likes + (liked ? 1 : 0),
+      slotsFree: free,
+      slotsLabel: free + " de " + o.total + (free === 1 ? " livre" : " livres"),
+      slotBadge: ss.badge, slotBg: ss.bg, slotFg: ss.fg, slotBorder: ss.border,
+      likeBg: ls.bg, likeFg: ls.fg, likeBorder: ls.border,
+      onOpen: () => this.setState({ view:"detail", detailId:o.id }),
+      onLike: (e) => { e && e.stopPropagation(); this.toggleLike(o.id); },
+    };
+  }
+
+  toggleLike(id) {
+    this.setState(s => ({ likes: { ...s.likes, [id]: !s.likes[id] } }));
+  }
+
+  buildDays() {
+    const events = {};
+    this.DATA.forEach(o => {
+      if (o.date.endsWith("MAI")) { (events[o.day] = events[o.day] || []).push(this.PROGRAMS[o.prog].color); }
+    });
+    // extra decorative markers
+    (events[2]  = events[2]  || []).push("#1e90ff");
+    (events[13] = events[13] || []).push("#7c3aed");
+    (events[25] = events[25] || []).push("#f5a623");
+    const days = [];
+    for (let i=0;i<5;i++) days.push({ blank:true });
+    for (let n=1;n<=31;n++) {
+      const dots = (events[n] || []).slice(0,3);
+      const sel = this.state.selDay === n;
+      const has = dots.length > 0;
+      days.push({
+        num:n, dots,
+        selected:sel, has,
+        onClick: () => this.setState({ selDay:n }),
+      });
+    }
+    return days.map(d => {
+      if (d.blank) return { num:"", dots:[], border:"transparent", bg:"transparent", numColor:"transparent", opacity:"1", cursor:"default", onClick:()=>{} };
+      return {
+        num:d.num, dots:d.dots,
+        border: d.selected ? "#14161a" : (d.has ? "#eceef1" : "#f3f4f6"),
+        bg: d.selected ? "#14161a" : "#fff",
+        numColor: d.selected ? "#fff" : (d.has ? "#14161a" : "#c1c5cc"),
+        opacity: "1",
+        cursor: "pointer",
+        onClick: d.onClick,
+      };
+    });
+  }
+
+  renderVals() {
+    const v = this.state.view;
+    const opps = this.filtered().map(o => this.cardVM(o));
+    const current = this.cardVM(this.DATA[this.state.detailId]);
+
+    const filterDefs = ["Todas","Datas comem.","Talentos","Sazonais"];
+    const filters = filterDefs.map((label,i) => ({
+      label, on: this.state.filter===i ? "on" : "",
+      onClick: () => this.setState({ filter:i }),
+    }));
+
+    // agenda
+    const agItems = this.DATA.filter(o => o.date.endsWith("MAI") && o.day === this.state.selDay).map(o => {
+      const vm = this.cardVM(o);
+      return { title:vm.title, grad:vm.grad, slotsLabel:vm.slotsLabel, slotBadge:vm.slotBadge, slotBg:vm.slotBg, slotFg:vm.slotFg, slotBorder:vm.slotBorder, onOpen:vm.onOpen };
+    });
+
+    // post preview
+    const ps = this.state.post;
+    const pp = this.PROGRAMS[ps.prog];
+    const [Y,M,D] = ps.dateISO.split("-");
+    const pDate = D + " " + this.MONTHS[parseInt(M,10)-1];
+
+    const programs = this.PROGRAMS.map((p,i) => ({ idx:i, name:p.name }));
+
+    return {
+      // nav / views
+      isVitrine: v==="vitrine", isDetail: v==="detail", isCalendar: v==="calendar", isPost: v==="post",
+      tabVitrine: v==="vitrine"?"on":"", tabCalendar: v==="calendar"?"on":"", tabDates:"",
+      goVitrine: () => this.setState({ view:"vitrine" }),
+      goCalendar: () => this.setState({ view:"calendar" }),
+      goPost: () => this.setState({ view:"post" }),
+
+      opps, current, filters,
+
+      // calendar
+      weekdays: ["DOM","SEG","TER","QUA","QUI","SEX","SÁB"],
+      days: this.buildDays(),
+      calGridOn: this.state.calMode==="grid"?"on":"",
+      calAgendaOn: this.state.calMode==="agenda"?"on":"",
+      setCalGrid: () => this.setState({ calMode:"grid" }),
+      setCalAgenda: () => this.setState({ calMode:"agenda" }),
+      agendaTitle: "Sáb, " + this.state.selDay + " Mai",
+      agendaSub: agItems.length + (agItems.length===1?" ação neste dia":" ações neste dia"),
+      agenda: agItems,
+
+      // post
+      programs,
+      post: {
+        prog: ps.prog, program: pp.name, color: pp.color, grad: pp.grad,
+        date: pDate, slots: ps.slots, title: ps.title || "Sua chamada aparece aqui",
+        dropImg: ps.img ? "url(" + ps.img + ")" : "none",
+        dropText: ps.img ? "Imagem carregada ✓" : "Adicionar imagem",
+        dropFg: ps.img ? "#fff" : "#9aa0a8",
+        phOpacity: ps.img ? "0" : "1",
+      },
+      onProgram: (e) => this.setState(s => ({ post:{...s.post, prog: parseInt(e.target.value,10)} })),
+      onDate: (e) => this.setState(s => ({ post:{...s.post, dateISO: e.target.value} })),
+      onSlots: (e) => this.setState(s => ({ post:{...s.post, slots: parseInt(e.target.value,10)||1} })),
+      onTitle: (e) => { const val=e.target.value; this.setState(s => ({ post:{...s.post, title: val} })); },
+      onFile: (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = ev => this.setState(s => ({ post:{...s.post, img: ev.target.result} }));
+        r.readAsDataURL(f);
+      },
+    };
+  }
+
+  filtered() {
+    const f = this.state.filter;
+    if (f===0) return this.DATA;
+    if (f===1) return this.DATA.filter(o => o.tag==="Sazonal" || o.tag==="Comercial");
+    if (f===2) return this.DATA.filter(o => o.tag==="Talento");
+    if (f===3) return this.DATA.filter(o => o.tag==="Sazonal");
+    return this.DATA;
+  }
+}
+</script>
+</body>
+</html>
