@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { OportunidadesGloboSlots } from '@/components/oportunidades/OportunidadesGloboSlots'
+import { ExcluirOportunidadeFlutuante } from '@/components/oportunidades/ExcluirOportunidadeFlutuante'
 import { listarCategoriasDeOportunidade, listarFormatosDeOportunidade, listarOportunidadesAtivas } from '@/lib/dados/oportunidades'
 import { listarProgramas } from '@/lib/dados/programas'
 import { obterSessao } from '@/lib/sessao-servidor'
@@ -22,15 +23,27 @@ export default async function PaginaOportunidades() {
     .filter((programa) => proprietario || !consultor || sessao.programasVinculados.includes(programa.id))
     .map((programa) => ({ id: programa.id, nome: programa.nome, mnemonico: programa.mnemonico }))
 
+  const oportunidadesExcluiveis = oportunidades.map((oportunidade) => ({
+    id: oportunidade.id,
+    programaId: oportunidade.programaId,
+    titulo: oportunidade.titulo,
+  }))
+
   return (
-    <OportunidadesGloboSlots
-      nomeUsuario={sessao.nome}
-      programas={programasVisiveis}
-      categorias={categorias}
-      formatos={formatos}
-      oportunidadesIniciais={oportunidades}
-      podeEditarTudo={proprietario}
-      programasEditaveis={sessao.programasVinculados}
-    />
+    <>
+      <OportunidadesGloboSlots
+        nomeUsuario={sessao.nome}
+        programas={programasVisiveis}
+        categorias={categorias}
+        formatos={formatos}
+        oportunidadesIniciais={oportunidades}
+        podeEditarTudo={proprietario}
+        programasEditaveis={sessao.programasVinculados}
+      />
+      <ExcluirOportunidadeFlutuante
+        oportunidades={oportunidadesExcluiveis}
+        programasPermitidos={consultor ? sessao.programasVinculados : []}
+      />
+    </>
   )
 }
