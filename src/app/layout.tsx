@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import { Space_Grotesk, Manrope, Poppins } from 'next/font/google'
+import { Manrope, Poppins } from 'next/font/google'
 import './globals.css'
 
-const tituloFonte = Space_Grotesk({
+const tituloFonte = Poppins({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['500', '600', '700', '800'],
   variable: '--fonte-titulo',
 })
 
@@ -14,28 +14,14 @@ const corpoFonte = Manrope({
   variable: '--fonte-corpo',
 })
 
-const vitrineTituloFonte = Poppins({
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
-  variable: '--fonte-vitrine-titulo',
-})
-
 export const metadata: Metadata = {
-  title: 'CHATBOT 2.0',
-  description: 'Consulta de disponibilidade e geração de propostas',
+  title: 'Globo Slots',
+  description: 'Oportunidades, disponibilidade e propostas comerciais dos programas Globo',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${tituloFonte.variable} ${corpoFonte.variable} ${vitrineTituloFonte.variable}`}>
-      {/*
-        suppressHydrationWarning apenas no <body>: extensões de navegador
-        (ColorZilla, Grammarly e afins) injetam atributos aqui depois que a
-        página carrega, e o React acusa diferença entre servidor e cliente por
-        algo que não é nosso. A supressão vale só para os atributos deste
-        elemento — qualquer diferença de verdade, dentro da árvore, continua
-        sendo reportada.
-      */}
+    <html lang="pt-BR" className={`${tituloFonte.variable} ${corpoFonte.variable}`}>
       <body suppressHydrationWarning>{children}</body>
     </html>
   )
