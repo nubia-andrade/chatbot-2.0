@@ -63,9 +63,12 @@ body {
 
 .vitrine-navlink {
   position: relative;
-  padding: 6px 2px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 1px;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   transition: color .15s ease;
 }
@@ -80,10 +83,19 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -7px;
+  bottom: 0;
   height: 3px;
-  border-radius: 999px;
+  border-radius: 999px 999px 0 0;
   background: #14161a;
+}
+
+.vitrine-nav-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.vitrine-nav-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .vitrine-card {
