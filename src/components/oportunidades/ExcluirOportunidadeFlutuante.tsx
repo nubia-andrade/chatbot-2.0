@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { excluirOportunidade } from '@/lib/acoes/excluir-oportunidade'
 
 type OportunidadeExcluivel = {
@@ -17,31 +17,10 @@ type Props = {
 
 export function ExcluirOportunidadeFlutuante({ oportunidades, programasPermitidos }: Props) {
   const router = useRouter()
-  const [eventoId, setEventoId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const eventoId = searchParams.get('evento')
   const [excluindo, setExcluindo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-
-  useEffect(() => {
-    const atualizar = () => setEventoId(new URLSearchParams(window.location.search).get('evento'))
-    atualizar()
-
-    const historyAny = window.history as History & { __globoSlotsReplaceState?: History['replaceState'] }
-    if (!historyAny.__globoSlotsReplaceState) {
-      const original = window.history.replaceState.bind(window.history)
-      historyAny.__globoSlotsReplaceState = original
-      window.history.replaceState = ((...args: Parameters<History['replaceState']>) => {
-        original(...args)
-        window.dispatchEvent(new Event('globo-slots-locationchange'))
-      }) as History['replaceState']
-    }
-
-    window.addEventListener('popstate', atualizar)
-    window.addEventListener('globo-slots-locationchange', atualizar)
-    return () => {
-      window.removeEventListener('popstate', atualizar)
-      window.removeEventListener('globo-slots-locationchange', atualizar)
-    }
-  }, [])
 
   const oportunidade = useMemo(
     () => oportunidades.find((item) => item.id === eventoId) ?? null,
@@ -53,12 +32,7 @@ export function ExcluirOportunidadeFlutuante({ oportunidades, programasPermitido
 
   async function confirmarExclusao() {
     if (excluindo) return
-
-    // O TypeScript não preserva o narrowing de `oportunidade` dentro da função
-    // assíncrona. Capturamos o valor atual antes de qualquer await.
     const oportunidadeAtual = oportunidade
-    if (!oportunidadeAtual) return
-
     const confirmado = window.confirm(
       `Excluir a oportunidade “${oportunidadeAtual.titulo}”?\n\nEla será removida de Oportunidades e do Calendário. Esta ação não pode ser desfeita.`,
     )
