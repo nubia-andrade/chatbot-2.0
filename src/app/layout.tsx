@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Space_Grotesk, Manrope } from 'next/font/google'
+import { Space_Grotesk, Manrope, Poppins } from 'next/font/google'
 import './globals.css'
 
 const tituloFonte = Space_Grotesk({
@@ -14,6 +14,12 @@ const corpoFonte = Manrope({
   variable: '--fonte-corpo',
 })
 
+const vitrineTituloFonte = Poppins({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800'],
+  variable: '--fonte-vitrine-titulo',
+})
+
 export const metadata: Metadata = {
   title: 'CHATBOT 2.0',
   description: 'Consulta de disponibilidade e geração de propostas',
@@ -21,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${tituloFonte.variable} ${corpoFonte.variable}`}>
+    <html lang="pt-BR" className={`${tituloFonte.variable} ${corpoFonte.variable} ${vitrineTituloFonte.variable}`}>
       {/*
         suppressHydrationWarning apenas no <body>: extensões de navegador
         (ColorZilla, Grammarly e afins) injetam atributos aqui depois que a
