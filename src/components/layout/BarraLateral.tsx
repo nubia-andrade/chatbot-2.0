@@ -12,10 +12,13 @@ type Props = {
   secoes: SecaoApp[]
 }
 
-type ItemMenu = { href: string; rotulo: string; rotuloMobile: string; secao: SecaoApp }
+type ItemMenu = { href: string; rotulo: string; rotuloMobile: string; secao: SecaoApp | null }
 
 const ITENS_MENU: ItemMenu[] = [
   { href: '/inicio', rotulo: 'Início', rotuloMobile: 'Início', secao: 'inicio' },
+  // A Vitrine é uma experiência transversal para todos os perfis autenticados:
+  // executivos consomem oportunidades e consultores também publicam ações.
+  { href: '/vitrine', rotulo: 'Vitrine', rotuloMobile: 'Vitrine', secao: null },
   { href: '/consulta', rotulo: 'Nova consulta', rotuloMobile: 'Consulta', secao: 'consulta' },
   { href: '/propostas', rotulo: 'Propostas', rotuloMobile: 'Propostas', secao: 'propostas' },
   { href: '/aprovacoes', rotulo: 'Aprovações', rotuloMobile: 'Aprovar', secao: 'aprovacoes' },
@@ -34,7 +37,7 @@ export function BarraLateral({ nome, perfis, secoes }: Props) {
   const caminhoAtual = usePathname()
   const roteador = useRouter()
   const [saindo, setSaindo] = useState(false)
-  const itens = ITENS_MENU.filter((item) => secoes.includes(item.secao))
+  const itens = ITENS_MENU.filter((item) => item.secao === null || secoes.includes(item.secao))
 
   async function encerrarSessao() {
     if (saindo) return
