@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 type ProgramaDoApp = { id: string; nome: string }
 type Props = {
@@ -83,6 +83,8 @@ function slotVisual(livres: number) {
 
 export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 'feed' }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const eventoNaUrl = searchParams.get('evento')
   const [tela, setTela] = useState<Tela>(modoInicial)
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [selecionada, setSelecionada] = useState<Oportunidade | null>(null)
@@ -106,6 +108,15 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
   }, [])
 
   const oportunidades = useMemo(() => [...locais, ...DEMO], [locais])
+
+  useEffect(() => {
+    if (!eventoNaUrl || modoInicial === 'postar') return
+    const encontrada = oportunidades.find((oportunidade) => oportunidade.id === eventoNaUrl)
+    if (!encontrada) return
+    setSelecionada(encontrada)
+    setTela('detalhe')
+  }, [eventoNaUrl, modoInicial, oportunidades])
+
   const filtradas = useMemo(() => oportunidades
     .filter((o) => {
       if (filtro === 'datas') return o.tag === 'Sazonal' || o.tag === 'Comercial'
@@ -122,7 +133,14 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
   function abrir(oportunidade: Oportunidade) {
     setSelecionada(oportunidade)
     setTela('detalhe')
+    window.history.replaceState(null, '', `/oportunidades?evento=${encodeURIComponent(oportunidade.id)}`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function voltarAoFeed() {
+    setTela('feed')
+    setSelecionada(null)
+    window.history.replaceState(null, '', '/oportunidades')
   }
 
   function alternarCurtida(id: string) {
@@ -156,7 +174,12 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
     }
     const proximas = [nova, ...locais]
     setLocais(proximas)
-    window.localStorage.setItem(CHAVE_LOCAL, JSON.stringify(proximas))
+    try {
+      window.localStorage.setItem(CHAVE_LOCAL, JSON.stringify(proximas))
+    } catch {
+      // A persistência definitiva será no Supabase. Se o navegador esgotar a
+      // cota local por causa de uma imagem grande, o card ainda permanece na sessão.
+    }
     setTela('feed')
     setPost((atual) => ({ ...atual, titulo: '', imagem: null }))
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -215,7 +238,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
     const likes = selecionada.likes + (curtidas[selecionada.id] ? 1 : 0)
     return (
       <div className="mx-auto max-w-[920px] px-5 pb-[70px] pt-7 sm:px-7">
-        <button type="button" onClick={() => setTela('feed')} className="mb-[18px] text-[14px] font-semibold text-[#6b7280]">← Voltar às oportunidades</button>
+        <button type="button" onClick={voltarAoFeed} className="mb-[18px] text-[14px] font-semibold text-[#6b7280]">← Voltar às oportunidades</button>
         <div className="grid items-start gap-[34px] md:grid-cols-[.9fr_1.1fr]">
           <Imagem oportunidade={selecionada} detalhe />
           <div className="pt-1">
@@ -265,7 +288,6 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, modoInicial = 
 }
 
 function Card({ oportunidade, curtida, aoAbrir, aoCurtir, preview = false }: { oportunidade: Oportunidade; curtida: boolean; aoAbrir: () => void; aoCurtir: () => void; preview?: boolean }) {
-  const slot = slotVisual(oportunidade.slotsLivres)
   return (
     <article onClick={preview ? undefined : aoAbrir} className={`${preview ? '' : 'vitrine-card cursor-pointer'} overflow-hidden rounded-[20px] bg-white shadow-[0_6px_20px_-12px_rgba(20,22,26,.3)]`}>
       <Imagem oportunidade={oportunidade} />
@@ -277,7 +299,6 @@ function Card({ oportunidade, curtida, aoAbrir, aoCurtir, preview = false }: { o
           <span className="ml-auto text-[12px] font-semibold text-[#c1c5cc]">{oportunidade.tag}</span>
         </div>
       </div>
-      <span className="sr-only">{slot.texto}</span>
     </article>
   )
 }
