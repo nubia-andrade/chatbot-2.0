@@ -53,14 +53,20 @@ export function ExcluirOportunidadeFlutuante({ oportunidades, programasPermitido
 
   async function confirmarExclusao() {
     if (excluindo) return
+
+    // O TypeScript não preserva o narrowing de `oportunidade` dentro da função
+    // assíncrona. Capturamos o valor atual antes de qualquer await.
+    const oportunidadeAtual = oportunidade
+    if (!oportunidadeAtual) return
+
     const confirmado = window.confirm(
-      `Excluir a oportunidade “${oportunidade.titulo}”?\n\nEla será removida de Oportunidades e do Calendário. Esta ação não pode ser desfeita.`,
+      `Excluir a oportunidade “${oportunidadeAtual.titulo}”?\n\nEla será removida de Oportunidades e do Calendário. Esta ação não pode ser desfeita.`,
     )
     if (!confirmado) return
 
     setErro(null)
     setExcluindo(true)
-    const resultado = await excluirOportunidade(oportunidade.id)
+    const resultado = await excluirOportunidade(oportunidadeAtual.id)
     if (!resultado.ok) {
       setErro(resultado.erro ?? 'Não foi possível excluir a oportunidade.')
       setExcluindo(false)
