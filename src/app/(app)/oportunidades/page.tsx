@@ -29,6 +29,8 @@ export default async function PaginaOportunidades() {
       categorias={categorias}
       formatos={formatos}
       oportunidadesIniciais={oportunidades}
+      podeEditarTudo={proprietario}
+      programasEditaveis={sessao.programasVinculados}
     />
   )
 }
