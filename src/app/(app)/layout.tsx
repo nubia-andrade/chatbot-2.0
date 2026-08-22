@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { obterSessao } from '@/lib/sessao-servidor'
-import { BarraLateral } from '@/components/layout/BarraLateral'
+import { EstruturaApp } from '@/components/layout/EstruturaApp'
 
 /**
  * Toda rota deste grupo depende da sessão de quem está logado — não faz
@@ -20,13 +20,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--canvas)]">
-      <BarraLateral
-        nome={sessao.nome}
-        perfis={sessao.perfis}
-        secoes={sessao.secoes}
-      />
-      <main className="min-w-0 flex-1 overflow-auto px-4 pb-24 pt-20 sm:px-6 md:p-10">{children}</main>
-    </div>
+    <EstruturaApp nome={sessao.nome} perfis={sessao.perfis} secoes={sessao.secoes}>
+      {children}
+    </EstruturaApp>
   )
 }
