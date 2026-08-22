@@ -1,8 +1,10 @@
 import { criarClienteServidor } from '../supabase/cliente-servidor'
 import { montarMapa, ocupaSlot } from '../dominio/formatos'
 import { encontrarProgramaId, montarIndice } from '../dominio/programas'
+import { regionalConsomeSlotNacional } from '../dominio/regional'
 import { normalizarNome } from '../dominio/texto'
 import { obterPrograma, listarApelidos } from './programas'
+import { listarAcoesRegionais } from './regional'
 
 export type InventarioDaOportunidade = {
   slotsTotal: number
@@ -21,6 +23,8 @@ type Acao = {
 type Alias = { id: string; nome_normalizado: string; cliente_id: string | null }
 type Marca = { id: string; nome_normalizado: string }
 type Relacao = { anunciante_take_id: string; marca_id: string; cliente_id_override: string | null }
+
+type Cliente = { id: string; nome: string; setor: string | null }
 
 const vazio = (erro: string): InventarioDaOportunidade => ({
   slotsTotal: 0,
@@ -41,13 +45,14 @@ export async function carregarInventarioDaOportunidade(
   if (!programa) return vazio('Programa não encontrado.')
 
   const supabase = await criarClienteServidor()
-  const [apelidos, formatos, respostaAcoes] = await Promise.all([
+  const [apelidos, formatos, respostaAcoes, acoesRegionais] = await Promise.all([
     listarApelidos(programaId),
     supabase.from('formatos').select('formato, categoria'),
     supabase
       .from('acoes_vendidas')
       .select('programa, formato, anunciante, marca')
       .eq('data_de_exibicao', dataISO),
+    regionalConsomeSlotNacional() ? listarAcoesRegionais(programaId, dataISO, dataISO) : Promise.resolve([]),
   ])
 
   if (formatos.error || respostaAcoes.error) {
@@ -64,11 +69,15 @@ export async function carregarInventarioDaOportunidade(
     (acao) => encontrarProgramaId(acao.programa, indice) === programa.id && ocupaSlot(acao.formato ?? '', mapaFormatos),
   )
 
+  // Uma ação regional pode ter várias praças, mas consome somente UM slot
+  // nacional por cliente/data, conforme a regra canônica do produto.
+  const compradoresRegionais = [...new Set(acoesRegionais.map((acao) => normalizarNome(acao.cliente_nome)).filter(Boolean))]
+  const ocupacaoRegional = compradoresRegionais.length
   const slotsTotal = Math.max(0, Math.floor(programa.slots ?? 0))
-  const slotsOcupados = acoes.length
+  const slotsOcupados = acoes.length + ocupacaoRegional
   const slotsLivres = Math.max(0, slotsTotal - slotsOcupados)
 
-  if (acoes.length === 0) {
+  if (acoes.length === 0 && compradoresRegionais.length === 0) {
     return { slotsTotal, slotsOcupados, slotsLivres, setoresCompradores: [], erro: null }
   }
 
@@ -84,12 +93,8 @@ export async function carregarInventarioDaOportunidade(
       : Promise.resolve({ data: [], error: null }),
   ])
 
-  if (aliasesResp.error || marcasResp.error) {
-    return { slotsTotal, slotsOcupados, slotsLivres, setoresCompradores: [], erro: null }
-  }
-
-  const aliases = (aliasesResp.data ?? []) as Alias[]
-  const marcas = (marcasResp.data ?? []) as Marca[]
+  const aliases = aliasesResp.error ? [] : (aliasesResp.data ?? []) as Alias[]
+  const marcas = marcasResp.error ? [] : (marcasResp.data ?? []) as Marca[]
   const aliasPorNome = new Map(aliases.map((item) => [item.nome_normalizado, item]))
   const marcaPorNome = new Map(marcas.map((item) => [item.nome_normalizado, item]))
   const aliasIds = aliases.map((item) => item.id)
@@ -119,16 +124,28 @@ export async function carregarInventarioDaOportunidade(
     if (clienteId) clienteIds.add(clienteId)
   }
 
-  if (clienteIds.size === 0) {
-    return { slotsTotal, slotsOcupados, slotsLivres, setoresCompradores: [], erro: null }
+  // Para regionais, o registro já guarda o nome oficial informado no app.
+  // A resolução pelo nome normalizado permite recuperar o setor da Carteira.
+  const clientesResp = await supabase.from('clientes').select('id, nome, setor')
+  const clientes = clientesResp.error ? [] : (clientesResp.data ?? []) as Cliente[]
+  const clientePorId = new Map(clientes.map((cliente) => [cliente.id, cliente]))
+  const clientePorNome = new Map(clientes.map((cliente) => [normalizarNome(cliente.nome), cliente]))
+
+  const setores = new Set<string>()
+  for (const id of clienteIds) {
+    const setor = clientePorId.get(id)?.setor?.trim()
+    if (setor) setores.add(setor)
+  }
+  for (const nome of compradoresRegionais) {
+    const setor = clientePorNome.get(nome)?.setor?.trim()
+    if (setor) setores.add(setor)
   }
 
-  const clientesResp = await supabase.from('clientes').select('id, setor').in('id', [...clienteIds])
-  const setores = [...new Set(
-    ((clientesResp.data ?? []) as { id: string; setor: string | null }[])
-      .map((cliente) => cliente.setor?.trim())
-      .filter((setor): setor is string => Boolean(setor)),
-  )].sort((a, b) => a.localeCompare(b, 'pt-BR'))
-
-  return { slotsTotal, slotsOcupados, slotsLivres, setoresCompradores: setores, erro: null }
+  return {
+    slotsTotal,
+    slotsOcupados,
+    slotsLivres,
+    setoresCompradores: [...setores].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    erro: null,
+  }
 }
