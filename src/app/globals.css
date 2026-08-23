@@ -3,6 +3,7 @@
 :root {
   /* Design system Globo Slots — derivado do handoff Hi-Fi de Oportunidades. */
   --marca: #14161A;
+  --marca-gradiente: linear-gradient(90deg, #05A6FF 0%, #8800F8 100%);
   --tile-a: linear-gradient(160deg, #FFD23F, #FF5E3A);
   --tile-b: linear-gradient(160deg, #12D8FA, #2D6BFF);
   --tile-c: linear-gradient(160deg, #F857A6, #7A2FF2);
@@ -54,11 +55,28 @@ body {
 }
 
 ::selection {
-  background: #ffd9cf;
+  background: #dcecff;
 }
 
 .vitrine-pop {
   font-family: var(--fonte-titulo), var(--fonte-corpo), system-ui, sans-serif;
+}
+
+.globo-slots-gradient-text {
+  display: inline-block;
+  background: var(--marca-gradiente);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.globo-slots-gradient-logo {
+  display: inline-block;
+  flex-shrink: 0;
+  background: var(--marca-gradiente);
+  -webkit-mask: url('/logo-globo-slots.svg') center / contain no-repeat;
+  mask: url('/logo-globo-slots.svg') center / contain no-repeat;
 }
 
 .vitrine-navlink {
