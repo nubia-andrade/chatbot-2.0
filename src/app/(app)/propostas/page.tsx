@@ -15,7 +15,7 @@ export default async function PaginaPropostas() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Acompanhamento comercial</p>
+          <p className="globo-slots-gradient-text text-[10.5px] font-bold uppercase tracking-[.08em]">Acompanhamento comercial</p>
           <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>
             Propostas
           </h1>
