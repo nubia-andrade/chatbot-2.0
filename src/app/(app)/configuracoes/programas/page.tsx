@@ -26,7 +26,7 @@ export default async function PaginaDeProgramas() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Programas e proposta</p>
+          <p className="globo-slots-gradient-text text-[10.5px] font-bold uppercase tracking-[.08em]">Programas e proposta</p>
           <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Programas</h1>
           <p className="mt-1 text-[13px] text-[var(--texto-3)]">
             {proprietario
