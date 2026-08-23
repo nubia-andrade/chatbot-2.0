@@ -72,6 +72,21 @@ function valorParaCampo(valor: number | null) {
   if (valor === null) return ''
   return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor)
 }
+function formatarMoedaEnquantoDigita(valor: string) {
+  const somentePermitidos = valor.replace(/[^0-9,]/g, '')
+  const primeiraVirgula = somentePermitidos.indexOf(',')
+  const parteInteiraCrua = (primeiraVirgula >= 0 ? somentePermitidos.slice(0, primeiraVirgula) : somentePermitidos).replace(/\D/g, '')
+  const parteDecimal = primeiraVirgula >= 0 ? somentePermitidos.slice(primeiraVirgula + 1).replace(/\D/g, '').slice(0, 2) : ''
+  const inteiroSemZeros = parteInteiraCrua.replace(/^0+(?=\d)/, '')
+  const inteiro = inteiroSemZeros
+    ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Number(inteiroSemZeros))
+    : primeiraVirgula >= 0 ? '0' : ''
+  return primeiraVirgula >= 0 ? `${inteiro},${parteDecimal}` : inteiro
+}
+function normalizarMoeda(valor: string) {
+  const numero = numeroDigitado(valor)
+  return numero === null ? '' : valorParaCampo(numero)
+}
 function slotVisual(livres: number) {
   if (livres <= 0) return { bg: '#eef0f2', fg: '#8a909a', borda: '#dfe2e7', texto: 'esgotado' }
   if (livres === 1) return { bg: '#ffe9e2', fg: '#c23a20', borda: '#ff5a3c', texto: '1 slot' }
@@ -384,8 +399,8 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
 
             <Bloco titulo="Condições comerciais">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Campo titulo="Valor da ação"><input inputMode="decimal" value={post.valorAcao} onChange={(e) => setPost((a) => ({ ...a, valorAcao: e.target.value }))} placeholder="Ex.: 270.000,00" className="vitrine-input" /></Campo>
-                <Campo titulo="Direitos e Conexos"><input inputMode="decimal" value={post.direitosConexos} onChange={(e) => setPost((a) => ({ ...a, direitosConexos: e.target.value }))} placeholder="Ex.: 41.796,00" className="vitrine-input" /></Campo>
+                <Campo titulo="Valor da ação"><input inputMode="decimal" value={post.valorAcao} onChange={(e) => setPost((a) => ({ ...a, valorAcao: formatarMoedaEnquantoDigita(e.target.value) }))} onBlur={() => setPost((a) => ({ ...a, valorAcao: normalizarMoeda(a.valorAcao) }))} placeholder="Ex.: 270.000,00" className="vitrine-input" /></Campo>
+                <Campo titulo="Direitos e Conexos"><input inputMode="decimal" value={post.direitosConexos} onChange={(e) => setPost((a) => ({ ...a, direitosConexos: formatarMoedaEnquantoDigita(e.target.value) }))} onBlur={() => setPost((a) => ({ ...a, direitosConexos: normalizarMoeda(a.direitosConexos) }))} placeholder="Ex.: 41.796,00" className="vitrine-input" /></Campo>
               </div>
               <Campo titulo="Custo de produção">
                 <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
@@ -393,7 +408,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
                     <option value="valor">Informar valor</option>
                     <option value="sob_consulta">Sob consulta</option>
                   </select>
-                  {post.custoProducaoTipo === 'valor' && <input inputMode="decimal" value={post.custoProducao} onChange={(e) => setPost((a) => ({ ...a, custoProducao: e.target.value }))} placeholder="Ex.: 15.000,00" className="vitrine-input" />}
+                  {post.custoProducaoTipo === 'valor' && <input inputMode="decimal" value={post.custoProducao} onChange={(e) => setPost((a) => ({ ...a, custoProducao: formatarMoedaEnquantoDigita(e.target.value) }))} onBlur={() => setPost((a) => ({ ...a, custoProducao: normalizarMoeda(a.custoProducao) }))} placeholder="Ex.: 15.000,00" className="vitrine-input" />}
                 </div>
               </Campo>
             </Bloco>
@@ -480,7 +495,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
     <div className="relative mx-auto max-w-[1180px] px-5 pb-[70px] pt-[24px] sm:px-7">
       <div className="vitrine-pop pointer-events-none absolute right-[18px] top-[2px] hidden select-none text-[118px] font-extrabold leading-[.8] tracking-[-5px] text-[rgba(20,22,26,.03)] lg:block">2026</div>
       <section className="relative max-w-[700px]">
-        <p className="text-[11.5px] font-semibold uppercase tracking-[1.8px] text-[#ff5a3c]">Oportunidades de ação</p>
+        <p className="globo-slots-gradient-text text-[11.5px] font-semibold uppercase tracking-[1.8px]">Oportunidades de ação</p>
         <h1 className="vitrine-pop mt-1.5 text-[31px] font-extrabold leading-[1.03] tracking-[-1.15px] sm:text-[36px]">Descubra onde sua marca pode entrar</h1>
         <p className="mt-2 max-w-[650px] text-[13.5px] leading-[1.45] text-[#6b7280]">Ações comemorativas, sazonais e participações de talentos dos programas Globo. Consulte condições comerciais e transforme uma oportunidade em consulta.</p>
       </section>
