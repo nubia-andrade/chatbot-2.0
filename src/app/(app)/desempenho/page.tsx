@@ -34,7 +34,7 @@ export default async function PaginaDesempenho() {
     <div className="flex flex-col gap-7">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#ff5a3c]">Desempenho comercial</p>
+          <p className="globo-slots-gradient-text text-[11px] font-bold uppercase tracking-[.12em]">Desempenho comercial</p>
           <h1 className="vitrine-pop mt-1 text-[30px] font-extrabold tracking-[-.8px] text-[#14161a]">Olá, {primeiroNome(sessao.nome)}.</h1>
           <p className="mt-1 text-[13px] text-[#6b7280]">
             {performance.programas
@@ -55,7 +55,7 @@ export default async function PaginaDesempenho() {
       {performance.executivo && (
         <section className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[#ff5a3c]">Minha atividade</p><h2 className="vitrine-pop mt-1 text-[20px] font-bold text-[#14161a]">Meu mês comercial</h2></div>
+            <div><p className="globo-slots-gradient-text text-[10.5px] font-bold uppercase tracking-[.07em]">Minha atividade</p><h2 className="vitrine-pop mt-1 text-[20px] font-bold text-[#14161a]">Meu mês comercial</h2></div>
             <Link href="/propostas" className="text-[11.5px] font-bold text-[#14161a]">Ver todas as minhas propostas →</Link>
           </div>
           <GradeMetricas metricas={performance.executivo.metricasMes} modo="executivo" />
