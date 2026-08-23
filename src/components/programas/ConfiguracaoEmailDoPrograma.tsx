@@ -104,7 +104,7 @@ export function ConfiguracaoEmailDoPrograma({
             <div>
               <p className="text-[10.5px] font-bold uppercase text-[var(--texto-3)]">Cópia (CC)</p>
               <h3 className="mt-1 text-[14px] font-bold text-[var(--texto)]">Responsáveis por {programaNome}</h3>
-              <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">Somente usuários já cadastrados no Chatbot 2.0 podem ser selecionados.</p>
+              <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">Somente usuários já cadastrados no Globo Slots podem ser selecionados.</p>
             </div>
             <span className="rounded-full bg-[#F5F3FF] px-3 py-1 text-[10.5px] font-bold text-[var(--roxo)]">{selecionados.length} selecionado{selecionados.length === 1 ? '' : 's'}</span>
           </div>
@@ -158,8 +158,7 @@ export function ConfiguracaoEmailDoPrograma({
         <div className="mt-3 overflow-hidden rounded-[16px] border border-[#E8E3EB] bg-[#F6F3F7] p-3">
           <div className="overflow-hidden rounded-[13px] bg-white shadow-sm">
             <div className="bg-[#F20A6B] px-5 py-5 text-white">
-              <p className="text-[9px] font-bold uppercase tracking-[.12em] opacity-80">Globo Publicidade</p>
-              <p className="mt-1 text-[23px] font-bold leading-tight">{programaNome}</p>
+              <p className="text-[23px] font-bold leading-tight">{programaNome}</p>
               <p className="mt-1 text-[10.5px] opacity-90">Nova proposta comercial pronta para consulta</p>
             </div>
             <div className="p-5">
