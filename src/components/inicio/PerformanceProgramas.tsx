@@ -86,7 +86,7 @@ export function PerformanceProgramas({ dados }: { dados: DadosProgramas }) {
     <section className="flex flex-col gap-4 border-t border-[var(--borda)] pt-7">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-[.07em] text-[var(--roxo)]">Meus programas</p>
+          <p className="globo-slots-gradient-text text-[10.5px] font-bold uppercase tracking-[.07em]">Meus programas</p>
           <h2 className="mt-1 text-[19px] font-bold text-[var(--texto)]">Performance dos programas</h2>
           <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">
             {individual
