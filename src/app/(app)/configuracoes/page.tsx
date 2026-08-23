@@ -93,7 +93,7 @@ export default async function PaginaConfiguracoes() {
   return (
     <div className="flex flex-col gap-7">
       <header>
-        <p className="text-[10.5px] font-bold uppercase tracking-[.08em] text-[var(--roxo)]">Administração do produto</p>
+        <p className="globo-slots-gradient-text text-[10.5px] font-bold uppercase tracking-[.08em]">Administração do produto</p>
         <h1 className="mt-1 text-[26px] font-bold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Configurações</h1>
         <p className="mt-1 max-w-[820px] text-[13px] text-[var(--texto-3)]">
           Ajuste programas e distribuição. Governança global e acessos ficam separados para reduzir risco de alterações fora do escopo do consultor.
@@ -103,7 +103,7 @@ export default async function PaginaConfiguracoes() {
       {gruposVisiveis.map((grupo) => (
         <section key={grupo.titulo} className="flex flex-col gap-3">
           <div>
-            <h2 className="text-[16px] font-bold text-[var(--texto)]">{grupo.titulo}</h2>
+            <h2 className="globo-slots-gradient-text text-[16px] font-bold">{grupo.titulo}</h2>
             <p className="mt-0.5 text-[11.5px] text-[var(--texto-3)]">{grupo.descricao}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
