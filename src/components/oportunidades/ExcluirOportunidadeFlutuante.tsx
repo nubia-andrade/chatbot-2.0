@@ -33,6 +33,7 @@ export function ExcluirOportunidadeFlutuante({ oportunidades, programasPermitido
   async function confirmarExclusao() {
     if (excluindo) return
     const oportunidadeAtual = oportunidade
+    if (!oportunidadeAtual) return
     const confirmado = window.confirm(
       `Excluir a oportunidade “${oportunidadeAtual.titulo}”?\n\nEla será removida de Oportunidades e do Calendário. Esta ação não pode ser desfeita.`,
     )

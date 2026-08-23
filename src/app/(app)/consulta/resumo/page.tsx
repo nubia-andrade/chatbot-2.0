@@ -19,15 +19,20 @@ function formatarData(dataIso: string): string {
   return `${dia}/${mes}/${ano}`
 }
 
+type ResultadoResumo = { chave: string; resumo: ResumoFinanceiroDaProposta | null; erro: string | null }
+
 export default function PassoResumo() {
   const pronto = useGuardaDoPasso('resumo')
   const { estado, finalizar, limpar } = useConsulta()
-  const [resumo, setResumo] = useState<ResumoFinanceiroDaProposta | null>(null)
-  const [erroResumo, setErroResumo] = useState<string | null>(null)
+  const [resultadoResumo, setResultadoResumo] = useState<ResultadoResumo | null>(null)
   const [gerando, setGerando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoGerarProposta | null>(null)
 
   const chaveItens = useMemo(() => JSON.stringify(estado.itens), [estado.itens])
+  const chaveAtual = `${estado.programaId}|${estado.modalidade}|${chaveItens}|${estado.incluirDigital}|${estado.incluirRedesSociais}`
+  const carregandoResumo = estado.itens.length > 0 && (!resultadoResumo || resultadoResumo.chave !== chaveAtual)
+  const resumo = !carregandoResumo && resultadoResumo?.chave === chaveAtual ? resultadoResumo.resumo : null
+  const erroResumo = !carregandoResumo && resultadoResumo?.chave === chaveAtual ? resultadoResumo.erro : null
   const totalPracas = useMemo(
     () => estado.itens.reduce((total, item) => total + item.pracas.length, 0),
     [estado.itens],
@@ -46,8 +51,7 @@ export default function PassoResumo() {
   useEffect(() => {
     if (!estado.programaId || estado.itens.length === 0) return
     let ativo = true
-    setResumo(null)
-    setErroResumo(null)
+    const chave = chaveAtual
 
     carregarResumoFinanceiro({
       programaId: estado.programaId,
@@ -57,15 +61,14 @@ export default function PassoResumo() {
       incluirRedesSociais: estado.incluirRedesSociais,
     }).then((retorno) => {
       if (!ativo) return
-      setResumo(retorno.resumo)
-      setErroResumo(retorno.erro)
+      setResultadoResumo({ chave, resumo: retorno.resumo, erro: retorno.erro })
     }).catch(() => {
-      if (ativo) setErroResumo('Não foi possível calcular os valores da proposta.')
+      if (ativo) setResultadoResumo({ chave, resumo: null, erro: 'Não foi possível calcular os valores da proposta.' })
     })
 
     return () => { ativo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado.programaId, estado.modalidade, chaveItens, estado.incluirDigital, estado.incluirRedesSociais])
+  }, [estado.programaId, estado.modalidade, chaveItens, estado.incluirDigital, estado.incluirRedesSociais, chaveAtual])
 
   if (!pronto || !estado.cliente || !estado.programaId) return <CarregandoDoPasso />
 

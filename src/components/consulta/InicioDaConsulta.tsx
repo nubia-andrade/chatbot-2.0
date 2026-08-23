@@ -63,11 +63,13 @@ export function InicioDaConsulta({ programas }: Props) {
       industria: estado.cliente.industria,
       apto_regional: estado.cliente.apto_regional,
     }
+    // Sincroniza o estado local a partir do contexto persistido só ao entrar em
+    // "nova versão" — não há manipulador de evento equivalente para isto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMarca(marcaDaVersao)
     setProgramaId(estado.programaId)
     void validarRestricao(estado.programaId, marcaDaVersao)
     // A origem da nova versão é fixa; esta validação deve rodar ao carregar a versão.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emNovaVersao, estado.cliente, estado.programaId, estado.marcaId, estado.marcaNome])
 
   const programa = programas.find((item) => item.id === programaId) ?? null

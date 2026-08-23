@@ -3,6 +3,7 @@
 import { obterPrograma } from '../dados/programas'
 import { listarDatasEspeciais } from '../dados/datas-especiais'
 import { listarPrecos } from '../dados/regional'
+import { obterSessao } from '../sessao-servidor'
 import { calcularResumoFinanceiro, type ItemParaResumoFinanceiro, type ResumoFinanceiroDaProposta } from '../dominio/resumo-financeiro'
 
 export async function carregarResumoFinanceiro(params: {
@@ -12,6 +13,9 @@ export async function carregarResumoFinanceiro(params: {
   incluirDigital: boolean
   incluirRedesSociais: boolean
 }): Promise<{ resumo: ResumoFinanceiroDaProposta | null; erro: string | null }> {
+  const sessao = await obterSessao()
+  if (!sessao) return { resumo: null, erro: 'Sessão expirada. Entre de novo.' }
+
   const programa = await obterPrograma(params.programaId)
   if (!programa) return { resumo: null, erro: 'Programa não encontrado.' }
 

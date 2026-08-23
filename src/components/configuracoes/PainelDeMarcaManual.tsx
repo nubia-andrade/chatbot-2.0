@@ -22,10 +22,7 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
   const podeSalvar = nomeMarca.trim() !== '' && Boolean(cliente) && !pendente
 
   useEffect(() => {
-    if (cliente || termoCliente.trim().length < 2) {
-      setSugestoes([])
-      return
-    }
+    if (cliente || termoCliente.trim().length < 2) return
 
     let ativo = true
     const timer = setTimeout(() => {
@@ -49,6 +46,7 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
   )
 
   const quantidadePendentes = iniciais.filter((item) => item.revisao_status === 'pendente').length
+  const sugestoesVisiveis = !cliente && termoCliente.trim().length >= 2 ? sugestoes : []
 
   function salvar() {
     if (!cliente || !nomeMarca.trim()) return
@@ -151,9 +149,9 @@ export function PainelDeMarcaManual({ iniciais }: Props) {
               />
             </label>
 
-            {!cliente && sugestoes.length > 0 && (
+            {sugestoesVisiveis.length > 0 && (
               <div className="absolute left-0 right-0 top-[68px] z-20 max-h-[260px] overflow-y-auto rounded-[10px] border border-[var(--borda-forte)] bg-white shadow-[var(--sombra-janela)]">
-                {sugestoes.map((item) => (
+                {sugestoesVisiveis.map((item) => (
                   <button
                     key={item.id}
                     type="button"

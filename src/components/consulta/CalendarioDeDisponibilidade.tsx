@@ -87,7 +87,7 @@ function rotuloDoEstado(estado: keyof typeof VISUAL, slotsLivres: number): strin
 }
 
 export function CalendarioDeDisponibilidade({ marca, programa, aoVoltar }: Props) {
-  const inicial = useMemo(mesAtual, [])
+  const inicial = useMemo(() => mesAtual(), [])
   const [ano, setAno] = useState(inicial.ano)
   const [mes, setMes] = useState(inicial.mes)
   const [resultado, setResultado] = useState<ResultadoDaDisponibilidadeMensal | null>(null)
@@ -111,10 +111,6 @@ export function CalendarioDeDisponibilidade({ marca, programa, aoVoltar }: Props
     }
   }, [ano, mes, programa.id, marca.cliente_id])
 
-  useEffect(() => {
-    setAvisoLimite(null)
-  }, [ano, mes])
-
   const dias = resultado?.dias ?? []
   const deslocamento = dias.length > 0 ? new Date(`${dias[0].data}T00:00:00Z`).getUTCDay() : 0
   const prefixoMes = `${ano}-${String(mes).padStart(2, '0')}`
@@ -129,6 +125,7 @@ export function CalendarioDeDisponibilidade({ marca, programa, aoVoltar }: Props
     const proximo = moverMes(ano, mes, deslocamentoMes)
     setAno(proximo.ano)
     setMes(proximo.mes)
+    setAvisoLimite(null)
   }
 
   function alternarData(data: string) {

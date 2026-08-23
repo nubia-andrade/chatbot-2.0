@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { OportunidadePublicada } from '@/lib/dados/oportunidades'
 
@@ -62,7 +62,7 @@ export function CalendarioGloboSlots({ oportunidades }: { oportunidades: Oportun
   const inicioMes = isoDoDia(ano, mes, 1)
   const fimMes = isoDoDia(ano, mes, totalDias)
 
-  const eventosDoMes = useMemo(() => oportunidades.filter((evento) => inicioDe(evento) <= fimMes && fimDe(evento) >= inicioMes), [oportunidades, inicioMes, fimMes])
+  const eventosDoMes = oportunidades.filter((evento) => inicioDe(evento) <= fimMes && fimDe(evento) >= inicioMes)
   const dataSelecionada = isoDoDia(ano, mes, Math.min(diaSelecionado, totalDias))
   const agenda = eventosDoMes.filter((evento) => ocorreEm(evento, dataSelecionada))
 

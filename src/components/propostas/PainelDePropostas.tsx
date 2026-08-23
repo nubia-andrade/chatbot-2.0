@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { PropostaDaLista, StatusEmailDaProposta, StatusNegociacao, StatusAprovacaoDaProposta } from '@/lib/dados/propostas'
 import { deveExibirClienteComMarca, nomePrincipalDaProposta } from '@/lib/dominio/exibicao-marca-cliente'
 import { BotaoReenviarEmail } from '@/components/propostas/BotaoReenviarEmail'
@@ -45,11 +45,24 @@ export function PainelDePropostas({ propostas, usuarioId, proprietario }: Props)
   const [periodo, setPeriodo] = useState<FiltroPeriodo>('todos')
   const [pagina, setPagina] = useState(1)
 
+  const chaveFiltros = `${busca}|${status}|${programa}|${modalidade}|${periodo}`
+  const [chaveFiltrosAnterior, setChaveFiltrosAnterior] = useState(chaveFiltros)
+  if (chaveFiltros !== chaveFiltrosAnterior) {
+    // Ajuste de estado durante a renderização: troca de filtro sempre volta
+    // para a página 1, sem precisar de um efeito reagindo depois do commit.
+    setChaveFiltrosAnterior(chaveFiltros)
+    setPagina(1)
+  }
+
   const grupos = useMemo(() => agrupar(propostas), [propostas])
   const programas = useMemo(() => [...new Set(grupos.map((grupo) => grupo.atual.programa_nome))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [grupos])
+  // `Date.now()` é impuro e não pode ser chamado durante a renderização; o
+  // inicializador preguiçoso do useState é o único lugar sancionado para lê-lo
+  // uma vez. O filtro por período usa esta referência fixa desde que a tela abriu.
+  const [agora] = useState(() => Date.now())
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase('pt-BR')
-    const agora = Date.now(); const dias = periodo === 'todos' ? null : Number(periodo)
+    const dias = periodo === 'todos' ? null : Number(periodo)
     return grupos.filter((grupo) => {
       const item = grupo.atual
       if (termo && !`${item.marca_nome ?? ''} ${item.cliente_nome} ${item.programa_nome}`.toLocaleLowerCase('pt-BR').includes(termo)) return false
@@ -59,14 +72,11 @@ export function PainelDePropostas({ propostas, usuarioId, proprietario }: Props)
       if (dias !== null && agora - new Date(item.criado_em).getTime() > dias * 86400000) return false
       return true
     })
-  }, [busca, grupos, modalidade, periodo, programa, status])
+  }, [agora, busca, grupos, modalidade, periodo, programa, status])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / ITENS_POR_PAGINA))
   const paginaSegura = Math.min(pagina, totalPaginas)
   const paginados = filtrados.slice((paginaSegura - 1) * ITENS_POR_PAGINA, paginaSegura * ITENS_POR_PAGINA)
-
-  useEffect(() => { setPagina(1) }, [busca, status, programa, modalidade, periodo])
-  useEffect(() => { if (pagina > totalPaginas) setPagina(totalPaginas) }, [pagina, totalPaginas])
 
   function limparFiltros() { setBusca(''); setStatus('todos'); setPrograma('todos'); setModalidade('todas'); setPeriodo('todos') }
 

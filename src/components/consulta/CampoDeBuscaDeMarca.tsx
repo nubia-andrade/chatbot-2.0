@@ -39,6 +39,9 @@ export function CampoDeBuscaDeMarca({ aoEscolher }: Props) {
     if (!aberto || escolhida || cliente) return
     const numero = ++consultaAtual.current
     const limpo = termo.trim()
+    // O spinner precisa acender no início do debounce, não só quando a busca
+    // termina — sem alternativa síncrona, é o próprio propósito deste efeito.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBuscando(true)
     const timer = setTimeout(async () => {
       const resultado = await buscarMarcas(limpo)

@@ -77,6 +77,9 @@ export function ProvedorDaConsulta({ children }: { children: ReactNode }) {
       const bruto = sessionStorage.getItem(CHAVE_SESSAO_CONSULTA)
       if (bruto) {
         const salvo = JSON.parse(bruto) as Partial<EstadoDaConsulta>
+        // sessionStorage só existe no cliente: não há como ler o estado salvo antes
+        // da montagem, então este é o próprio propósito de um efeito de hidratação.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEstado((atual) => ({ ...atual, ...salvo }))
       }
     } catch {
@@ -148,32 +151,26 @@ export function primeiroPassoPendente(estado: EstadoDaConsulta): 'contexto' | 'c
   return 'resumo'
 }
 
+/** O destino para onde este passo deveria redirecionar, ou nulo se pode ficar. */
+function destinoDoPasso(estado: EstadoDaConsulta, slug: 'contexto' | 'calendario' | 'resumo'): string | null {
+  if (estado.finalizada && slug !== 'resumo') return '/consulta/resumo'
+
+  const pendente = primeiroPassoPendente(estado)
+  const indexPendente = PASSOS.findIndex((passo) => passo.slug === pendente)
+  const indexEstePasso = PASSOS.findIndex((passo) => passo.slug === slug)
+
+  if (indexEstePasso > indexPendente) return PASSOS[indexPendente]?.href ?? '/consulta'
+  return null
+}
+
 export function useGuardaDoPasso(slug: 'contexto' | 'calendario' | 'resumo'): boolean {
   const { estado, hidratado } = useConsulta()
   const router = useRouter()
-  const [redirecionando, setRedirecionando] = useState(false)
+  const destino = hidratado ? destinoDoPasso(estado, slug) : null
 
   useEffect(() => {
-    if (!hidratado) return
+    if (destino) router.replace(destino)
+  }, [destino, router])
 
-    if (estado.finalizada && slug !== 'resumo') {
-      setRedirecionando(true)
-      router.replace('/consulta/resumo')
-      return
-    }
-
-    const pendente = primeiroPassoPendente(estado)
-    const indexPendente = PASSOS.findIndex((passo) => passo.slug === pendente)
-    const indexEstePasso = PASSOS.findIndex((passo) => passo.slug === slug)
-
-    if (indexEstePasso > indexPendente) {
-      setRedirecionando(true)
-      const destino = PASSOS[indexPendente]?.href ?? '/consulta'
-      router.replace(destino)
-    } else {
-      setRedirecionando(false)
-    }
-  }, [estado, hidratado, router, slug])
-
-  return hidratado && !redirecionando
+  return hidratado && !destino
 }

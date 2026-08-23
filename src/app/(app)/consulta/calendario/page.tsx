@@ -57,8 +57,6 @@ export default function PassoCalendario() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programaId, clienteId, modalidade, ano, mes, tentativa])
 
-  useEffect(() => { setAvisoLimite(null) }, [ano, mes])
-
   if (!pronto) return <CarregandoDoPasso />
   if (!estado.cliente || !programaId) return <CarregandoDoPasso />
   const cliente = estado.cliente
@@ -117,6 +115,7 @@ export default function PassoCalendario() {
     if (novoMes < 1) { novoMes = 12; novoAno -= 1 }
     else if (novoMes > 12) { novoMes = 1; novoAno += 1 }
     atualizar({ ano: novoAno, mes: novoMes })
+    setAvisoLimite(null)
   }
 
   function alternarData(data: string) {

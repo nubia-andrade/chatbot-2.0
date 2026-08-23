@@ -107,8 +107,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
   const [editando, setEditando] = useState<OportunidadePublicada | null>(null)
   const [curtidas, setCurtidas] = useState<Record<string, boolean>>({})
   const [arquivoImagem, setArquivoImagem] = useState<File | null>(null)
-  const [inventario, setInventario] = useState<InventarioDaOportunidade>(inventarioVazio)
-  const [consultandoInventario, setConsultandoInventario] = useState(false)
+  const [resultadoInventario, setResultadoInventario] = useState<{ chave: string; inventario: InventarioDaOportunidade } | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erroPublicacao, setErroPublicacao] = useState<string | null>(null)
   const [post, setPost] = useState({
@@ -139,27 +138,27 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
     if (!eventoNaUrl || modoInicial === 'postar') return
     const encontrada = oportunidades.find((oportunidade) => oportunidade.id === eventoNaUrl)
     if (!encontrada) return
+    // Sincroniza a tela com o parâmetro ?evento= da URL (deep link, voltar do
+    // navegador) — não há manipulador de evento equivalente a um link externo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelecionada(encontrada)
     setTela('detalhe')
   }, [eventoNaUrl, modoInicial, oportunidades])
 
+  const consultaDeInventarioAtiva = tela === 'postar' && post.tipoExibicao === 'data_unica' && Boolean(post.programaId) && Boolean(post.dataEvento)
+  const chaveInventario = `${post.programaId}|${post.dataEvento}`
+  const inventario = consultaDeInventarioAtiva && resultadoInventario?.chave === chaveInventario ? resultadoInventario.inventario : inventarioVazio
+  const consultandoInventario = consultaDeInventarioAtiva && resultadoInventario?.chave !== chaveInventario
+
   useEffect(() => {
-    if (tela !== 'postar' || post.tipoExibicao !== 'data_unica' || !post.programaId || !post.dataEvento) {
-      setInventario(inventarioVazio)
-      setConsultandoInventario(false)
-      return
-    }
+    if (!consultaDeInventarioAtiva) return
     let cancelado = false
-    setConsultandoInventario(true)
-    setErroPublicacao(null)
+    const chave = chaveInventario
     consultarInventarioDaOportunidade(post.programaId, post.dataEvento).then((resultado) => {
-      if (!cancelado) {
-        setInventario(resultado)
-        setConsultandoInventario(false)
-      }
+      if (!cancelado) setResultadoInventario({ chave, inventario: resultado })
     })
     return () => { cancelado = true }
-  }, [tela, post.programaId, post.tipoExibicao, post.dataEvento])
+  }, [consultaDeInventarioAtiva, chaveInventario, post.programaId, post.dataEvento])
 
   const filtradas = useMemo(() => oportunidades
     .filter((oportunidade) => filtro === 'todas' || oportunidade.categoriaId === filtro)
