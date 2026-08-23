@@ -11,7 +11,7 @@ export default async function PaginaAprovacoes() {
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[.1em] text-[var(--roxo)]">Governança comercial</p>
+          <p className="globo-slots-gradient-text text-[10px] font-bold uppercase tracking-[.1em]">Governança comercial</p>
           <h1 className="mt-1 text-[24px] font-extrabold text-[var(--texto)]" style={{ fontFamily: 'var(--fonte-titulo)' }}>Aprovações</h1>
           <p className="mt-1 max-w-[760px] text-[12px] leading-[1.5] text-[var(--texto-3)]">Revise propostas dos programas sob sua responsabilidade. O PDF só é liberado ao executivo depois da aprovação; rejeições exigem justificativa e permitem uma nova versão.</p>
         </div>
