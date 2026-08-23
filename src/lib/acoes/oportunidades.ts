@@ -23,9 +23,12 @@ function extensao(nome: string) {
 function moeda(valor: FormDataEntryValue | null): number | null {
   const texto = String(valor ?? '').trim()
   if (!texto) return null
-  let normalizado = texto.replace(/R\$/gi, '').replace(/\s/g, '')
-  if (normalizado.includes(',')) normalizado = normalizado.replace(/\./g, '').replace(',', '.')
-  normalizado = normalizado.replace(/[^0-9.-]/g, '')
+  const normalizado = texto
+    .replace(/R\$/gi, '')
+    .replace(/\s/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+    .replace(/[^0-9.-]/g, '')
   const numero = Number(normalizado)
   return Number.isFinite(numero) && numero >= 0 ? numero : null
 }
