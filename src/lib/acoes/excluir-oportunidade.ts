@@ -24,7 +24,7 @@ export async function excluirOportunidade(id: string): Promise<{ ok: boolean; er
   if (!sessao) return { ok: false, erro: 'Sua sessão expirou. Entre novamente.' }
 
   if (!temPerfil(sessao.perfis, 'consultor_programa')) {
-    return { ok: false, erro: 'Somente Consultor de programa pode excluir oportunidades.' }
+    return { ok: false, erro: 'Somente PO do produto pode excluir oportunidades.' }
   }
 
   const oportunidadeId = id.trim()

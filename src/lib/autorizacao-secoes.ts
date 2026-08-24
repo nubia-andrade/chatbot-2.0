@@ -6,6 +6,6 @@ import { podeAcessarSecao, type SecaoApp } from './dominio/perfis'
 export async function exigirAcessoASecao(secao: SecaoApp) {
   const sessao = await obterSessao()
   if (!sessao) redirect('/login')
-  if (!podeAcessarSecao(sessao.secoes, secao)) redirect('/oportunidades')
+  if (!podeAcessarSecao(sessao.secoes, secao)) redirect('/desempenho')
   return sessao
 }

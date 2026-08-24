@@ -486,7 +486,7 @@ export function OportunidadesGloboSlots({ nomeUsuario, programas, categorias, fo
             )}
 
             <button type="button" onClick={() => router.push(rotaConsulta)} className="vitrine-pop w-full rounded-[14px] bg-[#14161a] p-4 text-[16px] font-bold text-white">Gerar consulta →</button>
-            <div className="mt-[14px] flex items-center gap-2.5 text-[13px] font-medium text-[#9aa0a8]"><span className="h-7 w-7 rounded-full" style={{ background: tema.gradiente }} />Postado por {selecionada.autor} · Consultor de programa</div>
+            <div className="mt-[14px] flex items-center gap-2.5 text-[13px] font-medium text-[#9aa0a8]"><span className="h-7 w-7 rounded-full" style={{ background: tema.gradiente }} />Postado por {selecionada.autor} · PO do produto</div>
           </div>
         </div>
       </div>

@@ -42,7 +42,7 @@ export async function obterSessao(): Promise<Sessao | null> {
     .eq('permitido', true)
 
   if (!erroPermissoes && permissoes) {
-    const valoresValidos: SecaoApp[] = ['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes']
+    const valoresValidos: SecaoApp[] = ['inicio', 'oportunidades', 'consulta', 'propostas', 'aprovacoes', 'configuracoes']
     const permitidas = new Set<SecaoApp>(['inicio'])
     for (const linha of permissoes) {
       if (valoresValidos.includes(linha.secao as SecaoApp)) permitidas.add(linha.secao as SecaoApp)

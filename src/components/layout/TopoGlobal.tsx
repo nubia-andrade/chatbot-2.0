@@ -18,7 +18,7 @@ type Item = { href: string; rotulo: string; mostrar: boolean }
 const ROTULOS_PERFIL: Record<Perfil, string> = {
   executivo: 'Executivo comercial',
   executivo_regional: 'Executivo regional',
-  consultor_programa: 'Consultor de programa',
+  consultor_programa: 'PO do produto',
   proprietario: 'Proprietário',
 }
 
@@ -31,7 +31,7 @@ export function TopoGlobal({ nome, perfis, secoes }: Props) {
 
   const podePublicar = temPerfil(perfis, 'consultor_programa') || temPerfil(perfis, 'proprietario')
   const itens: Item[] = [
-    { href: '/oportunidades', rotulo: 'Oportunidades', mostrar: true },
+    { href: '/oportunidades', rotulo: 'Oportunidades', mostrar: secoes.includes('oportunidades') },
     { href: '/calendario', rotulo: 'Calendário', mostrar: true },
     { href: '/consulta', rotulo: 'Nova consulta', mostrar: secoes.includes('consulta') },
     { href: '/propostas', rotulo: 'Propostas', mostrar: secoes.includes('propostas') },

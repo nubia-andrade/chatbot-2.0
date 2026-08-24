@@ -4,10 +4,11 @@ export type Perfil =
   | 'consultor_programa'
   | 'proprietario'
 
-export type SecaoApp = 'inicio' | 'consulta' | 'propostas' | 'aprovacoes' | 'configuracoes'
+export type SecaoApp = 'inicio' | 'oportunidades' | 'consulta' | 'propostas' | 'aprovacoes' | 'configuracoes'
 
 export const SECOES_DO_APP: { valor: SecaoApp; rotulo: string }[] = [
   { valor: 'inicio', rotulo: 'Desempenho' },
+  { valor: 'oportunidades', rotulo: 'Oportunidades' },
   { valor: 'consulta', rotulo: 'Nova consulta' },
   { valor: 'propostas', rotulo: 'Propostas' },
   { valor: 'aprovacoes', rotulo: 'Aprovações' },
@@ -15,10 +16,10 @@ export const SECOES_DO_APP: { valor: SecaoApp; rotulo: string }[] = [
 ]
 
 export const SECOES_PADRAO_POR_PERFIL: Record<Perfil, SecaoApp[]> = {
-  executivo: ['inicio', 'consulta', 'propostas'],
-  executivo_regional: ['inicio', 'consulta', 'propostas'],
-  consultor_programa: ['inicio', 'propostas', 'aprovacoes', 'configuracoes'],
-  proprietario: ['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'],
+  executivo: ['inicio', 'oportunidades', 'consulta', 'propostas'],
+  executivo_regional: ['inicio', 'oportunidades', 'consulta', 'propostas'],
+  consultor_programa: ['inicio', 'oportunidades', 'propostas', 'aprovacoes', 'configuracoes'],
+  proprietario: ['inicio', 'oportunidades', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'],
 }
 
 export function temPerfil(perfis: Perfil[], procurado: Perfil): boolean {

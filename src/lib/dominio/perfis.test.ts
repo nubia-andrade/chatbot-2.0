@@ -17,17 +17,17 @@ describe('temPerfil', () => {
 })
 
 describe('seções por perfil', () => {
-  it('executivo vê somente início, nova consulta e propostas por padrão', () => {
-    expect(secoesPadraoDosPerfis(['executivo'])).toEqual(['inicio', 'consulta', 'propostas'])
+  it('executivo vê início, oportunidades, nova consulta e propostas por padrão', () => {
+    expect(secoesPadraoDosPerfis(['executivo'])).toEqual(['inicio', 'oportunidades', 'consulta', 'propostas'])
     expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'aprovacoes')).toBe(false)
     expect(podeAcessarSecao(secoesPadraoDosPerfis(['executivo']), 'configuracoes')).toBe(false)
   })
-  it('executivo regional tem as mesmas seções comerciais', () => { expect(secoesPadraoDosPerfis(['executivo_regional'])).toEqual(['inicio', 'consulta', 'propostas']) })
+  it('executivo regional tem as mesmas seções comerciais', () => { expect(secoesPadraoDosPerfis(['executivo_regional'])).toEqual(['inicio', 'oportunidades', 'consulta', 'propostas']) })
   it('perfis acumulados somam permissões, incluindo aprovações do consultor', () => {
-    expect(secoesPadraoDosPerfis(['executivo', 'consultor_programa'])).toEqual(['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'])
+    expect(secoesPadraoDosPerfis(['executivo', 'consultor_programa'])).toEqual(['inicio', 'oportunidades', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'])
   })
   it('proprietário possui todas as seções atuais', () => {
-    expect(secoesPadraoDosPerfis(['proprietario'])).toEqual(['inicio', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'])
+    expect(secoesPadraoDosPerfis(['proprietario'])).toEqual(['inicio', 'oportunidades', 'consulta', 'propostas', 'aprovacoes', 'configuracoes'])
   })
 })
 

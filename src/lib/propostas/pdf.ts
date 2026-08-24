@@ -669,7 +669,7 @@ export async function gerarPdfDaProposta(params: {
 
   pdf.setTitle(`Proposta - ${nomePrincipalDaProposta(params.marcaNome, params.clienteNome)} - ${params.programaNome}`)
   pdf.setSubject(params.modoTeste ? 'Prévia do modelo de proposta' : 'Proposta comercial')
-  pdf.setCreator('Chatbot 2.0')
+  pdf.setCreator('Globo Slots')
 
   return pdf.save()
 }

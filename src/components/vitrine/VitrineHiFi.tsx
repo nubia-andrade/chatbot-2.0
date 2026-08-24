@@ -273,7 +273,7 @@ function Topo({ view, nomeUsuario, podePostar, aoVitrine, aoCalendario, aoPostar
         </nav>
         <div className="ml-auto flex items-center gap-[14px]">
           {podePostar && <button type="button" onClick={aoPostar} className="vitrine-pop hidden items-center gap-[7px] rounded-full bg-[#14161a] px-[18px] py-[11px] text-[13.5px] font-bold text-white transition-transform active:scale-95 sm:flex">+ Postar ação</button>}
-          <Link href="/inicio" title="Voltar ao Chatbot 2.0" className="vitrine-pop flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#7c3aed,#1e90ff)] text-[13px] font-bold text-white">{iniciais(nomeUsuario)}</Link>
+          <Link href="/inicio" title="Voltar ao Globo Slots" className="vitrine-pop flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[linear-gradient(135deg,#7c3aed,#1e90ff)] text-[13px] font-bold text-white">{iniciais(nomeUsuario)}</Link>
         </div>
       </div>
       <div className="flex items-center gap-2 overflow-x-auto px-5 pb-3 md:hidden">

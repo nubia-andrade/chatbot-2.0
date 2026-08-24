@@ -20,7 +20,7 @@ type Props = {
 const OPCOES_DE_PERFIL: { valor: Perfil; rotulo: string; descricao: string }[] = [
   { valor: 'executivo', rotulo: 'Executivo', descricao: 'Consulta disponibilidade e gera as próprias propostas nacionais.' },
   { valor: 'executivo_regional', rotulo: 'Executivo regional', descricao: 'Libera também consultas e propostas regionais.' },
-  { valor: 'consultor_programa', rotulo: 'Consultor do programa', descricao: 'Administra os programas vinculados e acompanha suas propostas.' },
+  { valor: 'consultor_programa', rotulo: 'PO do produto', descricao: 'Administra os programas vinculados e acompanha suas propostas.' },
   { valor: 'proprietario', rotulo: 'Proprietário', descricao: 'Acesso administrativo completo, inclusive perfis e acessos.' },
 ]
 
@@ -155,8 +155,11 @@ export function PainelDePerfisEAcessos({ usuarios, programas, permissoesSecoes }
                     <p className="text-[12.5px] font-bold text-[var(--texto)]">{opcao.rotulo}</p>
                   </td>
                   {SECOES_DO_APP.map((secao) => {
-                    const marcado = matriz.some((item) => item.perfil === opcao.valor && item.secao === secao.valor && item.permitido)
                     const bloqueado = opcao.valor === 'proprietario' || secao.valor === 'inicio'
+                    // Bloqueado = acesso garantido pelo domínio, independente do que já foi salvo no
+                    // banco (ex.: uma seção nova antes de rodar a migration). Nunca deve exibir
+                    // desmarcado, senão a promessa de "Proprietário tem acesso completo" vira mentira.
+                    const marcado = bloqueado || matriz.some((item) => item.perfil === opcao.valor && item.secao === secao.valor && item.permitido)
                     return (
                       <td key={secao.valor} className="border-b border-[var(--borda)] px-3 py-3 text-center">
                         <input
@@ -244,7 +247,7 @@ export function PainelDePerfisEAcessos({ usuarios, programas, permissoesSecoes }
 
               {perfis.includes('consultor_programa') && (
                 <div className="mt-6 border-t border-[var(--borda)] pt-5">
-                  <h3 className="text-[13.5px] font-bold text-[var(--texto)]">Programas do consultor</h3>
+                  <h3 className="text-[13.5px] font-bold text-[var(--texto)]">Programas do PO do produto</h3>
                   <p className="mt-1 text-[11.5px] text-[var(--texto-3)]">Esses vínculos definem quais programas ele administra e quais propostas consegue acompanhar.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {programas.map((programa) => {

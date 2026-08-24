@@ -36,7 +36,7 @@ export default async function PaginaPerfisEAcessos() {
           Perfis e acessos
         </h1>
         <p className="mt-1 max-w-[820px] text-[13px] leading-[1.5] text-[var(--texto-3)]">
-          Defina os perfis de cada usuário, os programas administrados pelos consultores e quais seções do Chatbot 2.0 cada perfil pode visualizar.
+          Defina os perfis de cada usuário, os programas administrados pelos POs de produto e quais seções do Globo Slots cada perfil pode visualizar.
         </p>
       </header>
 

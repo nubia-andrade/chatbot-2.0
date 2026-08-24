@@ -330,7 +330,7 @@ export async function gerarProposta(entrada: EntradaGerarProposta): Promise<Resu
   const para = destinatarios.filter((item) => item.tipo === 'executivo')
   const cc = destinatarios.filter((item) => item.tipo === 'responsavel_programa')
   if (para.length === 0) {
-    const mensagem = 'PDF gerado, mas o executivo não possui e-mail cadastrado no Chatbot 2.0.'
+    const mensagem = 'PDF gerado, mas o executivo não possui e-mail cadastrado no Globo Slots.'
     await atualizarStatusEmail(supabase, propostaId, { email_status: 'falha', email_erro: mensagem })
     return { ...resultadoBase, destinatarios: destinatarios.map((item) => item.email), emailErro: mensagem }
   }

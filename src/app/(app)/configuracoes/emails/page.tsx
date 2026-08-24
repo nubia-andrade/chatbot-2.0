@@ -33,7 +33,7 @@ export default async function PaginaEmailsDasPropostas() {
             E-mails das propostas
           </h1>
           <p className="mt-1 max-w-[820px] text-[13px] leading-[1.55] text-[var(--texto-3)]">
-            O executivo que gera a proposta recebe em Para. Aqui você acompanha e configura os usuários do Chatbot 2.0 que recebem cópia por programa.
+            O executivo que gera a proposta recebe em Para. Aqui você acompanha e configura os usuários do Globo Slots que recebem cópia por programa.
           </p>
         </div>
         <Link href="/configuracoes" className="rounded-[10px] border border-[var(--borda-forte)] bg-white px-4 py-2.5 text-[12px] font-bold text-[var(--texto-2)]">
